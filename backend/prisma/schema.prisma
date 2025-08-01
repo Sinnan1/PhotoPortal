@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  name        String
+  role        Role      @default(CLIENT)
+  galleries   Gallery[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Gallery {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  password      String?
+  expiresAt     DateTime?
+  downloadLimit Int?      @default(0)
+  downloadCount Int       @default(0)
+  photographer  User      @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  photographerId String
+  photos        Photo[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("galleries")
+}
+
+model Photo {
+  id           String   @id @default(cuid())
+  filename     String
+  originalUrl  String
+  thumbnailUrl String
+  fileSize     Int
+  downloadCount Int     @default(0)
+  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId    String
+  createdAt    DateTime @default(now())
+
+  @@map("photos")
+}
+
+enum Role {
+  PHOTOGRAPHER
+  CLIENT
+}
