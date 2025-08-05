@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
-import { Camera, LogOut, Settings, User } from "lucide-react"
+import { Camera, LogOut, Settings, User, Heart, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -51,6 +51,19 @@ export function Navigation() {
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <Link href="/dashboard/liked">
+                      <DropdownMenuItem>
+                        <Heart className="mr-2 h-4 w-4" />
+                        <span>Liked Photos</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/dashboard/favorites">
+                      <DropdownMenuItem>
+                        <Star className="mr-2 h-4 w-4" />
+                        <span>Favorites</span>
+                      </DropdownMenuItem>
+                    </Link>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout}>
                       <LogOut className="mr-2 h-4 w-4" />

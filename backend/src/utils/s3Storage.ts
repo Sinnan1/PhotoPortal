@@ -67,12 +67,12 @@ export const uploadToS3 = async (
   
 	  await s3Client.send(thumbnailUploadCommand)
   
-	  // FIXED: Use Backblaze B2 URL format instead of AWS S3 format
-	  const bucketName = process.env.S3_BUCKET_NAME!
-	  
-	  // Backblaze B2 URL format: https://s3.us-east-005.backblazeb2.com/bucket-name/key
-	  const originalUrl = `https://s3.us-east-005.backblazeb2.com/${bucketName}/${filename}`
-	  const thumbnailUrl = `https://s3.us-east-005.backblazeb2.com/${bucketName}/${thumbnailFilename}`
+	  // Correct Path-Style URL format for Backblaze B2
+	  const bucketName = process.env.S3_BUCKET_NAME!;
+	  const endpoint = 'https://s3.us-east-005.backblazeb2.com';
+
+	  const originalUrl = `${endpoint}/${bucketName}/${filename}`;
+	  const thumbnailUrl = `${endpoint}/${bucketName}/${thumbnailFilename}`;
   
 	  return {
 		originalUrl,

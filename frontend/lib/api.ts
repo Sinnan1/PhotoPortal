@@ -2,10 +2,29 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/a
 
 function getAuthToken() {
   if (typeof document === "undefined") return null
-  return document.cookie
+  
+  // First try to get token from cookie
+  const cookieToken = document.cookie
     .split("; ")
     .find((row) => row.startsWith("auth-token="))
     ?.split("=")[1]
+  
+  if (cookieToken) return cookieToken
+  
+  // Fallback: try to get token from localStorage
+  try {
+    const user = localStorage.getItem("user")
+    if (user) {
+      const userData = JSON.parse(user)
+      // Check if we have a token stored somewhere else
+      const storedToken = localStorage.getItem("auth-token")
+      if (storedToken) return storedToken
+    }
+  } catch (error) {
+    console.error("Error reading from localStorage:", error)
+  }
+  
+  return null
 }
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
@@ -96,6 +115,54 @@ export const api = {
   // Fixed: Return the correct download URL
   downloadPhoto: (id: string, galleryId?: string) => {
     const params = galleryId ? `?galleryId=${galleryId}` : ''
-    return `${API_BASE_URL}/photos/${id}/download${params}`
+    return apiRequest(`/photos/${id}/download${params}`)
   },
+
+  // Like/Favorite APIs
+  likePhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/like`, {
+      method: "POST",
+    }),
+
+  unlikePhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/like`, {
+        method: "DELETE",
+    }),
+
+  favoritePhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/favorite`, {
+      method: "POST",
+    }),
+
+  unfavoritePhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/favorite`, {
+        method: "DELETE",
+    }),
+
+  getPhotoStatus: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/status`),
+
+  getLikedPhotos: () => apiRequest("/photos/liked"),
+
+  getFavoritedPhotos: () => apiRequest("/photos/favorited"),
+
+  likeGallery: (galleryId: string) =>
+    apiRequest(`/galleries/${galleryId}/like`, {
+        method: "POST",
+    }),
+
+  unlikeGallery: (galleryId: string) =>
+    apiRequest(`/galleries/${galleryId}/like`, {
+        method: "DELETE",
+    }),
+
+  favoriteGallery: (galleryId: string) =>
+    apiRequest(`/galleries/${galleryId}/favorite`, {
+        method: "POST",
+    }),
+
+  unfavoriteGallery: (galleryId: string) =>
+    apiRequest(`/galleries/${galleryId}/favorite`, {
+        method: "DELETE",
+    }),
 }

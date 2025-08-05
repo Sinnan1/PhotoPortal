@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { deleteFromS3 } from '../utils/s3Storage'
 
 const prisma = new PrismaClient()
 
@@ -88,6 +89,8 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						createdAt: true
 					}
 				},
+				likedBy: true,
+				favoritedBy: true,
 				_count: {
 					select: { photos: true }
 				}
@@ -116,6 +119,10 @@ export const getGallery = async (req: Request, res: Response) => {
 			where: { id },
 			include: {
 				photos: {
+					include: {
+						likedBy: true,
+						favoritedBy: true
+					},
 					orderBy: { createdAt: 'desc' }
 				},
 				photographer: {
@@ -281,7 +288,10 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 
 		// Check if gallery exists and belongs to photographer
 		const existingGallery = await prisma.gallery.findFirst({
-			where: { id, photographerId }
+			where: { id, photographerId },
+			include: {
+				photos: true
+			}
 		})
 
 		if (!existingGallery) {
@@ -291,6 +301,37 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 			})
 		}
 
+		// Delete all photos from S3 storage
+		if (existingGallery.photos.length > 0) {
+			try {
+				const deletePromises = existingGallery.photos.map(async (photo) => {
+					// Extract the S3 keys from the URLs
+					const originalUrl = new URL(photo.originalUrl);
+					const thumbnailUrl = new URL(photo.thumbnailUrl);
+					
+					// Split pathname and remove bucket name to get just the filename
+					const originalPathParts = originalUrl.pathname.split('/');
+					const thumbnailPathParts = thumbnailUrl.pathname.split('/');
+					
+					// Remove empty string and bucket name, keep the rest as the key
+					const originalKey = originalPathParts.slice(2).join('/');
+					const thumbnailKey = thumbnailPathParts.slice(2).join('/');
+					
+					return Promise.all([
+						deleteFromS3(originalKey),
+						deleteFromS3(thumbnailKey)
+					]);
+				});
+				
+				await Promise.all(deletePromises);
+				console.log(`Deleted ${existingGallery.photos.length} photos from S3 for gallery ${id}`);
+			} catch (storageError) {
+				console.error('Storage deletion error during gallery deletion:', storageError);
+				// Continue with database deletion even if storage fails
+			}
+		}
+
+		// Delete gallery from database (this will cascade delete photos due to foreign key)
 		await prisma.gallery.delete({
 			where: { id }
 		})
@@ -307,3 +348,83 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 		})
 	}
 }
+
+export const likeGallery = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.id;
+
+        const existingLike = await prisma.likedGallery.findUnique({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+
+        if (existingLike) {
+            return res.status(400).json({ success: false, error: 'Gallery already liked' });
+        }
+
+        await prisma.likedGallery.create({
+            data: { userId, galleryId: id },
+        });
+
+        res.json({ success: true, message: 'Gallery liked' });
+    } catch (error) {
+        console.error('Like gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+
+export const unlikeGallery = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.id;
+
+        await prisma.likedGallery.delete({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+
+        res.json({ success: true, message: 'Gallery unliked' });
+    } catch (error) {
+        console.error('Unlike gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+
+export const favoriteGallery = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.id;
+
+        const existingFavorite = await prisma.favoritedGallery.findUnique({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+
+        if (existingFavorite) {
+            return res.status(400).json({ success: false, error: 'Gallery already favorited' });
+        }
+
+        await prisma.favoritedGallery.create({
+            data: { userId, galleryId: id },
+        });
+
+        res.json({ success: true, message: 'Gallery favorited' });
+    } catch (error) {
+        console.error('Favorite gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+
+export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.id;
+
+        await prisma.favoritedGallery.delete({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+
+        res.json({ success: true, message: 'Gallery unfavorited' });
+    } catch (error) {
+        console.error('Unfavorite gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};

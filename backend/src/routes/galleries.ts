@@ -5,7 +5,11 @@ import {
 	getGallery,
 	verifyGalleryPassword,
 	updateGallery,
-	deleteGallery
+	deleteGallery,
+	likeGallery,
+	unlikeGallery,
+	favoriteGallery,
+	unfavoriteGallery
 } from '../controllers/galleryController'
 import { authenticateToken, requireRole } from '../middleware/auth'
 
@@ -20,5 +24,11 @@ router.delete('/:id', authenticateToken, requireRole('PHOTOGRAPHER'), deleteGall
 // Public routes (for clients to access galleries)
 router.get('/:id', getGallery)
 router.post('/:id/verify-password', verifyGalleryPassword)
+
+// Routes for liking and favoriting galleries
+router.post('/:id/like', authenticateToken, likeGallery)
+router.delete('/:id/like', authenticateToken, unlikeGallery)
+router.post('/:id/favorite', authenticateToken, favoriteGallery)
+router.delete('/:id/favorite', authenticateToken, unfavoriteGallery)
 
 export default router

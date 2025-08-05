@@ -21,6 +21,9 @@ import {
   Calendar,
   MoreHorizontal,
   Eye,
+  Heart,
+  Star,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,6 +34,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Share2, Copy } from 'lucide-react';
 
 interface Photo {
   id: string;
@@ -50,6 +62,8 @@ interface Gallery {
   createdAt: string;
   isExpired: boolean;
   photos?: Photo[]; // Add this for preview images
+  likedBy: { userId: string }[];
+  favoritedBy: { userId: string }[];
 }
 
 export default function DashboardPage() {
@@ -58,6 +72,8 @@ export default function DashboardPage() {
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedGallery, setSelectedGallery] = useState<Gallery | null>(null);
 
   useEffect(() => {
     if (user?.role === "PHOTOGRAPHER") {
@@ -88,6 +104,52 @@ export default function DashboardPage() {
     }
   };
 
+  const handleLikeGallery = async (galleryId: string) => {
+    try {
+      const gallery = galleries.find((g) => g.id === galleryId);
+      if (!gallery) return;
+
+      const isLiked = gallery.likedBy.some((like) => like.userId === user?.id);
+
+      if (isLiked) {
+        await api.unlikeGallery(galleryId);
+      } else {
+        await api.likeGallery(galleryId);
+      }
+
+      fetchGalleries();
+    } catch (error) {
+      showToast("Failed to update like status", "error");
+    }
+  };
+
+  const handleShareGallery = (gallery: Gallery) => {
+    setSelectedGallery(gallery);
+    setShowShareModal(true);
+  };
+
+  const handleFavoriteGallery = async (galleryId: string) => {
+    try {
+      const gallery = galleries.find((g) => g.id === galleryId);
+      if (!gallery) return;
+
+      const isFavorited = gallery.favoritedBy.some(
+        (favorite) => favorite.userId === user?.id
+      );
+
+      if (isFavorited) {
+        await api.unfavoriteGallery(galleryId);
+      } else {
+        await api.favoriteGallery(galleryId);
+      }
+
+      fetchGalleries();
+    } catch (error) {
+      showToast("Failed to update favorite status", "error");
+    }
+  };
+
+
   if (user?.role !== "PHOTOGRAPHER") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -112,6 +174,46 @@ export default function DashboardPage() {
           <Plus className="mr-2 h-4 w-4" />
           Create Gallery
         </Button>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Link href="/dashboard/liked">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <Heart className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Liked Photos</h3>
+                  <p className="text-gray-600">View your liked photos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/favorites">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-yellow-100 rounded-full">
+                  <Star className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Favorites</h3>
+                  <p className="text-gray-600">View your favorited photos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Galleries Section */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Galleries</h2>
       </div>
 
       {loading ? (
@@ -177,9 +279,16 @@ export default function DashboardPage() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      onClick={() => handleShareGallery(gallery)}
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       onClick={() => handleDeleteGallery(gallery.id)}
                       className="text-red-600"
                     >
+                      <Trash2 className="mr-2 h-4 w-4" />
                       Delete Gallery
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -238,6 +347,39 @@ export default function DashboardPage() {
                     <Badge variant="destructive">Expired</Badge>
                   )}
                 </div>
+
+                <div className="flex items-center justify-end gap-2 mt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleLikeGallery(gallery.id)}
+                  >
+                    <Heart
+                      className={`mr-2 h-4 w-4 ${
+                        gallery.likedBy?.some((like) => like.userId === user?.id)
+                          ? "text-red-500 fill-current"
+                          : ""
+                      }`}
+                    />
+                    {gallery.likedBy?.length || 0}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFavoriteGallery(gallery.id)}
+                  >
+                    <Star
+                      className={`mr-2 h-4 w-4 ${
+                        gallery.favoritedBy?.some(
+                          (favorite) => favorite.userId === user?.id
+                        )
+                          ? "text-yellow-500 fill-current"
+                          : ""
+                      }`}
+                    />
+                    {gallery.favoritedBy?.length || 0}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -252,6 +394,35 @@ export default function DashboardPage() {
           setShowCreateModal(false);
         }}
       />
+
+      {selectedGallery && (
+        <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share "{selectedGallery.title}"</DialogTitle>
+              <DialogDescription>
+                Anyone with this link can view the gallery.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center space-x-2">
+              <Input
+                value={`${window.location.origin}/gallery/${selectedGallery.id}`}
+                readOnly
+              />
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `${window.location.origin}/gallery/${selectedGallery.id}`
+                  );
+                  showToast("Link copied to clipboard", "success");
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
