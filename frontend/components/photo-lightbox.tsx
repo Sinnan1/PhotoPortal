@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react"
+import { PhotoActions } from "./photo-actions"
 
 interface Photo {
   id: string
@@ -63,6 +64,11 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         <X className="h-6 w-6" />
       </Button>
 
+      {/* Like/Favorite Buttons */}
+      <div className="absolute top-4 right-20 z-10">
+        <PhotoActions photoId={photo.id} />
+      </div>
+
       {/* Navigation Buttons */}
       {!isFirst && (
         <Button
@@ -108,6 +114,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           alt={photo.filename}
           width={1200}
           height={800}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="max-w-full max-h-full object-contain"
           priority
           onError={(e) => {

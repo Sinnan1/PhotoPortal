@@ -21,7 +21,6 @@ const nextConfig = {
         port: '5000',
       },
     ],
-    unoptimized: true,
   },
 }
 

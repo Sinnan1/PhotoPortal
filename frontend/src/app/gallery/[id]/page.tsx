@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -16,9 +16,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Download, Calendar, User, Images, Loader2 } from "lucide-react";
+import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
+import JSZip from "jszip";
+import { PhotoGrid } from "@/components/photo-grid";
+import { useAuth } from "@/lib/auth-context";
 
 interface Photo {
   id: string;
@@ -26,6 +29,8 @@ interface Photo {
   thumbnailUrl: string;
   originalUrl: string;
   createdAt: string;
+  likedBy: { userId: string }[];
+  favoritedBy: { userId: string }[];
 }
 
 interface Gallery {
@@ -46,6 +51,7 @@ export default function GalleryPage() {
   const params = useParams();
   const galleryId = params.id as string;
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [gallery, setGallery] = useState<Gallery | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,23 +59,13 @@ export default function GalleryPage() {
   const [password, setPassword] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
 
   useEffect(() => {
     fetchGallery();
   }, [galleryId]);
-
-  useEffect(() => {
-    if (gallery?.photos) {
-      console.log(
-        "Photo URLs:",
-        gallery.photos.map((p) => ({
-          filename: p.filename,
-          thumbnailUrl: p.thumbnailUrl,
-          originalUrl: p.originalUrl,
-        }))
-      );
-    }
-  }, [gallery]);
 
   const fetchGallery = async () => {
     try {
@@ -101,10 +97,108 @@ export default function GalleryPage() {
     }
   };
 
-  const handleDownload = (photoId: string) => {
-    const downloadUrl = api.downloadPhoto(photoId, galleryId);
-    window.open(downloadUrl, "_blank");
+  const handleDownload = async (photoId: string) => {
+    try {
+      const response = await api.downloadPhoto(photoId, galleryId);
+      const { downloadUrl, filename } = response.data;
+
+      // Fetch the image data
+      const imageResponse = await fetch(downloadUrl);
+      const imageBlob = await imageResponse.blob();
+
+      // Create a temporary link to trigger the download
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(imageBlob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error("Download failed", error);
+      showToast("Download failed", "error");
+    }
   };
+
+  const handleDownloadAll = async () => {
+    if (!gallery || gallery.photos.length === 0) {
+      showToast("No photos to download", "info");
+      return;
+    }
+
+    setIsDownloadingAll(true);
+    showToast("Preparing download...", "info");
+
+    try {
+      const zip = new JSZip();
+      const photoPromises = gallery.photos.map(async (photo) => {
+        try {
+          const response = await fetch(photo.originalUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${photo.filename}`);
+          }
+          const blob = await response.blob();
+          zip.file(photo.filename, blob);
+        } catch (error) {
+          console.error(`Failed to download ${photo.filename}:`, error);
+          // Optionally, notify the user about failed files
+        }
+      });
+
+      await Promise.all(photoPromises);
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `${gallery.title.replace(/\s+/g, '_')}_photos.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast("Download started!", "success");
+    } catch (error) {
+      console.error("Failed to create zip file", error);
+      showToast("Failed to create zip file", "error");
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
+
+  const handleDelete = async (photoId: string) => {
+    try {
+      await api.deletePhoto(photoId);
+      setGallery((prevGallery) => {
+        if (!prevGallery) return null;
+        return {
+          ...prevGallery,
+          photos: prevGallery.photos.filter((p) => p.id !== photoId),
+        };
+      });
+      showToast("Photo deleted", "success");
+    } catch (error) {
+      console.error("Failed to delete photo", error);
+      showToast("Failed to delete photo", "error");
+    }
+  };
+
+  const handleImageError = (photoId: string) => {
+    setImageErrors(prev => new Set(prev).add(photoId));
+  };
+
+  const filteredPhotos = useMemo(() => {
+    if (!gallery) return [];
+    if (filter === "liked") {
+      return gallery.photos.filter((photo) =>
+        photo.likedBy.some((like) => like.userId === user?.id)
+      );
+    }
+    if (filter === "favorited") {
+      return gallery.photos.filter((photo) =>
+        photo.favoritedBy.some((favorite) => favorite.userId === user?.id)
+      );
+    }
+    return gallery.photos;
+  }, [gallery, filter, user]);
 
   if (loading) {
     return (
@@ -179,13 +273,25 @@ export default function GalleryPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Gallery Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">{gallery.title}</h1>
-          {gallery.downloadLimit && (
-            <Badge variant="outline">
-              {gallery.downloadCount}/{gallery.downloadLimit} downloads
-            </Badge>
-          )}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 sm:mb-0">{gallery.title}</h1>
+          <div className="flex items-center space-x-2">
+            {gallery.photos.length > 0 && (
+              <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                {isDownloadingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download All
+              </Button>
+            )}
+            {gallery.downloadLimit && (
+              <Badge variant="outline">
+                {gallery.downloadCount}/{gallery.downloadLimit} downloads
+              </Badge>
+            )}
+          </div>
         </div>
 
         {gallery.description && (
@@ -210,58 +316,49 @@ export default function GalleryPage() {
         </div>
       </div>
 
-
+      {/* Filter Buttons */}
+      <div className="flex justify-end gap-2 mb-4">
+        <Button
+          variant={filter === "all" ? "secondary" : "ghost"}
+          onClick={() => setFilter("all")}
+        >
+          All ({gallery.photos.length})
+        </Button>
+        <Button
+          variant={filter === "liked" ? "secondary" : "ghost"}
+          onClick={() => setFilter("liked")}
+        >
+          <Heart className="mr-2 h-4 w-4" />
+          Liked ({gallery.photos.filter(p => p.likedBy.some(l => l.userId === user?.id)).length})
+        </Button>
+        <Button
+          variant={filter === "favorited" ? "secondary" : "ghost"}
+          onClick={() => setFilter("favorited")}
+        >
+          <Star className="mr-2 h-4 w-4" />
+          Favorited ({gallery.photos.filter(p => p.favoritedBy.some(f => f.userId === user?.id)).length})
+        </Button>
+      </div>
 
       {/* Photo Grid */}
-      {gallery.photos.length === 0 ? (
+      {filteredPhotos.length === 0 ? (
         <div className="text-center py-12">
           <Images className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">
-            No photos yet
+            No photos to display
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            Photos will appear here once uploaded.
+            {filter === "all" ? "This gallery is empty." : `You have no ${filter} photos in this gallery.`}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {gallery.photos.map((photo, index) => (
-            <div
-              key={photo.id}
-              className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
-            >
-              {/* Using original URLs for better quality in gallery grid */}
-              <img
-                src={photo.originalUrl || "/placeholder.svg"}
-                alt={photo.filename}
-                className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
-                onClick={() => setSelectedPhoto(photo)}
-                onError={(e) => {
-                  console.error('Image failed to load:', photo.originalUrl);
-                  // Fallback to thumbnail if original fails
-                  const target = e.target as HTMLImageElement;
-                  target.src = photo.thumbnailUrl || "/placeholder.svg";
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully:', photo.filename);
-                }}
-                crossOrigin="anonymous"
-              />
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                <Button
-                  size="sm"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload(photo.id);
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <PhotoGrid
+          photos={filteredPhotos}
+          onView={setSelectedPhoto}
+          onDownload={handleDownload}
+          onDelete={handleDelete}
+          columns={{ sm: 2, md: 3, lg: 4 }}
+        />
       )}
 
       {/* Photo Lightbox */}

@@ -11,47 +11,99 @@ datasource db {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  password    String
-  name        String
-  role        Role      @default(CLIENT)
-  galleries   Gallery[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  password           String
+  name               String
+  role               Role               @default(CLIENT)
+  galleries          Gallery[]
+  likedPhotos        LikedPhoto[]
+  favoritedPhotos    FavoritedPhoto[]
+  likedGalleries     LikedGallery[]
+  favoritedGalleries FavoritedGallery[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@map("users")
 }
 
 model Gallery {
-  id            String    @id @default(cuid())
-  title         String
-  description   String?
-  password      String?
-  expiresAt     DateTime?
-  downloadLimit Int?      @default(0)
-  downloadCount Int       @default(0)
-  photographer  User      @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  id             String             @id @default(cuid())
+  title          String
+  description    String?
+  password       String?
+  expiresAt      DateTime?
+  downloadLimit  Int?               @default(0)
+  downloadCount  Int                @default(0)
+  photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
   photographerId String
-  photos        Photo[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  photos         Photo[]
+  likedBy        LikedGallery[]
+  favoritedBy    FavoritedGallery[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@map("galleries")
 }
 
 model Photo {
-  id           String   @id @default(cuid())
-  filename     String
-  originalUrl  String
-  thumbnailUrl String
-  fileSize     Int
-  downloadCount Int     @default(0)
-  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  galleryId    String
-  createdAt    DateTime @default(now())
+  id            String           @id @default(cuid())
+  filename      String
+  originalUrl   String
+  thumbnailUrl  String
+  fileSize      Int
+  downloadCount Int              @default(0)
+  gallery       Gallery          @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId     String
+  likedBy       LikedPhoto[]
+  favoritedBy   FavoritedPhoto[]
+  createdAt     DateTime         @default(now())
 
   @@map("photos")
+}
+
+model LikedPhoto {
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  photoId String
+  createdAt DateTime @default(now())
+
+  @@id([userId, photoId])
+  @@map("liked_photos")
+}
+
+model FavoritedPhoto {
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  photoId String
+  createdAt DateTime @default(now())
+
+  @@id([userId, photoId])
+  @@map("favorited_photos")
+}
+
+model LikedGallery {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId String
+  createdAt DateTime @default(now())
+
+  @@id([userId, galleryId])
+  @@map("liked_galleries")
+}
+
+model FavoritedGallery {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId String
+  createdAt DateTime @default(now())
+
+  @@id([userId, galleryId])
+  @@map("favorited_galleries")
 }
 
 enum Role {

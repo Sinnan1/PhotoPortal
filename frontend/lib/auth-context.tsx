@@ -110,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
     localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
     router.push("/dashboard");
   };
@@ -137,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
     localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
     router.push("/dashboard");
   };

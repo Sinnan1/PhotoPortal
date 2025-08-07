@@ -3,7 +3,11 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Trash2 } from "lucide-react";
+import { Download, Eye, Trash2, Heart, Star } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
+import { useState } from "react";
 
 interface Photo {
   id: string;
@@ -13,6 +17,8 @@ interface Photo {
   fileSize?: number;
   downloadCount?: number;
   createdAt: string;
+  likedBy: { userId: string }[];
+  favoritedBy: { userId: string }[];
 }
 
 interface PhotoGridProps {
@@ -41,6 +47,10 @@ export function PhotoGrid({
   columns = { sm: 2, md: 3, lg: 4 },
   className = "",
 }: PhotoGridProps) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [photoState, setPhotoState] = useState(photos);
+
   const handleDownload = (photoId: string) => {
     if (onDownload) {
       onDownload(photoId);
@@ -50,6 +60,68 @@ export function PhotoGrid({
   const handleDelete = (photoId: string) => {
     if (onDelete && confirm("Are you sure you want to delete this photo?")) {
       onDelete(photoId);
+    }
+  };
+
+  const handleLikePhoto = async (photoId: string) => {
+    try {
+      const photo = photoState.find((p) => p.id === photoId);
+      if (!photo) return;
+
+      const isLiked = photo.likedBy.some((like) => like.userId === user?.id);
+
+      if (isLiked) {
+        await api.unlikePhoto(photoId);
+      } else {
+        await api.likePhoto(photoId);
+      }
+
+      // Optimistically update the UI
+      const updatedPhotos = photoState.map((p) => {
+        if (p.id === photoId) {
+          if (isLiked) {
+            return { ...p, likedBy: p.likedBy.filter((like) => like.userId !== user?.id) };
+          } else {
+            return { ...p, likedBy: [...p.likedBy, { userId: user!.id }] };
+          }
+        }
+        return p;
+      });
+      setPhotoState(updatedPhotos);
+
+    } catch (error) {
+      showToast("Failed to update like status", "error");
+    }
+  };
+
+  const handleFavoritePhoto = async (photoId: string) => {
+    try {
+      const photo = photoState.find((p) => p.id === photoId);
+      if (!photo) return;
+
+      const isFavorited = photo.favoritedBy.some((favorite) => favorite.userId === user?.id);
+
+      if (isFavorited) {
+        await api.unfavoritePhoto(photoId);
+      } else {
+        await api.favoritePhoto(photoId);
+      }
+
+      // Optimistically update the UI
+      const updatedPhotos = photoState.map((p) => {
+        if (p.id === photoId) {
+          if (isFavorited) {
+            return { ...p, favoritedBy: p.favoritedBy.filter((favorite) => favorite.userId !== user?.id) };
+          } else {
+            return { ...p, favoritedBy: [...p.favoritedBy, { userId: user!.id }] };
+          }
+        }
+        return p;
+      });
+      setPhotoState(updatedPhotos);
+
+    } catch (error) {
+      showToast("Failed to update favorite status", "error");
     }
   };
 
@@ -80,7 +152,7 @@ export function PhotoGrid({
     return breakpoints.join(", ");
   };
 
-  if (photos.length === 0) {
+  if (photoState.length === 0) {
     return (
       <div className="text-center py-12">
         <Eye className="mx-auto h-12 w-12 text-gray-400" />
@@ -96,7 +168,7 @@ export function PhotoGrid({
 
   return (
     <div className={getGridClasses()}>
-      {photos.map((photo, index) => (
+      {photoState.map((photo, index) => (
         <div
           key={photo.id}
           className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
@@ -156,6 +228,46 @@ export function PhotoGrid({
                 </Button>
               )}
             </div>
+          </div>
+
+          {/* Like/Favorite buttons */}
+          <div className="absolute top-2 right-2 flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLikePhoto(photo.id);
+              }}
+            >
+              <Heart
+                className={`h-5 w-5 ${
+                  photo.likedBy?.some((like) => like.userId === user?.id)
+                    ? "text-red-500 fill-current"
+                    : ""
+                }`}
+              />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFavoritePhoto(photo.id);
+              }}
+            >
+              <Star
+                className={`h-5 w-5 ${
+                  photo.favoritedBy?.some(
+                    (favorite) => favorite.userId === user?.id
+                  )
+                    ? "text-yellow-500 fill-current"
+                    : ""
+                }`}
+              />
+            </Button>
           </div>
 
           {/* Photo info overlay for admin */}
