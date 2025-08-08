@@ -428,3 +428,135 @@ export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 };
+
+export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
+	try {
+		const { id } = req.params
+		const { clientIds, access } = req.body // access is a boolean
+		const photographerId = req.user!.id
+
+		// Verify gallery belongs to photographer
+		const gallery = await prisma.gallery.findFirst({
+			where: { id, photographerId }
+		})
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: 'Gallery not found or access denied'
+			})
+		}
+
+		if (access) {
+			await prisma.galleryAccess.createMany({
+				data: clientIds.map((clientId: string) => ({
+					galleryId: id,
+					userId: clientId
+				})),
+				skipDuplicates: true
+			})
+		} else {
+			await prisma.galleryAccess.deleteMany({
+				where: {
+					galleryId: id,
+					userId: { in: clientIds }
+				}
+			})
+		}
+
+		res.json({ success: true })
+	} catch (error) {
+		console.error('Update gallery access error:', error)
+		res.status(500).json({ success: false, error: 'Internal server error' })
+	}
+}
+
+export const getAllowedClients = async (req: AuthRequest, res: Response) => {
+	try {
+		const { id } = req.params
+		const photographerId = req.user!.id
+
+		// Verify gallery belongs to photographer
+		const gallery = await prisma.gallery.findFirst({
+			where: { id, photographerId }
+		})
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: 'Gallery not found or access denied'
+			})
+		}
+
+		const clients = await prisma.galleryAccess.findMany({
+			where: { galleryId: id },
+			include: {
+				user: {
+					select: {
+						id: true,
+						email: true,
+						name: true
+					}
+				}
+			}
+		})
+
+		res.json({ success: true, data: clients })
+	} catch (error) {
+		console.error('Get allowed clients error:', error)
+		res.status(500).json({ success: false, error: 'Internal server error' })
+	}
+}
+
+export const getClientGalleries = async (req: AuthRequest, res: Response) => {
+	try {
+		const clientId = req.user!.id
+
+		// Get galleries that the client has access to
+		const accessibleGalleries = await prisma.galleryAccess.findMany({
+			where: { userId: clientId },
+			include: {
+				gallery: {
+					include: {
+						photographer: {
+							select: { id: true, name: true, email: true }
+						},
+						photos: {
+							select: {
+								id: true,
+								filename: true,
+								thumbnailUrl: true,
+								createdAt: true
+							}
+						},
+						likedBy: true,
+						favoritedBy: true,
+						_count: {
+							select: { photos: true }
+						}
+					}
+				}
+			},
+			orderBy: {
+				gallery: {
+					createdAt: 'desc'
+				}
+			}
+		})
+
+		// Transform the data to match the expected format
+		const galleries = accessibleGalleries.map((access) => ({
+			...access.gallery,
+			photoCount: access.gallery._count.photos,
+			isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
+		}))
+
+		res.json({
+			success: true,
+			data: galleries
+		})
+	} catch (error) {
+		console.error('Get client galleries error:', error)
+		res.status(500).json({ success: false, error: 'Internal server error' })
+	}
+}

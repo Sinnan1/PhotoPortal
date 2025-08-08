@@ -12,4 +12,12 @@ router.delete('/:id', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGR
 // Public routes (for clients to access galleries)
 router.get('/:id', galleryController_1.getGallery);
 router.post('/:id/verify-password', galleryController_1.verifyGalleryPassword);
+// Routes for liking and favoriting galleries
+router.post('/:id/like', auth_1.authenticateToken, galleryController_1.likeGallery);
+router.delete('/:id/like', auth_1.authenticateToken, galleryController_1.unlikeGallery);
+router.post('/:id/favorite', auth_1.authenticateToken, galleryController_1.favoriteGallery);
+router.delete('/:id/favorite', auth_1.authenticateToken, galleryController_1.unfavoriteGallery);
+// Routes for managing client access to galleries
+router.put('/:id/access', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), galleryController_1.updateGalleryAccess);
+router.get('/:id/allowed-clients', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), galleryController_1.getAllowedClients);
 exports.default = router;

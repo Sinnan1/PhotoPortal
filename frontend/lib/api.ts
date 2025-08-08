@@ -63,8 +63,19 @@ export const api = {
       body: JSON.stringify(userData),
     }),
 
+  // Client-specific auth
+  clientLogin: (credentials: { email: string; password: string }) =>
+    apiRequest("/auth/client-login", {
+      method: "POST",
+      body: JSON.stringify(credentials),
+    }),
+
+  getClientProfile: () => apiRequest("/auth/client-profile"),
+
   // Gallery APIs - Fixed endpoints to match your backend
   getGalleries: () => apiRequest("/galleries"),
+  
+  getClientGalleries: () => apiRequest("/galleries/client/accessible"),
 
   createGallery: (galleryData: any) =>
     apiRequest("/galleries", {
@@ -88,6 +99,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+
+  // Gallery Access Control APIs
+  updateGalleryAccess: (galleryId: string, clientIds: string[], access: boolean) =>
+    apiRequest(`/galleries/${galleryId}/access`, {
+      method: "PUT",
+      body: JSON.stringify({ clientIds, access }),
+    }),
+
+  getAllowedClients: (galleryId: string) =>
+    apiRequest(`/galleries/${galleryId}/allowed-clients`),
 
   // Photo APIs - Fixed endpoints
   uploadPhotos: (galleryId: string, formData: FormData) => {
@@ -165,4 +186,27 @@ export const api = {
     apiRequest(`/galleries/${galleryId}/favorite`, {
         method: "DELETE",
     }),
+
+  // Client Management APIs
+  createClient: (clientData: { email: string; password: string; name: string }) =>
+    apiRequest("/photographers/clients", {
+      method: "POST",
+      body: JSON.stringify(clientData),
+    }),
+
+  getClients: () => apiRequest("/photographers/clients"),
+
+  removeClient: (clientId: string) =>
+    apiRequest(`/photographers/clients/${clientId}`, {
+      method: "DELETE",
+    }),
+
+  // Analytics/Dashboard APIs
+  getTotals: () => apiRequest("/photographers/stats/totals"),
+
+  getMostLikedPhotos: () => apiRequest("/photographers/stats/most-liked-photos"),
+
+  getMostFavoritedPhotos: () => apiRequest("/photographers/stats/most-favorited-photos"),
+
+  getMostViewedGalleries: () => apiRequest("/photographers/stats/most-viewed-galleries"),
 }

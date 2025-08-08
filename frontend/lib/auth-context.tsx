@@ -15,6 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
+  clientLogin: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -115,6 +116,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
+  const clientLogin = async (email: string, password: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/auth/client-login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Login failed");
+    }
+
+    // Your backend response structure: { success: true, data: { user: {...}, token: "..." } }
+    const { user: userData, token } = data.data;
+
+    document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
+    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
+    setUser(userData);
+    router.push("/dashboard/client");
+  };
+
   const register = async (registerData: RegisterData) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
@@ -152,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, clientLogin, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
