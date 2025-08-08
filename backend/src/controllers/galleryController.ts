@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { deleteFromS3 } from '../utils/s3Storage'
+import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient()
 
@@ -115,7 +116,7 @@ export const getGallery = async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params
 
-		const gallery = await prisma.gallery.findUnique({
+        const gallery = await prisma.gallery.findUnique({
 			where: { id },
 			include: {
 				photos: {
@@ -145,6 +146,50 @@ export const getGallery = async (req: Request, res: Response) => {
 				error: 'Gallery has expired'
 			})
 		}
+
+        // If gallery is password-protected, enforce access rules
+        if (gallery.password) {
+            let isAuthorized = false
+
+            // 1) If user is authenticated, allow if photographer owner or client with access
+            const authHeader = req.headers['authorization']
+            const token = authHeader && (authHeader as string).split(' ')[1]
+            if (token) {
+                try {
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+                    const userId = decoded.userId as string
+
+                    // Photographer who owns the gallery
+                    if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+                        isAuthorized = true
+                    } else {
+                        // Client with explicit access
+                        const hasAccess = await prisma.galleryAccess.findUnique({
+                            where: { userId_galleryId: { userId, galleryId: id } }
+                        })
+                        if (hasAccess) isAuthorized = true
+                    }
+                } catch {
+                    // ignore token errors; will fall back to password header
+                }
+            }
+
+            // 2) If not authorized yet, validate provided password (via header or query)
+            if (!isAuthorized) {
+                const providedPassword =
+                    (req.headers['x-gallery-password'] as string | undefined) ||
+                    (req.query.password as string | undefined)
+
+                if (!providedPassword) {
+                    return res.status(401).json({ success: false, error: 'Password required' })
+                }
+
+                const isValidPassword = await bcrypt.compare(providedPassword, gallery.password)
+                if (!isValidPassword) {
+                    return res.status(401).json({ success: false, error: 'Invalid password' })
+                }
+            }
+        }
 
 		res.json({
 			success: true,

@@ -72,7 +72,7 @@ export default function GalleryPage() {
       const response = await api.getGallery(galleryId);
       setGallery(response.data);
     } catch (error: any) {
-      if (error.message.includes("password")) {
+      if (error.message.toLowerCase().includes("password")) {
         setPasswordRequired(true);
       } else {
         showToast("Failed to load gallery", "error");
@@ -87,9 +87,10 @@ export default function GalleryPage() {
     setVerifying(true);
 
     try {
-      await api.verifyGalleryPassword(galleryId, password);
+      // Re-fetch gallery providing password header so backend authorizes
+      const response = await api.getGallery(galleryId, password);
+      setGallery(response.data);
       setPasswordRequired(false);
-      fetchGallery();
     } catch (error) {
       showToast("Incorrect password", "error");
     } finally {
@@ -133,15 +134,15 @@ export default function GalleryPage() {
       const zip = new JSZip();
       const photoPromises = gallery.photos.map(async (photo) => {
         try {
-          const response = await fetch(photo.originalUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch ${photo.filename}`);
-          }
+          // Use backend download endpoint to enforce limits and count
+          const resp = await api.downloadPhoto(photo.id, galleryId);
+          const { downloadUrl, filename } = resp.data;
+          const response = await fetch(downloadUrl);
+          if (!response.ok) throw new Error(`Failed to fetch ${filename}`);
           const blob = await response.blob();
-          zip.file(photo.filename, blob);
+          zip.file(filename, blob);
         } catch (error) {
           console.error(`Failed to download ${photo.filename}:`, error);
-          // Optionally, notify the user about failed files
         }
       });
 
@@ -187,16 +188,8 @@ export default function GalleryPage() {
 
   const filteredPhotos = useMemo(() => {
     if (!gallery) return [];
-    if (filter === "liked") {
-      return gallery.photos.filter((photo) =>
-        photo.likedBy.some((like) => like.userId === user?.id)
-      );
-    }
-    if (filter === "favorited") {
-      return gallery.photos.filter((photo) =>
-        photo.favoritedBy.some((favorite) => favorite.userId === user?.id)
-      );
-    }
+    if (filter === "liked") return gallery.photos.filter((p) => p.likedBy?.length > 0);
+    if (filter === "favorited") return gallery.photos.filter((p) => p.favoritedBy?.length > 0);
     return gallery.photos;
   }, [gallery, filter, user]);
 
@@ -286,6 +279,88 @@ export default function GalleryPage() {
                 Download All
               </Button>
             )}
+            {gallery.photos.some((p) => p.likedBy?.length > 0) && (
+              <Button onClick={async () => {
+                setIsDownloadingAll(true);
+                try {
+                  const liked = gallery.photos.filter((p) => p.likedBy?.length > 0);
+                  const zip = new JSZip();
+                  await Promise.all(liked.map(async (photo) => {
+                    try {
+                      const resp = await api.downloadPhoto(photo.id, galleryId);
+                      const { downloadUrl, filename } = resp.data;
+                      const fileResp = await fetch(downloadUrl);
+                      if (!fileResp.ok) throw new Error(`Failed to fetch ${filename}`);
+                      const blob = await fileResp.blob();
+                      zip.file(filename, blob);
+                    } catch (err) {
+                      console.error(`Failed to download ${photo.filename}:`, err);
+                    }
+                  }));
+                  const zipBlob = await zip.generateAsync({ type: "blob" });
+                  const link = document.createElement("a");
+                  link.href = URL.createObjectURL(zipBlob);
+                  link.download = `${gallery.title.replace(/\s+/g, '_')}_liked.zip`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  showToast("Download started!", "success");
+                } catch (e) {
+                  console.error(e);
+                  showToast("Failed to create zip file", "error");
+                } finally {
+                  setIsDownloadingAll(false);
+                }
+              }} disabled={isDownloadingAll}>
+                {isDownloadingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download Liked
+              </Button>
+            )}
+            {gallery.photos.some((p) => p.favoritedBy?.length > 0) && (
+              <Button onClick={async () => {
+                setIsDownloadingAll(true);
+                try {
+                  const fav = gallery.photos.filter((p) => p.favoritedBy?.length > 0);
+                  const zip = new JSZip();
+                  await Promise.all(fav.map(async (photo) => {
+                    try {
+                      const resp = await api.downloadPhoto(photo.id, galleryId);
+                      const { downloadUrl, filename } = resp.data;
+                      const fileResp = await fetch(downloadUrl);
+                      if (!fileResp.ok) throw new Error(`Failed to fetch ${filename}`);
+                      const blob = await fileResp.blob();
+                      zip.file(filename, blob);
+                    } catch (err) {
+                      console.error(`Failed to download ${photo.filename}:`, err);
+                    }
+                  }));
+                  const zipBlob = await zip.generateAsync({ type: "blob" });
+                  const link = document.createElement("a");
+                  link.href = URL.createObjectURL(zipBlob);
+                  link.download = `${gallery.title.replace(/\s+/g, '_')}_favorites.zip`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  showToast("Download started!", "success");
+                } catch (e) {
+                  console.error(e);
+                  showToast("Failed to create zip file", "error");
+                } finally {
+                  setIsDownloadingAll(false);
+                }
+              }} disabled={isDownloadingAll}>
+                {isDownloadingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download Favorites
+              </Button>
+            )}
             {gallery.downloadLimit && (
               <Badge variant="outline">
                 {gallery.downloadCount}/{gallery.downloadLimit} downloads
@@ -329,14 +404,14 @@ export default function GalleryPage() {
           onClick={() => setFilter("liked")}
         >
           <Heart className="mr-2 h-4 w-4" />
-          Liked ({gallery.photos.filter(p => p.likedBy.some(l => l.userId === user?.id)).length})
+          Liked ({gallery.photos.filter(p => p.likedBy?.length > 0).length})
         </Button>
         <Button
           variant={filter === "favorited" ? "secondary" : "ghost"}
           onClick={() => setFilter("favorited")}
         >
           <Star className="mr-2 h-4 w-4" />
-          Favorited ({gallery.photos.filter(p => p.favoritedBy.some(f => f.userId === user?.id)).length})
+          Favorited ({gallery.photos.filter(p => p.favoritedBy?.length > 0).length})
         </Button>
       </div>
 

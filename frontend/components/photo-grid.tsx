@@ -250,11 +250,7 @@ export function PhotoGrid({
               }}
             >
               <Heart
-                className={`h-5 w-5 ${
-                  photo.likedBy?.some((like) => like.userId === user?.id)
-                    ? "text-red-500 fill-current"
-                    : ""
-                }`}
+                className={`h-5 w-5 ${photo.likedBy?.length ? "text-red-500 fill-current" : ""}`}
               />
             </Button>
             <Button
@@ -267,13 +263,7 @@ export function PhotoGrid({
               }}
             >
               <Star
-                className={`h-5 w-5 ${
-                  photo.favoritedBy?.some(
-                    (favorite) => favorite.userId === user?.id
-                  )
-                    ? "text-yellow-500 fill-current"
-                    : ""
-                }`}
+                className={`h-5 w-5 ${photo.favoritedBy?.length ? "text-yellow-500 fill-current" : ""}`}
               />
             </Button>
           </div>

@@ -39,7 +39,8 @@ interface Photo {
   thumbnailUrl: string;
   originalUrl: string;
   _count: {
-    likedBy: number;
+    likedBy?: number;
+    favoritedBy?: number;
   };
 }
 
@@ -255,7 +256,7 @@ export default function AnalyticsPage() {
                       <div className="absolute bottom-2 right-2">
                         <Badge className="flex items-center gap-1 text-xs">
                           <Star className="h-3 w-3" />
-                          {photo._count.likedBy}
+                          {photo._count.favoritedBy ?? 0}
                         </Badge>
                       </div>
                     </div>

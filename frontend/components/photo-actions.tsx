@@ -51,14 +51,19 @@ export function PhotoActions({
 
     setLoading(true);
     try {
-      const response = await api.likePhoto(photoId);
-      const newLiked = response.data.liked;
-      setLiked(newLiked);
-      onStatusChange?.(newLiked, favorited);
+      if (liked) {
+        await api.unlikePhoto(photoId);
+        setLiked(false);
+        onStatusChange?.(false, favorited);
+      } else {
+        await api.likePhoto(photoId);
+        setLiked(true);
+        onStatusChange?.(true, favorited);
+      }
       
       toast({
-        title: newLiked ? "Photo liked!" : "Photo unliked",
-        description: newLiked ? "Added to your liked photos" : "Removed from liked photos",
+        title: !liked ? "Photo liked!" : "Photo unliked",
+        description: !liked ? "Added to your liked photos" : "Removed from liked photos",
       });
     } catch (error) {
       console.error("Failed to like photo:", error);
@@ -78,14 +83,19 @@ export function PhotoActions({
 
     setLoading(true);
     try {
-      const response = await api.favoritePhoto(photoId);
-      const newFavorited = response.data.favorited;
-      setFavorited(newFavorited);
-      onStatusChange?.(liked, newFavorited);
+      if (favorited) {
+        await api.unfavoritePhoto(photoId);
+        setFavorited(false);
+        onStatusChange?.(liked, false);
+      } else {
+        await api.favoritePhoto(photoId);
+        setFavorited(true);
+        onStatusChange?.(liked, true);
+      }
       
       toast({
-        title: newFavorited ? "Photo favorited!" : "Photo unfavorited",
-        description: newFavorited ? "Added to your favorites" : "Removed from favorites",
+        title: !favorited ? "Photo favorited!" : "Photo unfavorited",
+        description: !favorited ? "Added to your favorites" : "Removed from favorites",
       });
     } catch (error) {
       console.error("Failed to favorite photo:", error);

@@ -83,8 +83,13 @@ export const api = {
       body: JSON.stringify(galleryData),
     }),
 
-  // Fixed: Use correct endpoint for public gallery access
-  getGallery: (id: string) => apiRequest(`/galleries/${id}`),
+  // Fixed: Use correct endpoint for public gallery access, optional password header
+  getGallery: (id: string, password?: string) =>
+    apiRequest(`/galleries/${id}`, {
+      headers: {
+        ...(password ? { 'x-gallery-password': password } : {}),
+      },
+    }),
 
   updateGallery: (id: string, data: any) =>
     apiRequest(`/galleries/${id}`, {

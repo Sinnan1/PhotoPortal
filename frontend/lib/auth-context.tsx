@@ -52,23 +52,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Since your backend doesn't have a /me endpoint, we'll store user data in localStorage
-      // and validate the token by making a request to a protected endpoint
+      // and validate the token by making a request to a protected endpoint that matches the role
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/galleries`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        // Determine which endpoint to use based on last known user role in localStorage
+        const storedUser = localStorage.getItem("user");
+        const role = storedUser ? (JSON.parse(storedUser).role as "PHOTOGRAPHER" | "CLIENT") : undefined;
+
+        const url = role === "CLIENT"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/auth/client-profile`
+          : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (response.ok) {
           // Token is valid, get user data from localStorage
-          const storedUser = localStorage.getItem("user");
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
+          if (storedUser) setUser(JSON.parse(storedUser));
         } else {
           // Token is invalid, clear everything
           document.cookie =
