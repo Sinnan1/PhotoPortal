@@ -15,13 +15,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, Users } from "lucide-react";
 
-export default function LoginPage() {
+export default function ClientLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { clientLogin } = useAuth();
   const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,7 +29,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await clientLogin(email, password);
       showToast("Successfully logged in!", "success");
     } catch (error) {
       showToast(
@@ -46,36 +46,21 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <div className="w-16 h-16 mx-auto bg-white/30 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center">
-            <Camera className="h-8 w-8 text-blue-600" />
+            <Users className="h-8 w-8 text-blue-600" />
           </div>
           <h2 className="mt-4 text-3xl font-bold text-gray-800">
-            Welcome Back
+            Client Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Or{" "}
-            <Link
-              href="/register"
-              className="text-blue-600 font-medium hover:underline"
-            >
-              create a new account
-            </Link>
-          </p>
-          <p className="mt-1 text-sm text-gray-600">
-            Are you a client?{" "}
-            <Link
-              href="/client-login"
-              className="text-blue-600 font-medium hover:underline"
-            >
-              Sign in as client
-            </Link>
+            Access your shared galleries
           </p>
         </div>
 
         <Card className="bg-white/30 backdrop-blur-md shadow-2xl border border-white/40 rounded-3xl transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
           <CardHeader>
-            <CardTitle className="text-2xl text-gray-800">Login</CardTitle>
+            <CardTitle className="text-2xl text-gray-800">Welcome Back</CardTitle>
             <CardDescription className="text-gray-600">
-              Enter your credentials to sign in
+              Enter your client credentials to access your galleries
             </CardDescription>
           </CardHeader>
 
@@ -112,15 +97,25 @@ export default function LoginPage() {
               </div>
             </CardContent>
 
-            <CardFooter>
+            <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
                 className="w-full rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200"
                 disabled={loading}
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In
+                Sign In as Client
               </Button>
+              
+              <div className="text-center text-sm text-gray-600">
+                <p>Are you a photographer?</p>
+                <Link
+                  href="/login"
+                  className="text-blue-600 font-medium hover:underline"
+                >
+                  Sign in as photographer
+                </Link>
+              </div>
             </CardFooter>
           </form>
         </Card>

@@ -15,6 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
+  clientLogin: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -51,23 +52,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Since your backend doesn't have a /me endpoint, we'll store user data in localStorage
-      // and validate the token by making a request to a protected endpoint
+      // and validate the token by making a request to a protected endpoint that matches the role
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/galleries`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        // Determine which endpoint to use based on last known user role in localStorage
+        const storedUser = localStorage.getItem("user");
+        const role = storedUser ? (JSON.parse(storedUser).role as "PHOTOGRAPHER" | "CLIENT") : undefined;
+
+        const url = role === "CLIENT"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/auth/client-profile`
+          : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (response.ok) {
           // Token is valid, get user data from localStorage
-          const storedUser = localStorage.getItem("user");
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
+          if (storedUser) setUser(JSON.parse(storedUser));
         } else {
           // Token is invalid, clear everything
           document.cookie =
@@ -115,6 +118,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
+  const clientLogin = async (email: string, password: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/auth/client-login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Login failed");
+    }
+
+    // Your backend response structure: { success: true, data: { user: {...}, token: "..." } }
+    const { user: userData, token } = data.data;
+
+    document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
+    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
+    setUser(userData);
+    router.push("/dashboard/client");
+  };
+
   const register = async (registerData: RegisterData) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
@@ -152,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, clientLogin, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

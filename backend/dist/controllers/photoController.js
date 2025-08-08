@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.favoritePhoto = exports.likePhoto = exports.downloadPhoto = exports.deletePhoto = exports.getPhotos = exports.uploadPhotos = exports.uploadMiddleware = void 0;
+exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.downloadPhoto = exports.deletePhoto = exports.getPhotos = exports.uploadPhotos = exports.uploadMiddleware = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const multer_1 = tslib_1.__importDefault(require("multer"));
@@ -138,16 +138,8 @@ const deletePhoto = async (req, res) => {
         }
         // Delete from S3 storage
         try {
-            // Extract the S3 keys from the URLs
-            // URL format: https://s3.us-east-005.backblazeb2.com/{bucketName}/{filename}
-            const originalUrl = new URL(photo.originalUrl);
-            const thumbnailUrl = new URL(photo.thumbnailUrl);
-            // Split pathname and remove bucket name to get just the filename
-            const originalPathParts = originalUrl.pathname.split('/');
-            const thumbnailPathParts = thumbnailUrl.pathname.split('/');
-            // Remove empty string and bucket name, keep the rest as the key
-            const originalKey = originalPathParts.slice(2).join('/');
-            const thumbnailKey = thumbnailPathParts.slice(2).join('/');
+            const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/');
+            const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
             console.log('Deleting keys:', { originalKey, thumbnailKey });
             await Promise.all([
                 (0, s3Storage_1.deleteFromS3)(originalKey),
@@ -267,33 +259,21 @@ const likePhoto = async (req, res) => {
             }
         });
         if (existingLike) {
-            // Unlike the photo
-            await prisma.likedPhoto.delete({
-                where: {
-                    userId_photoId: {
-                        userId,
-                        photoId
-                    }
-                }
-            });
-            return res.json({
-                success: true,
-                data: { liked: false }
+            return res.status(400).json({
+                success: false,
+                error: 'Photo already liked'
             });
         }
-        else {
-            // Like the photo
-            await prisma.likedPhoto.create({
-                data: {
-                    userId,
-                    photoId
-                }
-            });
-            return res.json({
-                success: true,
-                data: { liked: true }
-            });
-        }
+        await prisma.likedPhoto.create({
+            data: {
+                userId,
+                photoId
+            }
+        });
+        res.json({
+            success: true,
+            message: 'Photo liked'
+        });
     }
     catch (error) {
         console.error('Like photo error:', error);
@@ -304,6 +284,32 @@ const likePhoto = async (req, res) => {
     }
 };
 exports.likePhoto = likePhoto;
+const unlikePhoto = async (req, res) => {
+    try {
+        const { photoId } = req.params;
+        const userId = req.user.id;
+        await prisma.likedPhoto.delete({
+            where: {
+                userId_photoId: {
+                    userId,
+                    photoId
+                }
+            }
+        });
+        res.json({
+            success: true,
+            message: 'Photo unliked'
+        });
+    }
+    catch (error) {
+        console.error('Unlike photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+};
+exports.unlikePhoto = unlikePhoto;
 const favoritePhoto = async (req, res) => {
     try {
         const { photoId } = req.params;
@@ -328,33 +334,21 @@ const favoritePhoto = async (req, res) => {
             }
         });
         if (existingFavorite) {
-            // Unfavorite the photo
-            await prisma.favoritedPhoto.delete({
-                where: {
-                    userId_photoId: {
-                        userId,
-                        photoId
-                    }
-                }
-            });
-            return res.json({
-                success: true,
-                data: { favorited: false }
+            return res.status(400).json({
+                success: false,
+                error: 'Photo already favorited'
             });
         }
-        else {
-            // Favorite the photo
-            await prisma.favoritedPhoto.create({
-                data: {
-                    userId,
-                    photoId
-                }
-            });
-            return res.json({
-                success: true,
-                data: { favorited: true }
-            });
-        }
+        await prisma.favoritedPhoto.create({
+            data: {
+                userId,
+                photoId
+            }
+        });
+        res.json({
+            success: true,
+            message: 'Photo favorited'
+        });
     }
     catch (error) {
         console.error('Favorite photo error:', error);
@@ -365,6 +359,32 @@ const favoritePhoto = async (req, res) => {
     }
 };
 exports.favoritePhoto = favoritePhoto;
+const unfavoritePhoto = async (req, res) => {
+    try {
+        const { photoId } = req.params;
+        const userId = req.user.id;
+        await prisma.favoritedPhoto.delete({
+            where: {
+                userId_photoId: {
+                    userId,
+                    photoId
+                }
+            }
+        });
+        res.json({
+            success: true,
+            message: 'Photo unfavorited'
+        });
+    }
+    catch (error) {
+        console.error('Unfavorite photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+};
+exports.unfavoritePhoto = unfavoritePhoto;
 const getPhotoStatus = async (req, res) => {
     try {
         const { photoId } = req.params;

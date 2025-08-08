@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useAuth } from "@/lib/auth-context"
-import { Camera, LogOut, Settings, User, Heart, Star } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
+import { Camera, LogOut, Settings, User, Heart, Star, Users, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
 export function Navigation() {
-  const { user, logout } = useAuth()
+  const { user, logout } = useAuth();
 
   return (
     <nav className="border-b bg-white">
@@ -22,22 +22,50 @@ export function Navigation() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <Camera className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">PhotoPortal</span>
+              <span className="text-xl font-bold text-gray-900">
+                PhotoPortal
+              </span>
             </Link>
           </div>
 
           <div className="flex items-center space-x-4">
             {user ? (
               <>
+                {/* Role-based navigation */}
                 {user.role === "PHOTOGRAPHER" && (
-                  <Link href="/dashboard">
-                    <Button variant="ghost">Dashboard</Button>
-                  </Link>
+                  <div className="hidden md:flex items-center space-x-2">
+                    <Link href="/dashboard">
+                      <Button variant="ghost">Dashboard</Button>
+                    </Link>
+                    <Link href="/dashboard/clients">
+                      <Button variant="ghost" className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Clients
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard/analytics">
+                      <Button variant="ghost" className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        Analytics
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
+                {user.role === "CLIENT" && (
+                  <div className="hidden md:flex items-center space-x-2">
+                    <Link href="/dashboard/client">
+                      <Button variant="ghost">Dashboard</Button>
+                    </Link>
+                  </div>
                 )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      className="flex items-center space-x-2"
+                    >
                       <User className="h-4 w-4" />
                       <span>{user.name}</span>
                     </Button>
@@ -52,6 +80,26 @@ export function Navigation() {
                       <span>Settings</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
+                    
+                    {/* Role-based menu items */}
+                    {user.role === "PHOTOGRAPHER" && (
+                      <>
+                        <Link href="/dashboard/clients">
+                          <DropdownMenuItem>
+                            <Users className="mr-2 h-4 w-4" />
+                            <span>Manage Clients</span>
+                          </DropdownMenuItem>
+                        </Link>
+                        <Link href="/dashboard/analytics">
+                          <DropdownMenuItem>
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            <span>Analytics</span>
+                          </DropdownMenuItem>
+                        </Link>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    
                     <Link href="/dashboard/liked">
                       <DropdownMenuItem>
                         <Heart className="mr-2 h-4 w-4" />
@@ -74,10 +122,10 @@ export function Navigation() {
               </>
             ) : (
               <div className="flex items-center space-x-2">
-                <Link href="/auth/login">
+                <Link href="/login">
                   <Button variant="ghost">Login</Button>
                 </Link>
-                <Link href="/auth/register">
+                <Link href="/register">
                   <Button>Sign Up</Button>
                 </Link>
               </div>
@@ -86,5 +134,5 @@ export function Navigation() {
         </div>
       </div>
     </nav>
-  )
+  );
 }

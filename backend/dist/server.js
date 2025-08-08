@@ -11,6 +11,7 @@ const client_1 = require("@prisma/client");
 const auth_1 = tslib_1.__importDefault(require("./routes/auth"));
 const galleries_1 = tslib_1.__importDefault(require("./routes/galleries"));
 const photos_1 = tslib_1.__importDefault(require("./routes/photos"));
+const photographers_1 = tslib_1.__importDefault(require("./routes/photographers"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -26,6 +27,7 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/auth', auth_1.default);
 app.use('/api/galleries', galleries_1.default);
 app.use('/api/photos', photos_1.default);
+app.use('/api/photographers', photographers_1.default);
 // Basic route
 app.get('/', (req, res) => {
     res.json({ message: 'Photo Gallery API is running!' });

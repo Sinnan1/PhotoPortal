@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+// next.config.js
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -7,21 +7,36 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['localhost', 'your-api-domain.com', 's3.us-east-005.backblazeb2.com'],
+    domains: ['s3.us-east-005.backblazeb2.com'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 's3.us-east-005.backblazeb2.com',
-        port: '',
         pathname: '/photo-gallery-sinnan/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '5000',
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "img-src 'self' data: blob: https: http: https://s3.us-east-005.backblazeb2.com",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data:",
+              "connect-src 'self' https: http: ws: wss:",
+              "media-src 'self' https: http:",
+            ].join('; ')
+          }
+        ]
+      }
+    ]
+  }
 }
 
-export default nextConfig
+export default nextConfig;

@@ -57,6 +57,7 @@ export function PhotoGrid({
     }
   };
 
+
   const handleDelete = (photoId: string) => {
     if (onDelete && confirm("Are you sure you want to delete this photo?")) {
       onDelete(photoId);
@@ -177,18 +178,25 @@ export function PhotoGrid({
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
             fill
-            className="object-cover cursor-pointer transition-transform group-hover:scale-105"
+            className="object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
             onClick={() => onView?.(photo)}
-            // CRITICAL: Add priority to first row of images (above the fold)
-            priority={index < columns.lg * 2} // First 2 rows
-            loading={index < columns.lg * 2 ? "eager" : "lazy"}
+            // Fix 1: Remove conflicting loading prop when priority is true
+            priority={index < columns.lg}
             sizes={getSizes()}
-            placeholder="blur"
-            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+            // Fix 2: Remove blur placeholder temporarily to test
+            //placeholder="blur"
+            // blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/..."
+            
+            // Fix 3: Add error handling and debugging
+            onLoad={() => console.log(`Image loaded: ${photo.filename}`)}
+            onError={(e) => {
+              console.error(`Failed to load image: ${photo.filename}`, e);
+              console.error(`Image URL: ${photo.thumbnailUrl}`);
+            }}
           />
 
-          {/* Action overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+          {/* Action overlay - Fix 4: Reduce overlay opacity for debugging */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               {onView && (
                 <Button
@@ -235,37 +243,27 @@ export function PhotoGrid({
             <Button
               size="sm"
               variant="ghost"
-              className="text-white"
+              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/40"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLikePhoto(photo.id);
               }}
             >
               <Heart
-                className={`h-5 w-5 ${
-                  photo.likedBy?.some((like) => like.userId === user?.id)
-                    ? "text-red-500 fill-current"
-                    : ""
-                }`}
+                className={`h-5 w-5 ${photo.likedBy?.length ? "text-red-500 fill-current" : ""}`}
               />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="text-white"
+              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/40"
               onClick={(e) => {
                 e.stopPropagation();
                 handleFavoritePhoto(photo.id);
               }}
             >
               <Star
-                className={`h-5 w-5 ${
-                  photo.favoritedBy?.some(
-                    (favorite) => favorite.userId === user?.id
-                  )
-                    ? "text-yellow-500 fill-current"
-                    : ""
-                }`}
+                className={`h-5 w-5 ${photo.favoritedBy?.length ? "text-yellow-500 fill-current" : ""}`}
               />
             </Button>
           </div>

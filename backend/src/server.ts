@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client'
 import authRoutes from './routes/auth'
 import galleryRoutes from './routes/galleries'
 import photoRoutes from './routes/photos'
+import photographersRoutes from './routes/photographers'
 
 // Load environment variables
 dotenv.config()
@@ -28,6 +29,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/galleries', galleryRoutes)
 app.use('/api/photos', photoRoutes)
+app.use('/api/photographers', photographersRoutes)
 
 // Basic route
 app.get('/', (req, res) => {

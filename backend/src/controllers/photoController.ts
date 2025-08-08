@@ -160,18 +160,8 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 
 		// Delete from S3 storage
 		try {
-			// Extract the S3 keys from the URLs
-			// URL format: https://s3.us-east-005.backblazeb2.com/{bucketName}/{filename}
-			const originalUrl = new URL(photo.originalUrl);
-			const thumbnailUrl = new URL(photo.thumbnailUrl);
-			
-			// Split pathname and remove bucket name to get just the filename
-			const originalPathParts = originalUrl.pathname.split('/');
-			const thumbnailPathParts = thumbnailUrl.pathname.split('/');
-			
-			// Remove empty string and bucket name, keep the rest as the key
-			const originalKey = originalPathParts.slice(2).join('/');
-			const thumbnailKey = thumbnailPathParts.slice(2).join('/');
+			const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/');
+			const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
 			
 			console.log('Deleting keys:', { originalKey, thumbnailKey });
 			await Promise.all([

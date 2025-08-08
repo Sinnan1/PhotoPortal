@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteGallery = exports.updateGallery = exports.verifyGalleryPassword = exports.getGallery = exports.getGalleries = exports.createGallery = void 0;
+exports.getAllowedClients = exports.updateGalleryAccess = exports.unfavoriteGallery = exports.favoriteGallery = exports.unlikeGallery = exports.likeGallery = exports.deleteGallery = exports.updateGallery = exports.verifyGalleryPassword = exports.getGallery = exports.getGalleries = exports.createGallery = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = tslib_1.__importDefault(require("bcryptjs"));
@@ -77,6 +77,8 @@ const getGalleries = async (req, res) => {
                         createdAt: true
                     }
                 },
+                likedBy: true,
+                favoritedBy: true,
                 _count: {
                     select: { photos: true }
                 }
@@ -104,6 +106,10 @@ const getGallery = async (req, res) => {
             where: { id },
             include: {
                 photos: {
+                    include: {
+                        likedBy: true,
+                        favoritedBy: true
+                    },
                     orderBy: { createdAt: 'desc' }
                 },
                 photographer: {
@@ -313,3 +319,149 @@ const deleteGallery = async (req, res) => {
     }
 };
 exports.deleteGallery = deleteGallery;
+const likeGallery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const existingLike = await prisma.likedGallery.findUnique({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+        if (existingLike) {
+            return res.status(400).json({ success: false, error: 'Gallery already liked' });
+        }
+        await prisma.likedGallery.create({
+            data: { userId, galleryId: id },
+        });
+        res.json({ success: true, message: 'Gallery liked' });
+    }
+    catch (error) {
+        console.error('Like gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.likeGallery = likeGallery;
+const unlikeGallery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        await prisma.likedGallery.delete({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+        res.json({ success: true, message: 'Gallery unliked' });
+    }
+    catch (error) {
+        console.error('Unlike gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.unlikeGallery = unlikeGallery;
+const favoriteGallery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const existingFavorite = await prisma.favoritedGallery.findUnique({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+        if (existingFavorite) {
+            return res.status(400).json({ success: false, error: 'Gallery already favorited' });
+        }
+        await prisma.favoritedGallery.create({
+            data: { userId, galleryId: id },
+        });
+        res.json({ success: true, message: 'Gallery favorited' });
+    }
+    catch (error) {
+        console.error('Favorite gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.favoriteGallery = favoriteGallery;
+const unfavoriteGallery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        await prisma.favoritedGallery.delete({
+            where: { userId_galleryId: { userId, galleryId: id } },
+        });
+        res.json({ success: true, message: 'Gallery unfavorited' });
+    }
+    catch (error) {
+        console.error('Unfavorite gallery error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.unfavoriteGallery = unfavoriteGallery;
+const updateGalleryAccess = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { clientIds, access } = req.body; // access is a boolean
+        const photographerId = req.user.id;
+        // Verify gallery belongs to photographer
+        const gallery = await prisma.gallery.findFirst({
+            where: { id, photographerId }
+        });
+        if (!gallery) {
+            return res.status(404).json({
+                success: false,
+                error: 'Gallery not found or access denied'
+            });
+        }
+        if (access) {
+            await prisma.galleryAccess.createMany({
+                data: clientIds.map((clientId) => ({
+                    galleryId: id,
+                    userId: clientId
+                })),
+                skipDuplicates: true
+            });
+        }
+        else {
+            await prisma.galleryAccess.deleteMany({
+                where: {
+                    galleryId: id,
+                    userId: { in: clientIds }
+                }
+            });
+        }
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error('Update gallery access error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.updateGalleryAccess = updateGalleryAccess;
+const getAllowedClients = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const photographerId = req.user.id;
+        // Verify gallery belongs to photographer
+        const gallery = await prisma.gallery.findFirst({
+            where: { id, photographerId }
+        });
+        if (!gallery) {
+            return res.status(404).json({
+                success: false,
+                error: 'Gallery not found or access denied'
+            });
+        }
+        const clients = await prisma.galleryAccess.findMany({
+            where: { galleryId: id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        email: true,
+                        name: true
+                    }
+                }
+            }
+        });
+        res.json({ success: true, data: clients });
+    }
+    catch (error) {
+        console.error('Get allowed clients error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.getAllowedClients = getAllowedClients;

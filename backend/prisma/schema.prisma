@@ -24,6 +24,11 @@ model User {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
+  photographer   User?   @relation("PhotographerClients", fields: [photographerId], references: [id])
+  photographerId String?
+  clients        User[]  @relation("PhotographerClients")
+  accessibleGalleries GalleryAccess[]
+
   @@map("users")
 }
 
@@ -40,6 +45,7 @@ model Gallery {
   photos         Photo[]
   likedBy        LikedGallery[]
   favoritedBy    FavoritedGallery[]
+  accessibleBy   GalleryAccess[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -104,6 +110,17 @@ model FavoritedGallery {
 
   @@id([userId, galleryId])
   @@map("favorited_galleries")
+}
+
+model GalleryAccess {
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId    String
+    gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    galleryId String
+    createdAt DateTime @default(now())
+
+    @@id([userId, galleryId])
+    @@map("gallery_access")
 }
 
 enum Role {
