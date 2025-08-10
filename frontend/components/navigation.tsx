@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { Camera, LogOut, Settings, User, Heart, Star, Users, BarChart3 } from "lucide-react";
+import { Camera, LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,21 +15,32 @@ import {
 
 export function Navigation() {
   const { user, logout } = useAuth();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <nav className="border-b bg-white">
+    <nav className="border-b bg-white dark:bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <Camera className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">
+              <span className="text-xl font-bold text-gray-900 dark:text-foreground">
                 PhotoPortal
               </span>
             </Link>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Toggle Theme"
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            >
+              {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+
             {user ? (
               <>
                 {/* Role-based navigation */}

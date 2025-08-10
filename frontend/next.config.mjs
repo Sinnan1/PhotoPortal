@@ -1,4 +1,14 @@
 // next.config.js
+const isDev = process.env.NODE_ENV !== 'production'
+
+// Derive API origin for CSP connect-src
+let apiOrigin = 'http://localhost:5000'
+try {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+  const u = new URL(apiUrl)
+  apiOrigin = `${u.protocol}//${u.host}`
+} catch {}
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -12,7 +22,7 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 's3.us-east-005.backblazeb2.com',
-        pathname: '/photo-gallery-sinnan/**',
+        pathname: '/**',
       },
     ],
   },
@@ -25,11 +35,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "img-src 'self' data: blob: https: http: https://s3.us-east-005.backblazeb2.com",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
-              "connect-src 'self' https: http: ws: wss:",
+              `connect-src 'self' ${apiOrigin} https: http: ws: wss:`,
+              "img-src 'self' data: blob: https: http: https://s3.us-east-005.backblazeb2.com",
               "media-src 'self' https: http:",
             ].join('; ')
           }

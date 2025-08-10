@@ -267,7 +267,7 @@ export default function GalleryPage() {
       {/* Gallery Header */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 sm:mb-0">{gallery.title}</h1>
+          <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
           <div className="flex items-center space-x-2">
             {gallery.photos.length > 0 && (
               <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
@@ -370,10 +370,10 @@ export default function GalleryPage() {
         </div>
 
         {gallery.description && (
-          <p className="text-gray-600 mb-4">{gallery.description}</p>
+          <p className="text-muted-foreground mb-4">{gallery.description}</p>
         )}
 
-        <div className="flex items-center space-x-6 text-sm text-gray-500">
+        <div className="flex items-center space-x-6 text-sm text-muted-foreground">
           <div className="flex items-center">
             <User className="mr-1 h-4 w-4" />
             {gallery.photographer.name}
@@ -418,11 +418,11 @@ export default function GalleryPage() {
       {/* Photo Grid */}
       {filteredPhotos.length === 0 ? (
         <div className="text-center py-12">
-          <Images className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <Images className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-sm font-medium">
             No photos to display
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             {filter === "all" ? "This gallery is empty." : `You have no ${filter} photos in this gallery.`}
           </p>
         </div>

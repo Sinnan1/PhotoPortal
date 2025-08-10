@@ -17,8 +17,8 @@ interface Photo {
   fileSize?: number;
   downloadCount?: number;
   createdAt: string;
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
+  likedBy?: { userId: string }[];
+  favoritedBy?: { userId: string }[];
 }
 
 interface PhotoGridProps {

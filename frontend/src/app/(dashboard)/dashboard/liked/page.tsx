@@ -95,9 +95,9 @@ export default function LikedPhotosPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
           <Heart className="h-8 w-8 text-red-500" />
-          <h1 className="text-3xl font-bold text-gray-900">Liked Photos</h1>
+          <h1 className="text-3xl font-bold">Liked Photos</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Your collection of liked photos from all galleries
         </p>
       </div>
@@ -120,19 +120,18 @@ export default function LikedPhotosPage() {
       {/* Photo Grid */}
       {photos.length === 0 ? (
         <div className="text-center py-12">
-          <Heart className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <Heart className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-sm font-medium">
             No liked photos yet
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Like photos from galleries to see them here.
           </p>
         </div>
       ) : (
         <PhotoGrid
-          photos={photos}
-          showLikeFavorite={true}
-          onView={setSelectedPhoto}
+          photos={photos as any}
+          onView={(p) => setSelectedPhoto(p as any)}
           onDownload={handleDownload}
           columns={{ sm: 2, md: 3, lg: 4 }}
         />
