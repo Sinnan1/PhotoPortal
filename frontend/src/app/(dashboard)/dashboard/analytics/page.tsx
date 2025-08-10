@@ -106,8 +106,8 @@ export default function AnalyticsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-        <p className="text-gray-600 mt-2">Track your gallery performance and engagement</p>
+        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Track your gallery performance and engagement</p>
       </div>
 
       {loading ? (
@@ -200,7 +200,7 @@ export default function AnalyticsPage() {
                         </Badge>
                       </div>
                       <div className="absolute bottom-2 right-2">
-                        <Badge className="flex items-center gap-1 text-xs">
+                         <Badge className="flex items-center gap-1 text-xs">
                           <Heart className="h-3 w-3" />
                           {photo._count.likedBy}
                         </Badge>
@@ -254,9 +254,9 @@ export default function AnalyticsPage() {
                         </Badge>
                       </div>
                       <div className="absolute bottom-2 right-2">
-                        <Badge className="flex items-center gap-1 text-xs">
+                         <Badge className="flex items-center gap-1 text-xs">
                           <Star className="h-3 w-3" />
-                          {photo._count.favoritedBy ?? 0}
+                           {photo._count.favoritedBy ?? 0}
                         </Badge>
                       </div>
                     </div>

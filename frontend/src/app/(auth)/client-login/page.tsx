@@ -42,24 +42,20 @@ export default function ClientLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-pink-100 flex items-center justify-center px-4">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-white/30 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center">
-            <Users className="h-8 w-8 text-blue-600" />
+          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+            <Users className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="mt-4 text-3xl font-bold text-gray-800">
-            Client Login
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Access your shared galleries
-          </p>
+          <h2 className="mt-4 text-3xl font-bold">Client Login</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Access your shared galleries</p>
         </div>
 
-        <Card className="bg-white/30 backdrop-blur-md shadow-2xl border border-white/40 rounded-3xl transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+        <Card className="border rounded-2xl bg-card/60 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-2xl text-gray-800">Welcome Back</CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardTitle className="text-2xl">Welcome Back</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Enter your client credentials to access your galleries
             </CardDescription>
           </CardHeader>
@@ -67,7 +63,7 @@ export default function ClientLoginPage() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-5">
               <div>
-                <Label htmlFor="email" className="text-gray-700">
+                <Label htmlFor="email">
                   Email
                 </Label>
                 <Input
@@ -77,12 +73,12 @@ export default function ClientLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="mt-1 bg-white/70 backdrop-blur-sm border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg"
+                  className="mt-1"
                 />
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-gray-700">
+                <Label htmlFor="password">
                   Password
                 </Label>
                 <Input
@@ -92,7 +88,7 @@ export default function ClientLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="mt-1 bg-white/70 backdrop-blur-sm border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg mb-4"
+                  className="mt-1 mb-4"
                 />
               </div>
             </CardContent>
@@ -100,7 +96,7 @@ export default function ClientLoginPage() {
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
-                className="w-full rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200"
+                className="w-full rounded-full"
                 disabled={loading}
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -109,10 +105,7 @@ export default function ClientLoginPage() {
               
               <div className="text-center text-sm text-gray-600">
                 <p>Are you a photographer?</p>
-                <Link
-                  href="/login"
-                  className="text-blue-600 font-medium hover:underline"
-                >
+                <Link href="/login" className="text-primary font-medium hover:underline">
                   Sign in as photographer
                 </Link>
               </div>

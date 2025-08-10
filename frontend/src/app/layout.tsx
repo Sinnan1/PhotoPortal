@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { ToastProvider } from "@/components/ui/toast"
 import { Navigation } from "@/components/navigation"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,14 +21,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ToastProvider>
-          <AuthProvider>
-            <Navigation />
-            <main className="min-h-screen bg-gray-50">{children}</main>
-          </AuthProvider>
-        </ToastProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ToastProvider>
+            <AuthProvider>
+              <Navigation />
+              <main className="min-h-screen">{children}</main>
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
