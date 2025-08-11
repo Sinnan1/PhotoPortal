@@ -7,7 +7,7 @@ import { Download, Eye, Trash2, Heart, Star } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Photo {
   id: string;
@@ -28,6 +28,7 @@ interface PhotoGridProps {
   onDelete?: (photoId: string) => void;
   onView?: (photo: Photo) => void;
   onDownload?: (photoId: string) => void;
+  onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void;
   columns?: {
     sm: number;
     md: number;
@@ -44,12 +45,18 @@ export function PhotoGrid({
   onDelete,
   onView,
   onDownload,
+  onPhotoStatusChange,
   columns = { sm: 2, md: 3, lg: 4 },
   className = "",
 }: PhotoGridProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [photoState, setPhotoState] = useState(photos);
+
+  // Keep local state in sync with incoming photos (e.g., when applying filters)
+  useEffect(() => {
+    setPhotoState(photos);
+  }, [photos]);
 
   const handleDownload = (photoId: string) => {
     if (onDownload) {
@@ -69,7 +76,7 @@ export function PhotoGrid({
       const photo = photoState.find((p) => p.id === photoId);
       if (!photo) return;
 
-      const isLiked = photo.likedBy.some((like) => like.userId === user?.id);
+      const isLiked = (photo.likedBy ?? []).some((like) => like.userId === user?.id);
 
       if (isLiked) {
         await api.unlikePhoto(photoId);
@@ -81,14 +88,16 @@ export function PhotoGrid({
       const updatedPhotos = photoState.map((p) => {
         if (p.id === photoId) {
           if (isLiked) {
-            return { ...p, likedBy: p.likedBy.filter((like) => like.userId !== user?.id) };
+            return { ...p, likedBy: (p.likedBy ?? []).filter((like) => like.userId !== user?.id) };
           } else {
-            return { ...p, likedBy: [...p.likedBy, { userId: user!.id }] };
+            return { ...p, likedBy: [ ...(p.likedBy ?? []), { userId: user!.id } ] };
           }
         }
         return p;
       });
       setPhotoState(updatedPhotos);
+      // Notify parent so it can update its source list for filtering
+      onPhotoStatusChange?.(photoId, { liked: !isLiked });
 
     } catch (error) {
       showToast("Failed to update like status", "error");
@@ -100,7 +109,7 @@ export function PhotoGrid({
       const photo = photoState.find((p) => p.id === photoId);
       if (!photo) return;
 
-      const isFavorited = photo.favoritedBy.some((favorite) => favorite.userId === user?.id);
+      const isFavorited = (photo.favoritedBy ?? []).some((favorite) => favorite.userId === user?.id);
 
       if (isFavorited) {
         await api.unfavoritePhoto(photoId);
@@ -112,14 +121,16 @@ export function PhotoGrid({
       const updatedPhotos = photoState.map((p) => {
         if (p.id === photoId) {
           if (isFavorited) {
-            return { ...p, favoritedBy: p.favoritedBy.filter((favorite) => favorite.userId !== user?.id) };
+            return { ...p, favoritedBy: (p.favoritedBy ?? []).filter((favorite) => favorite.userId !== user?.id) };
           } else {
-            return { ...p, favoritedBy: [...p.favoritedBy, { userId: user!.id }] };
+            return { ...p, favoritedBy: [ ...(p.favoritedBy ?? []), { userId: user!.id } ] };
           }
         }
         return p;
       });
       setPhotoState(updatedPhotos);
+      // Notify parent so it can update its source list for filtering
+      onPhotoStatusChange?.(photoId, { favorited: !isFavorited });
 
     } catch (error) {
       showToast("Failed to update favorite status", "error");
@@ -249,9 +260,9 @@ export function PhotoGrid({
                 handleLikePhoto(photo.id);
               }}
             >
-              <Heart
-                className={`h-5 w-5 ${photo.likedBy?.length ? "text-red-500 fill-current" : ""}`}
-              />
+          <Heart
+            className={`h-5 w-5 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
+          />
             </Button>
             <Button
               size="sm"
@@ -262,9 +273,9 @@ export function PhotoGrid({
                 handleFavoritePhoto(photo.id);
               }}
             >
-              <Star
-                className={`h-5 w-5 ${photo.favoritedBy?.length ? "text-yellow-500 fill-current" : ""}`}
-              />
+          <Star
+            className={`h-5 w-5 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
+          />
             </Button>
           </div>
 

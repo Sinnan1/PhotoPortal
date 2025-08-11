@@ -63,6 +63,37 @@ export default function GalleryPage() {
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
 
+  // Keep gallery.photos in sync when a photo's like/favorite status changes without re-fetching
+  const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
+    setGallery((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        photos: prev.photos.map((p) => {
+          if (p.id !== photoId) return p;
+          const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
+          const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
+          return {
+            ...p,
+            likedBy:
+              status.liked === undefined
+                ? p.likedBy
+                : status.liked
+                ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
+                : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+            favoritedBy:
+              status.favorited === undefined
+                ? p.favoritedBy
+                : status.favorited
+                ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
+                : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+          } as Photo;
+        })
+      } as typeof prev;
+      return updated;
+    });
+  };
+
   useEffect(() => {
     fetchGallery();
   }, [galleryId]);
@@ -188,8 +219,12 @@ export default function GalleryPage() {
 
   const filteredPhotos = useMemo(() => {
     if (!gallery) return [];
-    if (filter === "liked") return gallery.photos.filter((p) => p.likedBy?.length > 0);
-    if (filter === "favorited") return gallery.photos.filter((p) => p.favoritedBy?.length > 0);
+    if (filter === "liked") {
+      return gallery.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
+    }
+    if (filter === "favorited") {
+      return gallery.photos.filter((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id));
+    }
     return gallery.photos;
   }, [gallery, filter, user]);
 
@@ -279,11 +314,11 @@ export default function GalleryPage() {
                 Download All
               </Button>
             )}
-            {gallery.photos.some((p) => p.likedBy?.length > 0) && (
+            {gallery.photos.some((p) => p.likedBy?.some((like) => like.userId === user?.id)) && (
               <Button onClick={async () => {
                 setIsDownloadingAll(true);
                 try {
-                  const liked = gallery.photos.filter((p) => p.likedBy?.length > 0);
+                  const liked = gallery.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
                   const zip = new JSZip();
                   await Promise.all(liked.map(async (photo) => {
                     try {
@@ -320,11 +355,11 @@ export default function GalleryPage() {
                 Download Liked
               </Button>
             )}
-            {gallery.photos.some((p) => p.favoritedBy?.length > 0) && (
+            {gallery.photos.some((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id)) && (
               <Button onClick={async () => {
                 setIsDownloadingAll(true);
                 try {
-                  const fav = gallery.photos.filter((p) => p.favoritedBy?.length > 0);
+                  const fav = gallery.photos.filter((p) => p.favoritedBy?.some((f) => f.userId === user?.id));
                   const zip = new JSZip();
                   await Promise.all(fav.map(async (photo) => {
                     try {
@@ -404,14 +439,14 @@ export default function GalleryPage() {
           onClick={() => setFilter("liked")}
         >
           <Heart className="mr-2 h-4 w-4" />
-          Liked ({gallery.photos.filter(p => p.likedBy?.length > 0).length})
+          Liked ({gallery.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length})
         </Button>
         <Button
           variant={filter === "favorited" ? "secondary" : "ghost"}
           onClick={() => setFilter("favorited")}
         >
           <Star className="mr-2 h-4 w-4" />
-          Favorited ({gallery.photos.filter(p => p.favoritedBy?.length > 0).length})
+          Favorited ({gallery.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length})
         </Button>
       </div>
 
@@ -429,9 +464,10 @@ export default function GalleryPage() {
       ) : (
         <PhotoGrid
           photos={filteredPhotos}
-          onView={setSelectedPhoto}
+          onView={(p) => setSelectedPhoto(p as any)}
           onDownload={handleDownload}
           onDelete={handleDelete}
+          onPhotoStatusChange={handlePhotoStatusChange}
           columns={{ sm: 2, md: 3, lg: 4 }}
         />
       )}
