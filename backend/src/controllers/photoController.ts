@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import multer from 'multer'
-// Changed: Import from S3 storage utils instead of B2
+import path from 'path'
+import fs from 'fs/promises'
 import { uploadToS3, deleteFromS3 } from '../utils/s3Storage'
 
 const prisma = new PrismaClient()
@@ -14,30 +15,126 @@ interface AuthRequest extends Request {
 	}
 }
 
-// Configure multer for memory storage
+// Balanced configuration - disk storage for reliability, reasonable limits for testing
 const upload = multer({
-	storage: multer.memoryStorage(),
+	// Use disk storage to prevent memory issues with large batches
+	storage: multer.diskStorage({
+		destination: async (req, file, cb) => {
+			const uploadDir = path.join(process.cwd(), 'temp-uploads')
+			try {
+				await fs.mkdir(uploadDir, { recursive: true })
+				cb(null, uploadDir)
+			} catch (error) {
+				const err = error instanceof Error ? error : new Error(String(error))
+				cb(err, uploadDir)
+			}
+		},
+		filename: (req, file, cb) => {
+			// Generate unique filename to avoid conflicts
+			const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${file.originalname}`
+			cb(null, uniqueName)
+		}
+	}),
 	limits: {
-		fileSize: 10 * 1024 * 1024 // 10MB limit
+		fileSize: 50 * 1024 * 1024, // 50MB limit - good for large JPGs and some RAW files
+		files: 50 // Allow up to 50 files per batch
 	},
 	fileFilter: (req, file, cb) => {
-		// Check file type
-		const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-		if (allowedTypes.includes(file.mimetype)) {
+		// Support both regular images and RAW formats for future-proofing
+		const allowedTypes = [
+			// Standard image formats
+			'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/tiff',
+			// RAW formats (browsers may not set correct MIME types)
+			'image/x-canon-cr2', 'image/x-canon-crw', 'image/x-nikon-nef',
+			'image/x-sony-arw', 'image/x-adobe-dng', 'image/x-panasonic-raw',
+			// Fallback for unrecognized files
+			'application/octet-stream'
+		]
+		
+		// Check file extensions for RAW files (more reliable than MIME types)
+		const allowedExtensions = [
+			// Standard formats
+			'.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif',
+			// RAW formats
+			'.cr2', '.cr3', '.crw', '.nef', '.nrw', '.arw', '.srf', '.sr2',
+			'.dng', '.orf', '.rw2', '.pef', '.raf', '.3fr', '.fff', '.dcr',
+			'.kdc', '.mdc', '.mos', '.mrw', '.x3f'
+		]
+		
+		const fileExt = path.extname(file.originalname).toLowerCase()
+		
+		if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt)) {
+			// Additional validation: warn about very large files
+			if (file.size && file.size > 30 * 1024 * 1024) { // > 30MB
+				console.log(`Large file detected: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+			}
 			cb(null, true)
 		} else {
-			cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'))
+			cb(new Error(`Invalid file type: ${file.originalname}. Supported formats: JPG, PNG, WebP, TIFF, and RAW files (CR2, NEF, ARW, etc.).`))
 		}
 	}
 })
 
-export const uploadMiddleware = upload.array('photos', 20) // Allow up to 20 photos
+export const uploadMiddleware = upload.array('photos', 50) // Allow up to 50 photos per batch
 
+// Helper function to clean up temp files after upload
+export const cleanupTempFiles = async (filePaths: string[]) => {
+	const cleanupPromises = filePaths.map(async (filePath) => {
+		try {
+			await fs.unlink(filePath)
+			console.log(`Cleaned up temp file: ${filePath}`)
+		} catch (error) {
+			console.warn(`Failed to cleanup temp file ${filePath}:`, error)
+		}
+	})
+	
+	await Promise.allSettled(cleanupPromises)
+}
+
+// Middleware to handle multer errors gracefully
+export const handleUploadErrors = (error: any, req: any, res: any, next: any) => {
+	if (error instanceof multer.MulterError) {
+		if (error.code === 'LIMIT_FILE_SIZE') {
+			return res.status(400).json({
+				success: false,
+				error: 'File too large. Maximum size is 50MB per file.'
+			})
+		}
+		if (error.code === 'LIMIT_FILE_COUNT') {
+			return res.status(400).json({
+				success: false,
+				error: 'Too many files. Maximum is 50 files per batch.'
+			})
+		}
+		if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+			return res.status(400).json({
+				success: false,
+				error: 'Unexpected file field. Use "photos" field name.'
+			})
+		}
+	}
+	
+	if (error.message.includes('Invalid file type')) {
+		return res.status(400).json({
+			success: false,
+			error: error.message
+		})
+	}
+	
+	// Generic upload error
+	return res.status(500).json({
+		success: false,
+		error: 'Upload failed. Please try again.'
+	})
+}
+// Enhanced upload function with better error handling and cleanup
 export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 	try {
 		const { galleryId } = req.params
 		const photographerId = req.user!.id
 		const files = req.files as Express.Multer.File[]
+
+		console.log(`Upload started: ${files?.length || 0} files for gallery ${galleryId}`)
 
 		if (!files || files.length === 0) {
 			return res.status(400).json({
@@ -45,6 +142,10 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 				error: 'No files uploaded'
 			})
 		}
+
+		// Log file sizes for monitoring
+		const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+		console.log(`Total upload size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`)
 
 		// Verify gallery exists and belongs to photographer
 		const gallery = await prisma.gallery.findFirst({
@@ -58,49 +159,76 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 			})
 		}
 
-		const uploadPromises = files.map(async (file) => {
-			try {
-				// Changed: Upload to S3 instead of B2
-				const { originalUrl, thumbnailUrl, fileSize } = await uploadToS3(
-					file.buffer,
-					file.originalname,
-					galleryId
-				)
-
-				// Save to database
-				const photo = await prisma.photo.create({
-					data: {
-						filename: file.originalname,
-						originalUrl,
-						thumbnailUrl,
-						fileSize,
+		// Process in smaller batches to manage memory
+		const batchSize = 5
+		const allResults = []
+		
+		for (let i = 0; i < files.length; i += batchSize) {
+			const batch = files.slice(i, i + batchSize)
+			console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(files.length/batchSize)}`)
+			
+			const batchPromises = batch.map(async (file) => {
+				try {
+					// Read file from disk since we're using diskStorage
+					const filePath = (file as any).path as string
+					const fileBuffer = await fs.readFile(filePath)
+					const { originalUrl, thumbnailUrl, fileSize } = await uploadToS3(
+						fileBuffer,
+						file.originalname,
 						galleryId
+					)
+
+					const photo = await prisma.photo.create({
+						data: {
+							filename: file.originalname,
+							originalUrl,
+							thumbnailUrl,
+							fileSize,
+							galleryId
+						}
+					})
+
+					return {
+						success: true,
+						photo,
+						filename: file.originalname
 					}
-				})
+				} catch (error) {
+					console.error(`Upload failed for ${file.originalname}:`, error)
+					return {
+						success: false,
+						filename: file.originalname,
+						error: error instanceof Error ? error.message : 'Upload failed'
+					}
+				} finally {
+					// Cleanup temp file regardless of success/failure
+					const filePath = (file as any).path as string
+					if (filePath) {
+						cleanupTempFiles([filePath]).catch(() => {})
+					}
+				}
+			})
 
-				return {
-					success: true,
-					photo
-				}
-			} catch (error) {
-				console.error(`Upload failed for ${file.originalname}:`, error)
-				return {
-					success: false,
-					filename: file.originalname,
-					error: error instanceof Error ? error.message : 'Upload failed'
-				}
+			const batchResults = await Promise.all(batchPromises)
+			allResults.push(...batchResults)
+			
+			// Small delay between batches to prevent overwhelming the system
+			if (i + batchSize < files.length) {
+				await new Promise(resolve => setTimeout(resolve, 100))
 			}
-		})
+		}
 
-		const results = await Promise.all(uploadPromises)
-		const successful = results.filter(r => r.success)
-		const failed = results.filter(r => !r.success)
+		const successful = allResults.filter(r => r.success)
+		const failed = allResults.filter(r => !r.success)
+
+		console.log(`Upload completed: ${successful.length} successful, ${failed.length} failed`)
 
 		res.status(201).json({
 			success: true,
 			data: {
 				uploaded: successful.length,
 				failed: failed.length,
+				total: files.length,
 				results: successful.map(r => r.photo),
 				errors: failed
 			}
@@ -114,18 +242,78 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 	}
 }
 
+// Add batch upload endpoint for better performance
+export const batchUploadPhotos = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params
+		const photographerId = req.user!.id
+		
+		// Verify gallery
+		const gallery = await prisma.gallery.findFirst({
+			where: { id: galleryId, photographerId }
+		})
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: 'Gallery not found or access denied'
+			})
+		}
+
+		// Return upload configuration for client
+		res.json({
+			success: true,
+			data: {
+				uploadUrl: `/api/photos/upload/${galleryId}`,
+				maxFileSize: 200 * 1024 * 1024, // 200MB
+				maxFiles: 50,
+				supportedFormats: [
+					'JPEG', 'PNG', 'WebP', 'TIFF',
+					'CR2', 'CR3', 'NEF', 'ARW', 'DNG', 'ORF', 'RW2'
+				]
+			}
+		})
+	} catch (error) {
+		console.error('Batch upload config error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
+
+// Keep existing functions but add better error handling
 export const getPhotos = async (req: Request, res: Response) => {
 	try {
 		const { galleryId } = req.params
+		const page = parseInt(req.query.page as string) || 1
+		const limit = parseInt(req.query.limit as string) || 24 // Good for grid display
+		
+		const skip = (page - 1) * limit
 
-		const photos = await prisma.photo.findMany({
-			where: { galleryId },
-			orderBy: { createdAt: 'desc' }
-		})
+		const [photos, total] = await Promise.all([
+			prisma.photo.findMany({
+				where: { galleryId },
+				orderBy: { createdAt: 'desc' },
+				skip,
+				take: limit
+			}),
+			prisma.photo.count({ where: { galleryId } })
+		])
 
 		res.json({
 			success: true,
-			data: photos
+			data: {
+				photos,
+				pagination: {
+					page,
+					limit,
+					total,
+					pages: Math.ceil(total / limit),
+					hasNext: page * limit < total,
+					hasPrev: page > 1
+				}
+			}
 		})
 	} catch (error) {
 		console.error('Get photos error:', error)
@@ -135,13 +323,48 @@ export const getPhotos = async (req: Request, res: Response) => {
 		})
 	}
 }
+// Add photo compression endpoint for web viewing
+export const getCompressedPhoto = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params
+		const { quality = '80', width, height } = req.query
 
+		const photo = await prisma.photo.findUnique({
+			where: { id }
+		})
+
+		if (!photo) {
+			return res.status(404).json({
+				success: false,
+				error: 'Photo not found'
+			})
+		}
+
+		// Return compressed version URL or generate on-demand
+		// This could be enhanced to generate different sizes
+		res.json({
+			success: true,
+			data: {
+				compressedUrl: photo.thumbnailUrl, // For now, return thumbnail
+				originalUrl: photo.originalUrl
+			}
+		})
+	} catch (error) {
+		console.error('Get compressed photo error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
+
+// Enhanced delete with better cleanup
 export const deletePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
 		const photographerId = req.user!.id
 
-		// Find photo and verify ownership through gallery
+		// Find photo and verify ownership
 		const photo = await prisma.photo.findUnique({
 			where: { id },
 			include: {
@@ -158,25 +381,22 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 			})
 		}
 
-		// Delete from S3 storage
+		// Delete from S3 storage with better error handling
 		try {
-			const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/');
-			const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
+			const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/')
+			const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/')
 			
-			console.log('Deleting keys:', { originalKey, thumbnailKey });
 			await Promise.all([
-				deleteFromS3(originalKey),
-				deleteFromS3(thumbnailKey)
+				deleteFromS3(originalKey).catch(err => console.warn('Failed to delete original:', err)),
+				deleteFromS3(thumbnailKey).catch(err => console.warn('Failed to delete thumbnail:', err))
 			])
 		} catch (storageError) {
 			console.error('Storage deletion error:', storageError)
-			// Continue with database deletion even if storage fails
+			// Continue with database deletion
 		}
 
 		// Delete from database
-		await prisma.photo.delete({
-			where: { id }
-		})
+		await prisma.photo.delete({ where: { id } })
 
 		res.json({
 			success: true,
@@ -191,74 +411,62 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 	}
 }
 
-export const downloadPhoto = async (req: Request, res: Response) => {
+// Add bulk operations for managing large numbers of photos
+export const bulkDeletePhotos = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
-		const { galleryId } = req.query
+		const { photoIds } = req.body
+		const photographerId = req.user!.id
 
-		// Verify gallery access if provided
-		if (galleryId) {
-			const gallery = await prisma.gallery.findUnique({
-				where: { id: galleryId as string }
-			})
-
-			if (!gallery) {
-				return res.status(404).json({
-					success: false,
-					error: 'Gallery not found'
-				})
-			}
-
-			// Check expiry
-			if (gallery.expiresAt && gallery.expiresAt < new Date()) {
-				return res.status(410).json({
-					success: false,
-					error: 'Gallery has expired'
-				})
-			}
-
-			// Check download limit
-			if (gallery.downloadLimit && gallery.downloadCount >= gallery.downloadLimit) {
-				return res.status(429).json({
-					success: false,
-					error: 'Download limit exceeded'
-				})
-			}
-
-			// Increment download count
-			await prisma.gallery.update({
-				where: { id: galleryId as string },
-				data: { downloadCount: { increment: 1 } }
-			})
-		}
-
-		const photo = await prisma.photo.findUnique({
-			where: { id }
-		})
-
-		if (!photo) {
-			return res.status(404).json({
+		if (!Array.isArray(photoIds) || photoIds.length === 0) {
+			return res.status(400).json({
 				success: false,
-				error: 'Photo not found'
+				error: 'Photo IDs array is required'
 			})
 		}
 
-		// Increment photo download count
-		await prisma.photo.update({
-			where: { id },
-			data: { downloadCount: { increment: 1 } }
+		// Verify all photos belong to the photographer
+		const photos = await prisma.photo.findMany({
+			where: {
+				id: { in: photoIds },
+				gallery: { photographerId }
+			}
 		})
 
-		// Return download URL (client will handle the actual download)
+		if (photos.length !== photoIds.length) {
+			return res.status(403).json({
+				success: false,
+				error: 'Some photos not found or access denied'
+			})
+		}
+
+		// Delete from storage
+		const deletePromises = photos.map(async (photo) => {
+			try {
+				const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/')
+				const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/')
+				
+				await Promise.all([
+					deleteFromS3(originalKey),
+					deleteFromS3(thumbnailKey)
+				])
+			} catch (error) {
+				console.warn(`Failed to delete storage for photo ${photo.id}:`, error)
+			}
+		})
+
+		await Promise.all(deletePromises)
+
+		// Delete from database
+		const result = await prisma.photo.deleteMany({
+			where: { id: { in: photoIds } }
+		})
+
 		res.json({
 			success: true,
-			data: {
-				downloadUrl: photo.originalUrl,
-				filename: photo.filename
-			}
+			message: `${result.count} photos deleted successfully`
 		})
 	} catch (error) {
-		console.error('Download photo error:', error)
+		console.error('Bulk delete photos error:', error)
 		res.status(500).json({
 			success: false,
 			error: 'Internal server error'
@@ -266,295 +474,155 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 	}
 }
 
+// Like a photo
 export const likePhoto = async (req: AuthRequest, res: Response) => {
-	try {
-		const { photoId } = req.params
-		const userId = req.user!.id
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
 
-		// Check if photo exists
-		const photo = await prisma.photo.findUnique({
-			where: { id: photoId }
-		})
+        // Ensure photo exists
+        const photo = await prisma.photo.findUnique({ where: { id } })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
 
-		if (!photo) {
-			return res.status(404).json({
-				success: false,
-				error: 'Photo not found'
-			})
-		}
+        // Create like if not exists
+        await prisma.likedPhoto.create({
+            data: { userId, photoId: id }
+        }).catch(async (err) => {
+            // If already liked (unique constraint), ignore
+            return null
+        })
 
-		// Check if already liked
-		const existingLike = await prisma.likedPhoto.findUnique({
-			where: {
-				userId_photoId: {
-					userId,
-					photoId
-				}
-			}
-		})
-
-		if (existingLike) {
-			return res.status(400).json({
-				success: false,
-				error: 'Photo already liked'
-			})
-		}
-
-		await prisma.likedPhoto.create({
-			data: {
-				userId,
-				photoId
-			}
-		})
-
-		res.json({
-			success: true,
-			message: 'Photo liked'
-		})
-	} catch (error) {
-		console.error('Like photo error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        return res.json({ success: true, message: 'Photo liked' })
+    } catch (error) {
+        console.error('Like photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Unlike a photo
 export const unlikePhoto = async (req: AuthRequest, res: Response) => {
-	try {
-		const { photoId } = req.params
-		const userId = req.user!.id
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
 
-		await prisma.likedPhoto.delete({
-			where: {
-				userId_photoId: {
-					userId,
-					photoId
-				}
-			}
-		})
+        await prisma.likedPhoto.delete({
+            where: { userId_photoId: { userId, photoId: id } }
+        }).catch(() => null)
 
-		res.json({
-			success: true,
-			message: 'Photo unliked'
-		})
-	} catch (error) {
-		console.error('Unlike photo error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        return res.json({ success: true, message: 'Photo unliked' })
+    } catch (error) {
+        console.error('Unlike photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Favorite a photo
 export const favoritePhoto = async (req: AuthRequest, res: Response) => {
-	try {
-		const { photoId } = req.params
-		const userId = req.user!.id
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
 
-		// Check if photo exists
-		const photo = await prisma.photo.findUnique({
-			where: { id: photoId }
-		})
+        const photo = await prisma.photo.findUnique({ where: { id } })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
 
-		if (!photo) {
-			return res.status(404).json({
-				success: false,
-				error: 'Photo not found'
-			})
-		}
+        await prisma.favoritedPhoto.create({
+            data: { userId, photoId: id }
+        }).catch(() => null)
 
-		// Check if already favorited
-		const existingFavorite = await prisma.favoritedPhoto.findUnique({
-			where: {
-				userId_photoId: {
-					userId,
-					photoId
-				}
-			}
-		})
-
-		if (existingFavorite) {
-			return res.status(400).json({
-				success: false,
-				error: 'Photo already favorited'
-			})
-		}
-
-		await prisma.favoritedPhoto.create({
-			data: {
-				userId,
-				photoId
-			}
-		})
-
-		res.json({
-			success: true,
-			message: 'Photo favorited'
-		})
-	} catch (error) {
-		console.error('Favorite photo error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        return res.json({ success: true, message: 'Photo favorited' })
+    } catch (error) {
+        console.error('Favorite photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Unfavorite a photo
 export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
-	try {
-		const { photoId } = req.params
-		const userId = req.user!.id
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
 
-		await prisma.favoritedPhoto.delete({
-			where: {
-				userId_photoId: {
-					userId,
-					photoId
-				}
-			}
-		})
+        await prisma.favoritedPhoto.delete({
+            where: { userId_photoId: { userId, photoId: id } }
+        }).catch(() => null)
 
-		res.json({
-			success: true,
-			message: 'Photo unfavorited'
-		})
-	} catch (error) {
-		console.error('Unfavorite photo error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        return res.json({ success: true, message: 'Photo unfavorited' })
+    } catch (error) {
+        console.error('Unfavorite photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Get like/favorite status for the current user
 export const getPhotoStatus = async (req: AuthRequest, res: Response) => {
-	try {
-		const { photoId } = req.params
-		const userId = req.user!.id
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
 
-		// Check if photo exists
-		const photo = await prisma.photo.findUnique({
-			where: { id: photoId }
-		})
+        const [liked, favorited] = await Promise.all([
+            prisma.likedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } }),
+            prisma.favoritedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } })
+        ])
 
-		if (!photo) {
-			return res.status(404).json({
-				success: false,
-				error: 'Photo not found'
-			})
-		}
-
-		// Check like and favorite status
-		const [liked, favorited] = await Promise.all([
-			prisma.likedPhoto.findUnique({
-				where: {
-					userId_photoId: {
-						userId,
-						photoId
-					}
-				}
-			}),
-			prisma.favoritedPhoto.findUnique({
-				where: {
-					userId_photoId: {
-						userId,
-						photoId
-					}
-				}
-			})
-		])
-
-		res.json({
-			success: true,
-			data: {
-				liked: !!liked,
-				favorited: !!favorited
-			}
-		})
-	} catch (error) {
-		console.error('Get photo status error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        return res.json({ success: true, data: { liked: !!liked, favorited: !!favorited } })
+    } catch (error) {
+        console.error('Get photo status error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Get all liked photos for the current user
 export const getLikedPhotos = async (req: AuthRequest, res: Response) => {
-	try {
-		const userId = req.user!.id
+    try {
+        const userId = req.user!.id
+        const liked = await prisma.likedPhoto.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                photo: {
+                    include: {
+                        gallery: {
+                            include: { photographer: { select: { name: true } } }
+                        }
+                    }
+                }
+            }
+        })
 
-		const likedPhotos = await prisma.likedPhoto.findMany({
-			where: { userId },
-			include: {
-				photo: {
-					include: {
-						gallery: {
-							select: {
-								id: true,
-								title: true,
-								photographer: {
-									select: {
-										name: true
-									}
-								}
-							}
-						}
-					}
-				}
-			},
-			orderBy: { createdAt: 'desc' }
-		})
-
-		res.json({
-			success: true,
-			data: likedPhotos.map(lp => lp.photo)
-		})
-	} catch (error) {
-		console.error('Get liked photos error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        const photos = liked.map((lp) => lp.photo)
+        return res.json({ success: true, data: photos })
+    } catch (error) {
+        console.error('Get liked photos error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
 
+// Get all favorited photos for the current user
 export const getFavoritedPhotos = async (req: AuthRequest, res: Response) => {
-	try {
-		const userId = req.user!.id
+    try {
+        const userId = req.user!.id
+        const favorites = await prisma.favoritedPhoto.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                photo: {
+                    include: {
+                        gallery: {
+                            include: { photographer: { select: { name: true } } }
+                        }
+                    }
+                }
+            }
+        })
 
-		const favoritedPhotos = await prisma.favoritedPhoto.findMany({
-			where: { userId },
-			include: {
-				photo: {
-					include: {
-						gallery: {
-							select: {
-								id: true,
-								title: true,
-								photographer: {
-									select: {
-										name: true
-									}
-								}
-							}
-						}
-					}
-				}
-			},
-			orderBy: { createdAt: 'desc' }
-		})
-
-		res.json({
-			success: true,
-			data: favoritedPhotos.map(fp => fp.photo)
-		})
-	} catch (error) {
-		console.error('Get favorited photos error:', error)
-		res.status(500).json({
-			success: false,
-			error: 'Internal server error'
-		})
-	}
+        const photos = favorites.map((fp) => fp.photo)
+        return res.json({ success: true, data: photos })
+    } catch (error) {
+        console.error('Get favorited photos error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
 }
