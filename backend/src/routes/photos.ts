@@ -4,7 +4,8 @@ import {
 	uploadPhotos,
 	getPhotos,
 	deletePhoto,
-	downloadPhoto,
+	getCompressedPhoto,
+	bulkDeletePhotos,
 	likePhoto,
 	unlikePhoto,
 	favoritePhoto,
@@ -27,17 +28,22 @@ router.post(
 )
 router.delete('/:id', authenticateToken, requireRole('PHOTOGRAPHER'), deletePhoto)
 
-// Like/Favorite routes (authenticated users)
-router.post('/:photoId/like', authenticateToken, likePhoto)
-router.delete('/:photoId/like', authenticateToken, unlikePhoto)
-router.post('/:photoId/favorite', authenticateToken, favoritePhoto)
-router.delete('/:photoId/favorite', authenticateToken, unfavoritePhoto)
-router.get('/:photoId/status', authenticateToken, getPhotoStatus)
+// Bulk operations
+router.post('/bulk-delete', authenticateToken, requireRole('PHOTOGRAPHER'), bulkDeletePhotos)
+
+// Like/Favorite routes
+router.post('/:id/like', authenticateToken, likePhoto)
+router.delete('/:id/like', authenticateToken, unlikePhoto)
+router.post('/:id/favorite', authenticateToken, favoritePhoto)
+router.delete('/:id/favorite', authenticateToken, unfavoritePhoto)
+
+// Status and lists
+router.get('/:id/status', authenticateToken, getPhotoStatus)
 router.get('/liked', authenticateToken, getLikedPhotos)
 router.get('/favorited', authenticateToken, getFavoritedPhotos)
 
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)
-router.get('/:id/download', downloadPhoto)
+router.get('/:id/download', getCompressedPhoto)
 
 export default router

@@ -50,6 +50,8 @@ export default function ManageGalleryPage() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
+  const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'queued' | 'uploading' | 'processing' | 'success' | 'failed' }>({})
+  const [uploadAttempts, setUploadAttempts] = useState<{ [key: string]: number }>({})
 
   const [formData, setFormData] = useState({
     title: "",
@@ -112,23 +114,106 @@ export default function ManageGalleryPage() {
     if (!files.length) return
 
     setUploading(true)
-    const formData = new FormData()
 
+    // Initialize progress, status and attempts
+    const initProgress: { [key: string]: number } = {}
+    const initStatus: { [key: string]: 'queued' } = {} as any
+    const initAttempts: { [key: string]: number } = {}
     Array.from(files).forEach((file) => {
-      formData.append("photos", file)
-      setUploadProgress((prev) => ({ ...prev, [file.name]: 0 }))
+      initProgress[file.name] = 0
+      initStatus[file.name] = 'queued'
+      initAttempts[file.name] = 0
     })
+    setUploadProgress((prev) => ({ ...initProgress, ...prev }))
+    setUploadStatus((prev) => ({ ...prev, ...initStatus }))
+    setUploadAttempts((prev) => ({ ...prev, ...initAttempts }))
+
+    let successCount = 0
+    let failureCount = 0
 
     try {
-      await api.uploadPhotos(galleryId, formData)
-      showToast(`Successfully uploaded ${files.length} photos`, "success")
-      fetchGallery()
-      setUploadProgress({})
-    } catch (error) {
-      showToast("Failed to upload photos", "error")
+      // Upload sequentially to provide clearer per-file progress and avoid overwhelming the server
+      for (const file of Array.from(files)) {
+        const ok = await uploadSingleFileWithProgress(file)
+        if (ok) successCount++
+        else failureCount++
+      }
+
+      if (successCount > 0) {
+        showToast(`Successfully uploaded ${successCount} ${successCount === 1 ? 'photo' : 'photos'}`, 'success')
+        fetchGallery()
+      }
+      if (failureCount > 0) {
+        showToast(`${failureCount} ${failureCount === 1 ? 'upload' : 'uploads'} failed`, 'error')
+      }
     } finally {
       setUploading(false)
     }
+  }
+
+  const uploadSingleFileWithProgress = (file: File): Promise<boolean> => {
+    const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+    const token = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
+      : undefined
+
+    const attemptUpload = (attempt: number): Promise<boolean> => {
+      return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest()
+        const formData = new FormData()
+        formData.append('photos', file)
+
+        setUploadStatus((prev) => ({ ...prev, [file.name]: 'uploading' }))
+        setUploadAttempts((prev) => ({ ...prev, [file.name]: attempt }))
+
+        xhr.upload.onprogress = (e: ProgressEvent<EventTarget>) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100)
+            setUploadProgress((prev) => ({ ...prev, [file.name]: percent }))
+            if (percent === 100) {
+              // Body sent; server may still be processing
+              setUploadStatus((prev) => ({ ...prev, [file.name]: 'processing' }))
+            }
+          }
+        }
+
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            const status = xhr.status
+            if (status >= 200 && status < 300) {
+              setUploadStatus((prev) => ({ ...prev, [file.name]: 'success' }))
+              setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }))
+              resolve(true)
+              return
+            }
+
+            // Do not retry on client errors like 400/413; allow retry for 429
+            if (status >= 400 && status < 500 && status !== 429) {
+              setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
+              resolve(false)
+              return
+            }
+
+            // Retry with exponential backoff up to 3 attempts
+            if (attempt < 3) {
+              const delay = 500 * Math.pow(2, attempt - 1)
+              setTimeout(() => {
+                resolve(attemptUpload(attempt + 1))
+              }, delay)
+            } else {
+              setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
+              resolve(false)
+            }
+          }
+        }
+
+        xhr.open('POST', `${BASE_URL}/photos/upload/${galleryId}`)
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+        xhr.send(formData)
+      })
+    }
+
+    return attemptUpload(1)
   }
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -247,19 +332,34 @@ export default function ManageGalleryPage() {
               </div>
 
               {uploading && (
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-3">
                   <p className="text-sm font-medium">Uploading photos...</p>
-                  {Object.entries(uploadProgress).map(([filename, progress]) => (
-                    <div key={filename} className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600 flex-1 truncate">{filename}</span>
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all"
-                          style={{ width: `${progress}%` }}
-                        />
+                  {Object.entries(uploadProgress).map(([filename, progress]) => {
+                    const status = uploadStatus[filename]
+                    const attempts = uploadAttempts[filename] || 0
+                    return (
+                      <div key={filename} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-700 truncate flex-1 pr-2">{filename}</span>
+                          <span className="text-xs text-gray-500">
+                            {status === 'uploading' && `${progress}%`}
+                            {status === 'processing' && 'Processing...'}
+                            {status === 'success' && 'Done'}
+                            {status === 'failed' && 'Failed'}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`${status === 'failed' ? 'bg-red-500' : 'bg-blue-600'} h-2 rounded-full transition-all`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        {attempts > 1 && status !== 'success' && (
+                          <div className="text-xs text-gray-500">Attempt {attempts} of 3</div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -288,7 +388,7 @@ export default function ManageGalleryPage() {
                         fill
                         className="object-cover"
                       />
-                      <div className="absolute inset-0 bg-black bg-opacit/0 group-hover:bg-opacity/50 transition-all flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
                         <Button
                           size="sm"
                           variant="destructive"
