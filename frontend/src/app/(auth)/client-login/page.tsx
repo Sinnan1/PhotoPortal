@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Loader2, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 
 export default function ClientLoginPage() {
   const [email, setEmail] = useState("");
@@ -42,12 +43,13 @@ export default function ClientLoginPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+    <div className="min-h-[calc(100vh-4rem)] relative flex items-center justify-center px-4">
+      <div className="pointer-events-none absolute -z-10 right-[-6rem] bottom-[-6rem] opacity-10">
+        <Image src="/ICONS-01.png" alt="" width={500} height={500} />
+      </div>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <Users className="h-8 w-8 text-primary" />
-          </div>
+          <Image src="/Logo-Main.png" alt="PhotoPortal" width={220} height={54} className="mx-auto" />
           <h2 className="mt-4 text-3xl font-bold">Client Login</h2>
           <p className="mt-2 text-sm text-muted-foreground">Access your shared galleries</p>
         </div>

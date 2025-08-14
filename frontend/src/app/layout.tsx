@@ -10,8 +10,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "PhotoPortal - Professional Photo Gallery",
-  description: "Create and share password-protected photo galleries with clients",
+  title: "Yarrow Weddings & Co.",
+  description: "Private wedding galleries crafted exclusively for Yarrow Weddings & Co. clients.",
     generator: 'v0.dev'
 }
 

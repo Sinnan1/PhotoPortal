@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -42,80 +43,95 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <Camera className="h-8 w-8 text-primary" />
-          </div>
-          <h2 className="mt-4 text-3xl font-bold">Welcome Back</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Or{" "}
-            <Link href="/register" className="text-primary font-medium hover:underline">
-              create a new account
-            </Link>
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Are you a client?{" "}
-            <Link href="/client-login" className="text-primary font-medium hover:underline">
-              Sign in as client
-            </Link>
-          </p>
+    <div className="min-h-[calc(100vh-4rem)] grid lg:grid-cols-2">
+      {/* Left: Brand hero */}
+      <div className="relative hidden lg:block overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-800 to-green-600" />
+        <div className="absolute inset-0 opacity-15">
+          <Image src="/ICONS-01.png" alt="" fill sizes="50vw" className="object-contain object-center" />
         </div>
+        <div className="relative h-full w-full flex items-center justify-center p-12">
+          <div className="max-w-md text-white">
+            <h2 className="text-3xl font-semibold leading-tight">Welcome back to your private wedding gallery</h2>
+            <p className="mt-3 text-white/80">A timeless, secure space to relive your most cherished moments.</p>
+          </div>
+        </div>
+      </div>
 
-        <Card className="border rounded-2xl bg-card/60 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="text-2xl">Login</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Enter your credentials to sign in
-            </CardDescription>
-          </CardHeader>
+      {/* Right: Form */}
+      <div className="flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center lg:hidden">
+            <Image src="/Logo-Main.png" alt="Yarrow Weddings & Co." width={220} height={54} className="mx-auto" />
+          </div>
 
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-5">
-              <div>
-                <Label htmlFor="email">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1"
-                />
-              </div>
+          <Card className="border rounded-2xl bg-card/70 backdrop-blur shadow-xl">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Sign in</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Enter your credentials to access your gallery
+              </CardDescription>
+            </CardHeader>
 
-              <div>
-                <Label htmlFor="password">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="mt-1 mb-4"
-                />
-              </div>
-            </CardContent>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-5">
+                <div>
+                  <Label htmlFor="email">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="mt-1"
+                  />
+                </div>
 
-            <CardFooter>
-              <Button
-                type="submit"
-                className="w-full rounded-full"
-                disabled={loading}
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+                <div>
+                  <Label htmlFor="password">
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="mt-1 mb-2"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Are you a client?</span>
+                  <Link href="/client-login" className="text-primary font-medium hover:underline">
+                    Sign in as client
+                  </Link>
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex flex-col space-y-4">
+                <Button
+                  type="submit"
+                  className="w-full rounded-full"
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Sign In
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                  New to Yarrow Weddings & Co.?{" "}
+                  <Link href="/register" className="text-primary font-medium hover:underline">
+                    Create an account
+                  </Link>
+                </p>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
       </div>
     </div>
   );

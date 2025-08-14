@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react"
@@ -24,11 +24,14 @@ interface PhotoLightboxProps {
 }
 
 export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload }: PhotoLightboxProps) {
+  const [src, setSrc] = useState(photo.originalUrl)
   const currentIndex = photos.findIndex((p) => p.id === photo.id)
   const isFirst = currentIndex === 0
   const isLast = currentIndex === photos.length - 1
 
   useEffect(() => {
+    // Reset src when photo changes
+    setSrc(photo.originalUrl)
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case "Escape":
@@ -50,7 +53,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       document.removeEventListener("keydown", handleKeyDown)
       document.body.style.overflow = "unset"
     }
-  }, [isFirst, isLast, onClose, onNext, onPrevious])
+  }, [isFirst, isLast, onClose, onNext, onPrevious, photo.originalUrl])
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
@@ -110,18 +113,23 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       {/* Main Image */}
       <div className="relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center">
         <Image
-          src={photo.originalUrl || "/placeholder.svg"}
+          src={src || "/placeholder.svg"}
           alt={photo.filename}
           width={1200}
           height={800}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="max-w-full max-h-full object-contain"
           priority
-          onError={(e) => {
-            console.error('Lightbox image failed to load:', photo.originalUrl);
-            // Fallback to placeholder
-            const target = e.target as HTMLImageElement;
-            target.src = "/placeholder.svg";
+          unoptimized
+          onError={() => {
+            // Try to correct common double-extension issue (e.g., .JPG.jpg)
+            if (/\.(jpe?g|png|webp|tiff)\.jpg$/i.test(src)) {
+              const corrected = src.replace(/\.jpg$/i, "")
+              setSrc(corrected)
+              return
+            }
+            console.error('Lightbox image failed to load:', src)
+            setSrc('/placeholder.svg')
           }}
         />
       </div>
