@@ -39,41 +39,80 @@ const authorizeB2 = async (): Promise<void> => {
 // Enhanced delete function using native B2 API
 export const deleteFromB2 = async (filename: string): Promise<void> => {
 	try {
+		console.log(`🗑️  Starting B2 delete for: ${filename}`)
+		
 		await authorizeB2()
 		
 		if (!bucketId) {
 			throw new Error('Bucket ID not available')
 		}
 
-		// List file versions to get the file ID
-		const fileVersions = await b2Client.listFileVersions({
+		console.log(`📋 Listing file versions for: ${filename}`)
+		console.log(`   Using bucket ID: ${bucketId}`)
+
+		// First try to find files starting with the filename
+		let fileVersions = await b2Client.listFileVersions({
 			bucketId,
 			startFileName: filename,
 			startFileId: '',
-			maxFileCount: 1
+			maxFileCount: 100 // Increased to get more results
 		})
 
+		console.log(`📁 Found ${fileVersions.data.files.length} files in targeted lookup`)
+		
 		// Find exact match for the filename
-		const fileVersion = fileVersions.data.files.find((file: any) => file.fileName === filename)
+		let fileVersion = fileVersions.data.files.find((file: any) => file.fileName === filename)
+		
+		// If not found, try a broader search (this handles cases where B2 startFileName doesn't work as expected)
+		if (!fileVersion) {
+			console.log(`🔍 Exact match not found, trying broader search...`)
+			fileVersions = await b2Client.listFileVersions({
+				bucketId,
+				startFileName: '',
+				startFileId: '',
+				maxFileCount: 1000 // Get more files for broader search
+			})
+			
+			console.log(`📁 Broader search found ${fileVersions.data.files.length} total files`)
+			fileVersion = fileVersions.data.files.find((file: any) => file.fileName === filename)
+		}
+
+		// Log some files for debugging
+		console.log(`📋 Sample files found:`)
+		fileVersions.data.files.slice(0, 5).forEach((file: any, index: number) => {
+			console.log(`   ${index + 1}. "${file.fileName}" (${file.fileId})`)
+		})
 		
 		if (!fileVersion) {
-			console.log(`File not found for deletion: ${filename}`)
+			console.log(`❌ Exact match not found for: "${filename}"`)
+			console.log(`   Searched in ${fileVersions.data.files.length} files`)
 			return // File doesn't exist, consider it successfully deleted
 		}
 
+		console.log(`✅ Found exact match: "${fileVersion.fileName}"`)
+		console.log(`   File ID: ${fileVersion.fileId}`)
+		console.log(`   File Size: ${fileVersion.size} bytes`)
+
 		// Delete the specific file version using native B2 API
-		await b2Client.deleteFileVersion({
+		console.log(`🔥 Deleting file version...`)
+		const deleteResult = await b2Client.deleteFileVersion({
 			fileId: fileVersion.fileId,
 			fileName: fileVersion.fileName
 		})
 
-		console.log(`Successfully deleted: ${filename} (fileId: ${fileVersion.fileId})`)
+		console.log(`✅ Successfully deleted: ${filename}`)
+		console.log(`   File ID: ${fileVersion.fileId}`)
+		console.log(`   Delete result:`, deleteResult.data)
 	} catch (error) {
-		console.error('B2 delete error:', {
+		console.error('❌ B2 delete error:', {
 			message: (error as Error)?.message,
 			filename,
 			stack: (error as Error)?.stack
 		})
+		
+		if ((error as any)?.response?.data) {
+			console.error('B2 API Error Details:', (error as any).response.data)
+		}
 		
 		// Don't throw error if file doesn't exist
 		if ((error as any)?.response?.data?.code === 'file_not_found') {
