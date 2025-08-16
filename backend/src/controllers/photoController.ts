@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
-import { uploadToS3, deleteFromS3 } from '../utils/s3Storage'
+import { uploadToS3, deleteFromB2 } from '../utils/b2Storage'
 
 const prisma = new PrismaClient()
 
@@ -387,8 +387,8 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 			const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/')
 			
 			await Promise.all([
-				deleteFromS3(originalKey).catch(err => console.warn('Failed to delete original:', err)),
-				deleteFromS3(thumbnailKey).catch(err => console.warn('Failed to delete thumbnail:', err))
+				deleteFromB2(originalKey).catch(err => console.warn('Failed to delete original:', err)),
+				deleteFromB2(thumbnailKey).catch(err => console.warn('Failed to delete thumbnail:', err))
 			])
 		} catch (storageError) {
 			console.error('Storage deletion error:', storageError)
@@ -446,8 +446,8 @@ export const bulkDeletePhotos = async (req: AuthRequest, res: Response) => {
 				const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/')
 				
 				await Promise.all([
-					deleteFromS3(originalKey),
-					deleteFromS3(thumbnailKey)
+					deleteFromB2(originalKey),
+					deleteFromB2(thumbnailKey)
 				])
 			} catch (error) {
 				console.warn(`Failed to delete storage for photo ${photo.id}:`, error)

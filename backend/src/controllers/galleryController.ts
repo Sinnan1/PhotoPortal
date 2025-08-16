@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { deleteFromS3 } from '../utils/s3Storage'
+import { deleteFromB2 } from '../utils/b2Storage'
 import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient()
@@ -363,8 +363,8 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 					const thumbnailKey = thumbnailPathParts.slice(2).join('/');
 					
 					return Promise.all([
-						deleteFromS3(originalKey),
-						deleteFromS3(thumbnailKey)
+						deleteFromB2(originalKey),
+						deleteFromB2(thumbnailKey)
 					]);
 				});
 				
