@@ -486,15 +486,33 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ success: false, error: 'Photo not found' })
         }
 
-        // Create like if not exists
-        await prisma.likedPhoto.create({
-            data: { userId, photoId: id }
-        }).catch(async (err) => {
-            // If already liked (unique constraint), ignore
-            return null
+        // Sync likes across photographer and all clients with access to this gallery
+        // 1) Find gallery photographer
+        const galleryOwner = await prisma.gallery.findUnique({
+            where: { id: photo.galleryId },
+            select: { photographerId: true }
         })
 
-        return res.json({ success: true, message: 'Photo liked' })
+        // 2) Find all clients who have access to this gallery
+        const accessUsers = await prisma.galleryAccess.findMany({
+            where: { galleryId: photo.galleryId },
+            select: { userId: true }
+        })
+
+        // 3) Build the set of users to mirror the like to (owner + all clients with access)
+        const userIdsToLike = new Set<string>([
+            userId,
+            ...(galleryOwner ? [galleryOwner.photographerId] : [])
+        ])
+        accessUsers.forEach(u => userIdsToLike.add(u.userId))
+
+        // 4) Create likes for all these users, skipping duplicates
+        await prisma.likedPhoto.createMany({
+            data: Array.from(userIdsToLike).map(uid => ({ userId: uid, photoId: id })),
+            skipDuplicates: true
+        })
+
+        return res.json({ success: true, message: 'Photo liked (synced)' })
     } catch (error) {
         console.error('Like photo error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
@@ -507,11 +525,33 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
         const { id } = req.params
         const userId = req.user!.id
 
-        await prisma.likedPhoto.delete({
-            where: { userId_photoId: { userId, photoId: id } }
-        }).catch(() => null)
+        // Ensure photo exists to derive gallery
+        const photo = await prisma.photo.findUnique({ where: { id } })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
 
-        return res.json({ success: true, message: 'Photo unliked' })
+        // Get gallery owner and all clients with access
+        const galleryOwner = await prisma.gallery.findUnique({
+            where: { id: photo.galleryId },
+            select: { photographerId: true }
+        })
+        const accessUsers = await prisma.galleryAccess.findMany({
+            where: { galleryId: photo.galleryId },
+            select: { userId: true }
+        })
+
+        const userIdsToUnlike = new Set<string>([
+            userId,
+            ...(galleryOwner ? [galleryOwner.photographerId] : [])
+        ])
+        accessUsers.forEach(u => userIdsToUnlike.add(u.userId))
+
+        await prisma.likedPhoto.deleteMany({
+            where: { photoId: id, userId: { in: Array.from(userIdsToUnlike) } }
+        })
+
+        return res.json({ success: true, message: 'Photo unliked (synced)' })
     } catch (error) {
         console.error('Unlike photo error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
@@ -529,11 +569,28 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ success: false, error: 'Photo not found' })
         }
 
-        await prisma.favoritedPhoto.create({
-            data: { userId, photoId: id }
-        }).catch(() => null)
+        // Sync favorites across photographer and all clients with access
+        const galleryOwner = await prisma.gallery.findUnique({
+            where: { id: photo.galleryId },
+            select: { photographerId: true }
+        })
+        const accessUsers = await prisma.galleryAccess.findMany({
+            where: { galleryId: photo.galleryId },
+            select: { userId: true }
+        })
 
-        return res.json({ success: true, message: 'Photo favorited' })
+        const userIdsToFavorite = new Set<string>([
+            userId,
+            ...(galleryOwner ? [galleryOwner.photographerId] : [])
+        ])
+        accessUsers.forEach(u => userIdsToFavorite.add(u.userId))
+
+        await prisma.favoritedPhoto.createMany({
+            data: Array.from(userIdsToFavorite).map(uid => ({ userId: uid, photoId: id })),
+            skipDuplicates: true
+        })
+
+        return res.json({ success: true, message: 'Photo favorited (synced)' })
     } catch (error) {
         console.error('Favorite photo error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
@@ -546,11 +603,33 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
         const { id } = req.params
         const userId = req.user!.id
 
-        await prisma.favoritedPhoto.delete({
-            where: { userId_photoId: { userId, photoId: id } }
-        }).catch(() => null)
+        // Ensure photo exists to derive gallery
+        const photo = await prisma.photo.findUnique({ where: { id } })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
 
-        return res.json({ success: true, message: 'Photo unfavorited' })
+        // Get gallery owner and all clients with access
+        const galleryOwner = await prisma.gallery.findUnique({
+            where: { id: photo.galleryId },
+            select: { photographerId: true }
+        })
+        const accessUsers = await prisma.galleryAccess.findMany({
+            where: { galleryId: photo.galleryId },
+            select: { userId: true }
+        })
+
+        const userIdsToUnfavorite = new Set<string>([
+            userId,
+            ...(galleryOwner ? [galleryOwner.photographerId] : [])
+        ])
+        accessUsers.forEach(u => userIdsToUnfavorite.add(u.userId))
+
+        await prisma.favoritedPhoto.deleteMany({
+            where: { photoId: id, userId: { in: Array.from(userIdsToUnfavorite) } }
+        })
+
+        return res.json({ success: true, message: 'Photo unfavorited (synced)' })
     } catch (error) {
         console.error('Unfavorite photo error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
