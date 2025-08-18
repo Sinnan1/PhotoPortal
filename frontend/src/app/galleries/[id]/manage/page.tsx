@@ -67,6 +67,17 @@ export default function ManageGalleryPage() {
     }
   }, [user, galleryId])
 
+  // Enable folder selection on the hidden input when present
+  useEffect(() => {
+    const input = fileInputRef.current
+    if (input) {
+      try {
+        input.setAttribute('webkitdirectory', '')
+        input.setAttribute('directory', '')
+      } catch {}
+    }
+  }, [])
+
   const fetchGallery = async () => {
     try {
       const response = await api.getGallery(galleryId)
@@ -110,8 +121,75 @@ export default function ManageGalleryPage() {
     }
   }
 
-  const handleFileUpload = async (files: FileList) => {
-    if (!files.length) return
+  // Extract files from DataTransfer (supports dropped folders)
+  const getFilesFromDataTransfer = async (dt: DataTransfer): Promise<File[]> => {
+    const items = Array.from(dt.items || []) as any[]
+    const out: File[] = []
+
+    const traverse = async (entry: any, prefix = ""): Promise<void> => {
+      if (!entry) return
+      if (entry.isFile) {
+        await new Promise<void>((resolve) => {
+          entry.file((file: File) => {
+            try {
+              Object.defineProperty(file, 'webkitRelativePath', { value: prefix + file.name })
+            } catch {}
+            out.push(file)
+            resolve()
+          })
+        })
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader()
+        const readAll = async (): Promise<any[]> => {
+          const result: any[] = []
+          while (true) {
+            const batch: any[] = await new Promise((resolve) => reader.readEntries(resolve))
+            if (!batch || batch.length === 0) break
+            result.push(...batch)
+          }
+          return result
+        }
+        const entries = await readAll()
+        await Promise.all(entries.map((e) => traverse(e, prefix + entry.name + "/")))
+      }
+    }
+
+    await Promise.all(items.map((it) => {
+      const entry = it && typeof it.webkitGetAsEntry === 'function' ? it.webkitGetAsEntry() : null
+      return entry ? traverse(entry) : Promise.resolve()
+    }))
+
+    // Fallback if items API is unavailable
+    if (out.length === 0 && dt.files) {
+      return Array.from(dt.files)
+    }
+    return out
+  }
+
+  const uploadWithConcurrency = async (files: File[], concurrency = 5) => {
+    let index = 0
+    let successCount = 0
+    let failureCount = 0
+
+    const worker = async () => {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const current = index++
+        if (current >= files.length) break
+        const ok = await uploadSingleFileWithProgress(files[current])
+        if (ok) successCount++
+        else failureCount++
+      }
+    }
+
+    const workers = Array.from({ length: Math.min(concurrency, files.length) }, worker)
+    await Promise.all(workers)
+    return { successCount, failureCount }
+  }
+
+  const handleFileUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.isArray(files) ? files : Array.from(files)
+    if (fileArray.length === 0) return
 
     setUploading(true)
 
@@ -119,7 +197,7 @@ export default function ManageGalleryPage() {
     const initProgress: { [key: string]: number } = {}
     const initStatus: { [key: string]: 'queued' } = {} as any
     const initAttempts: { [key: string]: number } = {}
-    Array.from(files).forEach((file) => {
+    fileArray.forEach((file) => {
       initProgress[file.name] = 0
       initStatus[file.name] = 'queued'
       initAttempts[file.name] = 0
@@ -128,16 +206,9 @@ export default function ManageGalleryPage() {
     setUploadStatus((prev) => ({ ...prev, ...initStatus }))
     setUploadAttempts((prev) => ({ ...prev, ...initAttempts }))
 
-    let successCount = 0
-    let failureCount = 0
-
     try {
-      // Upload sequentially to provide clearer per-file progress and avoid overwhelming the server
-      for (const file of Array.from(files)) {
-        const ok = await uploadSingleFileWithProgress(file)
-        if (ok) successCount++
-        else failureCount++
-      }
+      // Limited parallel uploads for better throughput without overwhelming the server
+      const { successCount, failureCount } = await uploadWithConcurrency(fileArray, 5)
 
       if (successCount > 0) {
         showToast(`Successfully uploaded ${successCount} ${successCount === 1 ? 'photo' : 'photos'}`, 'success')
@@ -305,11 +376,17 @@ export default function ManageGalleryPage() {
               <div
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
-                onDrop={(e) => {
+                onDrop={async (e) => {
                   e.preventDefault()
-                  const files = e.dataTransfer.files
+                  const dt = e.dataTransfer
+                  let files: File[] = []
+                  try {
+                    files = await getFilesFromDataTransfer(dt)
+                  } catch {
+                    files = Array.from(dt.files || [])
+                  }
                   if (files.length > 0) {
-                    handleFileUpload(files)
+                    await handleFileUpload(files)
                   }
                 }}
                 onDragOver={(e) => e.preventDefault()}
