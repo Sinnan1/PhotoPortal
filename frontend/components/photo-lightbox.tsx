@@ -43,6 +43,16 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         case "ArrowRight":
           if (!isLast) onNext()
           break
+        case "q":
+        case "Q":
+          // Trigger like action
+          document.querySelector('[data-action="like"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          break
+        case "w":
+        case "W":
+          // Trigger favorite action
+          document.querySelector('[data-action="favorite"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          break
       }
     }
 
@@ -67,9 +77,12 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         <X className="h-6 w-6" />
       </Button>
 
-      {/* Like/Favorite Buttons */}
-      <div className="absolute top-4 right-20 z-10">
-        <PhotoActions photoId={photo.id} />
+      {/* Like/Favorite Buttons - positioned on right with proper spacing */}
+      <div className="absolute top-16 right-4 z-10">
+        <PhotoActions 
+          photoId={photo.id} 
+          className="flex-col [&>button]:text-white [&>button]:backdrop-blur-sm [&>button]:bg-black/30 [&>button]:hover:bg-black/50 [&>button]:border-white/20"
+        />
       </div>
 
       {/* Navigation Buttons */}
@@ -95,12 +108,13 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         </Button>
       )}
 
-      {/* Download Button */}
+      {/* Download Button - moved to give more space */}
       <Button
         variant="ghost"
         size="icon"
         className="absolute top-4 right-16 text-white hover:bg-white hover:bg-opacity-20 z-10"
         onClick={onDownload}
+        aria-label="Download photo"
       >
         <Download className="h-6 w-6" />
       </Button>
@@ -138,6 +152,11 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       <div className="absolute bottom-4 left-4 text-white text-sm z-10">
         <p className="font-medium">{photo.filename}</p>
         <p className="text-gray-300">{new Date(photo.createdAt).toLocaleDateString()}</p>
+      </div>
+
+      {/* Keyboard Shortcuts Help */}
+      <div className="absolute bottom-4 right-4 text-white text-xs z-10 opacity-60">
+        <p>Q: Like • W: Favorite • ←→: Navigate • ESC: Close</p>
       </div>
 
       {/* Click outside to close */}

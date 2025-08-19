@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Trash2, Save, ArrowLeft, Images, Settings, Loader2 } from "lucide-react"
+import { Upload, Trash2, Save, ArrowLeft, Images, Settings, Loader2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -52,6 +52,7 @@ export default function ManageGalleryPage() {
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'queued' | 'uploading' | 'processing' | 'success' | 'failed' }>({})
   const [uploadAttempts, setUploadAttempts] = useState<{ [key: string]: number }>({})
+  const [activeUploads, setActiveUploads] = useState<{ [key: string]: XMLHttpRequest }>({})
 
   const [formData, setFormData] = useState({
     title: "",
@@ -187,6 +188,22 @@ export default function ManageGalleryPage() {
     return { successCount, failureCount }
   }
 
+  const cancelUpload = () => {
+    // Abort all active uploads
+    Object.values(activeUploads).forEach(xhr => {
+      xhr.abort()
+    })
+    
+    // Reset upload state
+    setActiveUploads({})
+    setUploading(false)
+    setUploadProgress({})
+    setUploadStatus({})
+    setUploadAttempts({})
+    
+    showToast("Upload canceled", "info")
+  }
+
   const handleFileUpload = async (files: FileList | File[]) => {
     const fileArray = Array.isArray(files) ? files : Array.from(files)
     if (fileArray.length === 0) return
@@ -217,8 +234,14 @@ export default function ManageGalleryPage() {
       if (failureCount > 0) {
         showToast(`${failureCount} ${failureCount === 1 ? 'upload' : 'uploads'} failed`, 'error')
       }
+    } catch (error) {
+      // Handle upload cancellation or other errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        showToast("Upload canceled", "info")
+      }
     } finally {
       setUploading(false)
+      setActiveUploads({})
     }
   }
 
@@ -234,6 +257,9 @@ export default function ManageGalleryPage() {
         const formData = new FormData()
         formData.append('photos', file)
 
+        // Track this upload request
+        setActiveUploads(prev => ({ ...prev, [file.name]: xhr }))
+
         setUploadStatus((prev) => ({ ...prev, [file.name]: 'uploading' }))
         setUploadAttempts((prev) => ({ ...prev, [file.name]: attempt }))
 
@@ -248,8 +274,25 @@ export default function ManageGalleryPage() {
           }
         }
 
+        xhr.onabort = () => {
+          setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
+          setActiveUploads(prev => {
+            const newUploads = { ...prev }
+            delete newUploads[file.name]
+            return newUploads
+          })
+          resolve(false)
+        }
+
         xhr.onreadystatechange = () => {
           if (xhr.readyState === XMLHttpRequest.DONE) {
+            // Remove from active uploads
+            setActiveUploads(prev => {
+              const newUploads = { ...prev }
+              delete newUploads[file.name]
+              return newUploads
+            })
+
             const status = xhr.status
             if (status >= 200 && status < 300) {
               setUploadStatus((prev) => ({ ...prev, [file.name]: 'success' }))
@@ -375,7 +418,16 @@ export default function ManageGalleryPage() {
             <CardContent>
               <div
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                role="button"
+                tabIndex={0}
+                aria-label="Upload photos by clicking or dragging files here"
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    fileInputRef.current?.click()
+                  }
+                }}
                 onDrop={async (e) => {
                   e.preventDefault()
                   const dt = e.dataTransfer
@@ -410,7 +462,19 @@ export default function ManageGalleryPage() {
 
               {uploading && (
                 <div className="mt-4 space-y-3">
-                  <p className="text-sm font-medium">Uploading photos...</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Uploading photos...</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={cancelUpload}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      aria-label="Cancel all photo uploads"
+                    >
+                      <X className="mr-1 h-4 w-4" />
+                      Cancel Upload
+                    </Button>
+                  </div>
                   {Object.entries(uploadProgress).map(([filename, progress]) => {
                     const status = uploadStatus[filename]
                     const attempts = uploadAttempts[filename] || 0
@@ -471,6 +535,7 @@ export default function ManageGalleryPage() {
                           variant="destructive"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => handleDeletePhoto(photo.id)}
+                          aria-label={`Delete photo ${photo.filename}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

@@ -244,7 +244,7 @@ export default function ClientDashboardPage() {
                 {/* Gallery preview - show first few photos if available */}
                 {gallery.photos && gallery.photos.length > 0 && (
                   <div className="mb-4">
-                    <div className="grid grid-cols-3 gap-1 h-20">
+                    <div className="grid grid-cols-3 gap-1">
                       {gallery.photos.slice(0, 3).map((photo, photoIndex) => (
                         <div
                           key={photo.id}
