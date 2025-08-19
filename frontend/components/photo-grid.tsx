@@ -36,6 +36,7 @@ interface PhotoGridProps {
     xl?: number;
   };
   className?: string;
+  lastPhotoElementRef?: (node: HTMLDivElement) => void;
 }
 
 export function PhotoGrid({
@@ -48,6 +49,7 @@ export function PhotoGrid({
   onPhotoStatusChange,
   columns = { sm: 2, md: 3, lg: 4 },
   className = "",
+  lastPhotoElementRef,
 }: PhotoGridProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -180,11 +182,14 @@ export function PhotoGrid({
 
   return (
     <div className={getGridClasses()}>
-      {photoState.map((photo, index) => (
-        <div
-          key={photo.id}
-          className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
-        >
+      {photoState.map((photo, index) => {
+        const isLastPhoto = index === photoState.length - 1;
+        return (
+          <div
+            key={photo.id}
+            ref={isLastPhoto ? lastPhotoElementRef : undefined}
+            className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
+          >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
@@ -298,8 +303,9 @@ export function PhotoGrid({
               </div>
             </div>
           )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

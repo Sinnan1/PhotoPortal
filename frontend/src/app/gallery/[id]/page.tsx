@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -62,6 +62,13 @@ export default function GalleryPage() {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
+  
+  // Infinite scroll state
+  const [displayedPhotos, setDisplayedPhotos] = useState<Photo[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const PHOTOS_PER_PAGE = 30;
 
   // Keep gallery.photos in sync when a photo's like/favorite status changes without re-fetching
   const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
@@ -227,6 +234,46 @@ export default function GalleryPage() {
     }
     return gallery.photos;
   }, [gallery, filter, user]);
+
+  // Load more photos function
+  const loadMorePhotos = useCallback(() => {
+    if (!gallery || loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    const startIndex = displayedPhotos.length;
+    const endIndex = startIndex + PHOTOS_PER_PAGE;
+    const newPhotos = filteredPhotos.slice(startIndex, endIndex);
+    
+    // Simulate network delay for smooth UX
+    setTimeout(() => {
+      setDisplayedPhotos(prev => [...prev, ...newPhotos]);
+      setHasMore(endIndex < filteredPhotos.length);
+      setLoadingMore(false);
+    }, 200);
+  }, [gallery, filteredPhotos, displayedPhotos.length, loadingMore, hasMore, PHOTOS_PER_PAGE]);
+
+  // Intersection observer for infinite scroll
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastPhotoElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore) {
+        loadMorePhotos();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loadingMore, hasMore, loadMorePhotos]);
+
+  // Reset pagination when filter changes or gallery loads
+  useEffect(() => {
+    if (gallery && filteredPhotos.length > 0) {
+      const initialPhotos = filteredPhotos.slice(0, PHOTOS_PER_PAGE);
+      setDisplayedPhotos(initialPhotos);
+      setCurrentPage(2);
+      setHasMore(filteredPhotos.length > PHOTOS_PER_PAGE);
+    }
+  }, [filteredPhotos, gallery]);
 
   if (loading) {
     return (
@@ -451,7 +498,7 @@ export default function GalleryPage() {
       </div>
 
       {/* Photo Grid */}
-      {filteredPhotos.length === 0 ? (
+      {displayedPhotos.length === 0 && !loading ? (
         <div className="text-center py-12">
           <Images className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-2 text-sm font-medium">
@@ -462,21 +509,39 @@ export default function GalleryPage() {
           </p>
         </div>
       ) : (
-        <PhotoGrid
-          photos={filteredPhotos}
-          onView={(p) => setSelectedPhoto(p as any)}
-          onDownload={handleDownload}
-          onDelete={handleDelete}
-          onPhotoStatusChange={handlePhotoStatusChange}
-          columns={{ sm: 2, md: 3, lg: 4 }}
-        />
+        <>
+          <PhotoGrid
+            photos={displayedPhotos}
+            onView={(p) => setSelectedPhoto(p as any)}
+            onDownload={handleDownload}
+            onDelete={handleDelete}
+            onPhotoStatusChange={handlePhotoStatusChange}
+            columns={{ sm: 2, md: 3, lg: 4 }}
+            lastPhotoElementRef={lastPhotoElementRef}
+          />
+          
+          {/* Loading more indicator */}
+          {loadingMore && (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading more photos...</span>
+            </div>
+          )}
+          
+          {/* End of photos indicator */}
+          {!hasMore && displayedPhotos.length > 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>You've reached the end! {displayedPhotos.length} photos total.</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Photo Lightbox */}
       {selectedPhoto && (
         <PhotoLightbox
           photo={selectedPhoto}
-          photos={gallery.photos}
+          photos={filteredPhotos}
           onClose={() => setSelectedPhoto(null)}
           onNext={() => {
             const currentIndex = gallery.photos.findIndex(
