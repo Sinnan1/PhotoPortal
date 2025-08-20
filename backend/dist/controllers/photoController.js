@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
+exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.downloadPhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const multer_1 = tslib_1.__importDefault(require("multer"));
@@ -326,6 +326,60 @@ const getCompressedPhoto = async (req, res) => {
     }
 };
 exports.getCompressedPhoto = getCompressedPhoto;
+// Download photo endpoint that serves the actual file
+const downloadPhoto = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const photo = await prisma.photo.findUnique({
+            where: { id }
+        });
+        if (!photo) {
+            return res.status(404).json({
+                success: false,
+                error: 'Photo not found'
+            });
+        }
+        // Check if this is a direct download request or info request
+        const isInfoRequest = req.headers.accept?.includes('application/json') || req.query.info === 'true';
+        if (isInfoRequest) {
+            // Return download info for frontend
+            res.json({
+                success: true,
+                data: {
+                    downloadUrl: photo.originalUrl,
+                    filename: photo.filename || `photo_${id}.jpg`
+                }
+            });
+        }
+        else {
+            // Serve the actual image file
+            try {
+                // Set appropriate headers for file download
+                res.setHeader('Content-Type', 'image/jpeg'); // Adjust based on actual file type
+                res.setHeader('Content-Disposition', `attachment; filename="${photo.filename || `photo_${id}.jpg`}"`);
+                // For now, redirect to the original image URL
+                // In a production environment, you might want to serve the file directly
+                // or implement proper image streaming with compression
+                res.redirect(photo.originalUrl);
+            }
+            catch (error) {
+                console.error('Failed to serve image:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to serve image'
+                });
+            }
+        }
+    }
+    catch (error) {
+        console.error('Download photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+};
+exports.downloadPhoto = downloadPhoto;
 // Enhanced delete with better cleanup
 const deletePhoto = async (req, res) => {
     try {

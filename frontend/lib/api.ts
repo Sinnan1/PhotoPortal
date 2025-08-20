@@ -140,7 +140,7 @@ export const api = {
 
   // Fixed: Return the correct download URL
   downloadPhoto: (id: string, galleryId?: string) => {
-    const params = galleryId ? `?galleryId=${galleryId}` : ''
+    const params = galleryId ? `?galleryId=${galleryId}&info=true` : '?info=true'
     return apiRequest(`/photos/${id}/download${params}`)
   },
 

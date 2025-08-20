@@ -20,5 +20,6 @@ router.get('/liked', auth_1.authenticateToken, photoController_1.getLikedPhotos)
 router.get('/favorited', auth_1.authenticateToken, photoController_1.getFavoritedPhotos);
 // Public routes (for clients)
 router.get('/gallery/:galleryId', photoController_1.getPhotos);
-router.get('/:id/download', photoController_1.getCompressedPhoto);
+router.get('/:id/download', photoController_1.downloadPhoto);
+router.get('/:id/compressed', photoController_1.getCompressedPhoto);
 exports.default = router;
