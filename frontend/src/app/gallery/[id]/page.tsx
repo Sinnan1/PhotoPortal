@@ -544,21 +544,22 @@ export default function GalleryPage() {
           photos={filteredPhotos}
           onClose={() => setSelectedPhoto(null)}
           onNext={() => {
-            const currentIndex = gallery.photos.findIndex(
+            const currentIndex = filteredPhotos.findIndex(
               (p) => p.id === selectedPhoto.id
             );
-            const nextIndex = (currentIndex + 1) % gallery.photos.length;
-            setSelectedPhoto(gallery.photos[nextIndex]);
+            const nextIndex = (currentIndex + 1) % filteredPhotos.length;
+            setSelectedPhoto(filteredPhotos[nextIndex]);
           }}
           onPrevious={() => {
-            const currentIndex = gallery.photos.findIndex(
+            const currentIndex = filteredPhotos.findIndex(
               (p) => p.id === selectedPhoto.id
             );
             const prevIndex =
-              currentIndex === 0 ? gallery.photos.length - 1 : currentIndex - 1;
-            setSelectedPhoto(gallery.photos[prevIndex]);
+              currentIndex === 0 ? filteredPhotos.length - 1 : currentIndex - 1;
+            setSelectedPhoto(filteredPhotos[prevIndex]);
           }}
           onDownload={() => handleDownload(selectedPhoto.id)}
+          onPhotoStatusChange={handlePhotoStatusChange}
         />
       )}
     </div>

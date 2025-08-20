@@ -14,6 +14,8 @@ interface Photo {
   thumbnailUrl: string;
   originalUrl: string;
   createdAt: string;
+  likedBy: { userId: string }[];
+  favoritedBy: { userId: string }[];
   gallery: {
     id: string;
     title: string;
