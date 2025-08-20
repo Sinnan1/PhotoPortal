@@ -10,6 +10,7 @@ import authRoutes from './routes/auth'
 import galleryRoutes from './routes/galleries'
 import photoRoutes from './routes/photos'
 import photographersRoutes from './routes/photographers'
+import uploadsRoutes from './routes/uploads'
 
 // Load environment variables
 dotenv.config()
@@ -66,6 +67,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/galleries', galleryRoutes)
 app.use('/api/photos', photoRoutes)
 app.use('/api/photographers', photographersRoutes)
+app.use('/api/uploads', uploadsRoutes)
 
 // Upload configuration endpoint for frontend
 app.get('/api/upload-config', (req, res) => {
