@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
+import os from 'os'
 import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 
@@ -12,6 +13,9 @@ const s3Client = new S3Client({
 		secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
 	}
 })
+
+// Limit Sharp concurrency to avoid CPU contention on small VPS instances
+sharp.concurrency(Math.min(3, Math.max(1, os.cpus().length)))
 
 // RAW file extensions that Sharp can handle
 const SHARP_SUPPORTED_RAW = ['.dng', '.tiff', '.tif']

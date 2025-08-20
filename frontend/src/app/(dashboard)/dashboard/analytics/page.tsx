@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
                           className="object-cover"
                           sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 16vw"
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
                       </div>
                       <div className="absolute top-2 left-2">
                         <Badge variant="secondary" className="text-xs">
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
                           className="object-cover"
                           sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 16vw"
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
                       </div>
                       <div className="absolute top-2 left-2">
                         <Badge variant="secondary" className="text-xs">

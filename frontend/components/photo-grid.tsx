@@ -36,6 +36,7 @@ interface PhotoGridProps {
     xl?: number;
   };
   className?: string;
+  lastPhotoElementRef?: (node: HTMLDivElement) => void;
 }
 
 export function PhotoGrid({
@@ -48,6 +49,7 @@ export function PhotoGrid({
   onPhotoStatusChange,
   columns = { sm: 2, md: 3, lg: 4 },
   className = "",
+  lastPhotoElementRef,
 }: PhotoGridProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -180,11 +182,14 @@ export function PhotoGrid({
 
   return (
     <div className={getGridClasses()}>
-      {photoState.map((photo, index) => (
-        <div
-          key={photo.id}
-          className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
-        >
+      {photoState.map((photo, index) => {
+        const isLastPhoto = index === photoState.length - 1;
+        return (
+          <div
+            key={photo.id}
+            ref={isLastPhoto ? lastPhotoElementRef : undefined}
+            className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
+          >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
@@ -206,13 +211,14 @@ export function PhotoGrid({
             }}
           />
 
-          {/* Action overlay - Fix 4: Reduce overlay opacity for debugging */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+          {/* Action overlay - positioned at bottom to avoid overlap with like/favorite */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-end justify-center pb-4">
             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               {onView && (
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="backdrop-blur-sm bg-white/90 hover:bg-white"
                   onClick={(e) => {
                     e.stopPropagation();
                     onView(photo);
@@ -225,6 +231,7 @@ export function PhotoGrid({
               {onDownload && (
                 <Button
                   size="sm"
+                  className="backdrop-blur-sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDownload(photo.id);
@@ -238,6 +245,7 @@ export function PhotoGrid({
                 <Button
                   size="sm"
                   variant="destructive"
+                  className="backdrop-blur-sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(photo.id);
@@ -249,33 +257,35 @@ export function PhotoGrid({
             </div>
           </div>
 
-          {/* Like/Favorite buttons */}
-          <div className="absolute top-2 right-2 flex gap-2">
+          {/* Like/Favorite buttons - positioned at top-left to avoid overlap */}
+          <div className="absolute top-2 left-2 flex gap-1">
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/40"
+              className="text-white backdrop-blur-sm bg-black/30 hover:bg-black/50 p-1.5"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLikePhoto(photo.id);
               }}
+              aria-label="Like photo"
             >
-          <Heart
-            className={`h-5 w-5 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
-          />
+              <Heart
+                className={`h-4 w-4 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
+              />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/40"
+              className="text-white backdrop-blur-sm bg-black/30 hover:bg-black/50 p-1.5"
               onClick={(e) => {
                 e.stopPropagation();
                 handleFavoritePhoto(photo.id);
               }}
+              aria-label="Favorite photo"
             >
-          <Star
-            className={`h-5 w-5 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
-          />
+              <Star
+                className={`h-4 w-4 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
+              />
             </Button>
           </div>
 
@@ -293,8 +303,9 @@ export function PhotoGrid({
               </div>
             </div>
           )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

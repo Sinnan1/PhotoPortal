@@ -116,6 +116,8 @@ export function PhotoActions({
         variant={liked ? "default" : "secondary"}
         onClick={handleLike}
         disabled={loading}
+        data-action="like"
+        title="Like photo (Press Q)"
         className={`transition-all duration-200 ${
           liked ? "bg-red-500 hover:bg-red-600" : ""
         }`}
@@ -130,6 +132,8 @@ export function PhotoActions({
         variant={favorited ? "default" : "secondary"}
         onClick={handleFavorite}
         disabled={loading}
+        data-action="favorite"
+        title="Favorite photo (Press W)"
         className={`transition-all duration-200 ${
           favorited ? "bg-yellow-500 hover:bg-yellow-600" : ""
         }`}
