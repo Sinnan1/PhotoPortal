@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { PhotoActions } from "./photo-actions"
+import { useAuth } from "@/lib/auth-context"
 
 interface Photo {
   id: string
@@ -12,6 +13,8 @@ interface Photo {
   thumbnailUrl: string
   originalUrl: string
   createdAt: string
+  likedBy: { userId: string }[]
+  favoritedBy: { userId: string }[]
 }
 
 interface PhotoLightboxProps {
@@ -21,9 +24,11 @@ interface PhotoLightboxProps {
   onNext: () => void
   onPrevious: () => void
   onDownload: () => void
+  onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onPhotoStatusChange }: PhotoLightboxProps) {
+  const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
     medium: null as string | null,
@@ -34,6 +39,15 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
   const currentIndex = photos.findIndex((p) => p.id === photo.id)
   const isFirst = currentIndex === 0
   const isLast = currentIndex === photos.length - 1
+
+  // Calculate initial like/favorite status - recalculate when photo changes
+  const initialLiked = user ? (photo.likedBy ?? []).some(like => like.userId === user.id) : false
+  const initialFavorited = user ? (photo.favoritedBy ?? []).some(fav => fav.userId === user.id) : false
+
+  // Handler for status changes
+  const handleStatusChange = (liked: boolean, favorited: boolean) => {
+    onPhotoStatusChange?.(photo.id, { liked, favorited })
+  }
 
   useEffect(() => {
     // Reset and load new photo with progressive enhancement
@@ -179,7 +193,11 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       {/* Like/Favorite Buttons - positioned on right with proper spacing */}
       <div className="absolute top-16 right-4 z-10">
         <PhotoActions 
-          photoId={photo.id} 
+          key={photo.id}
+          photoId={photo.id}
+          initialLiked={initialLiked}
+          initialFavorited={initialFavorited}
+          onStatusChange={handleStatusChange}
           className="flex-col [&>button]:text-white [&>button]:backdrop-blur-sm [&>button]:bg-black/30 [&>button]:hover:bg-black/50 [&>button]:border-white/20"
         />
       </div>
