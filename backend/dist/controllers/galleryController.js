@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllowedClients = exports.updateGalleryAccess = exports.unfavoriteGallery = exports.favoriteGallery = exports.unlikeGallery = exports.likeGallery = exports.deleteGallery = exports.updateGallery = exports.verifyGalleryPassword = exports.getGallery = exports.getGalleries = exports.createGallery = void 0;
+exports.getClientGalleries = exports.getAllowedClients = exports.updateGalleryAccess = exports.unfavoriteGallery = exports.favoriteGallery = exports.unlikeGallery = exports.likeGallery = exports.deleteGallery = exports.updateGallery = exports.verifyGalleryPassword = exports.getGallery = exports.getGalleries = exports.createGallery = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = tslib_1.__importDefault(require("bcryptjs"));
 const s3Storage_1 = require("../utils/s3Storage");
+const jsonwebtoken_1 = tslib_1.__importDefault(require("jsonwebtoken"));
 const prisma = new client_1.PrismaClient();
 const createGallery = async (req, res) => {
     try {
@@ -129,6 +130,46 @@ const getGallery = async (req, res) => {
                 success: false,
                 error: 'Gallery has expired'
             });
+        }
+        // If gallery is password-protected, enforce access rules
+        if (gallery.password) {
+            let isAuthorized = false;
+            // 1) If user is authenticated, allow if photographer owner or client with access
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.split(' ')[1];
+            if (token) {
+                try {
+                    const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+                    const userId = decoded.userId;
+                    // Photographer who owns the gallery
+                    if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+                        isAuthorized = true;
+                    }
+                    else {
+                        // Client with explicit access
+                        const hasAccess = await prisma.galleryAccess.findUnique({
+                            where: { userId_galleryId: { userId, galleryId: id } }
+                        });
+                        if (hasAccess)
+                            isAuthorized = true;
+                    }
+                }
+                catch {
+                    // ignore token errors; will fall back to password header
+                }
+            }
+            // 2) If not authorized yet, validate provided password (via header or query)
+            if (!isAuthorized) {
+                const providedPassword = req.headers['x-gallery-password'] ||
+                    req.query.password;
+                if (!providedPassword) {
+                    return res.status(401).json({ success: false, error: 'Password required' });
+                }
+                const isValidPassword = await bcryptjs_1.default.compare(providedPassword, gallery.password);
+                if (!isValidPassword) {
+                    return res.status(401).json({ success: false, error: 'Invalid password' });
+                }
+            }
         }
         res.json({
             success: true,
@@ -465,3 +506,54 @@ const getAllowedClients = async (req, res) => {
     }
 };
 exports.getAllowedClients = getAllowedClients;
+const getClientGalleries = async (req, res) => {
+    try {
+        const clientId = req.user.id;
+        // Get galleries that the client has access to
+        const accessibleGalleries = await prisma.galleryAccess.findMany({
+            where: { userId: clientId },
+            include: {
+                gallery: {
+                    include: {
+                        photographer: {
+                            select: { id: true, name: true, email: true }
+                        },
+                        photos: {
+                            select: {
+                                id: true,
+                                filename: true,
+                                thumbnailUrl: true,
+                                createdAt: true
+                            }
+                        },
+                        likedBy: true,
+                        favoritedBy: true,
+                        _count: {
+                            select: { photos: true }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                gallery: {
+                    createdAt: 'desc'
+                }
+            }
+        });
+        // Transform the data to match the expected format
+        const galleries = accessibleGalleries.map((access) => ({
+            ...access.gallery,
+            photoCount: access.gallery._count.photos,
+            isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
+        }));
+        res.json({
+            success: true,
+            data: galleries
+        });
+    }
+    catch (error) {
+        console.error('Get client galleries error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.getClientGalleries = getClientGalleries;
