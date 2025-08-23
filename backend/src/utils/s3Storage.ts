@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 import os from 'os'
 import { v4 as uuidv4 } from 'uuid'
@@ -220,6 +220,36 @@ export const batchDeleteFromS3 = async (filenames: string[]): Promise<void> => {
 	)
 	
 	await Promise.all(deletePromises)
+}
+
+// Function to retrieve objects from S3
+export const getObjectFromS3 = async (key: string): Promise<Buffer> => {
+	try {
+		const command = new GetObjectCommand({
+			Bucket: process.env.S3_BUCKET_NAME!,
+			Key: key
+		})
+		
+		const response = await s3Client.send(command)
+		const buffer = await streamToBuffer(response.Body)
+		return buffer
+	} catch (error) {
+		console.error('S3 get object error:', {
+			message: (error as Error)?.message,
+			key
+		})
+		throw new Error(`Failed to retrieve object ${key} from storage`)
+	}
+}
+
+// Helper function to convert stream to buffer
+async function streamToBuffer(stream: any): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const chunks: any[] = []
+		stream.on('data', (chunk: any) => chunks.push(chunk))
+		stream.on('error', reject)
+		stream.on('end', () => resolve(Buffer.concat(chunks)))
+	})
 }
 
 // Function to generate different thumbnail sizes

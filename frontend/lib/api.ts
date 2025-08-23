@@ -138,10 +138,35 @@ export const api = {
 
   deletePhoto: (id: string) => apiRequest(`/photos/${id}`, { method: "DELETE" }),
 
-  // Fixed: Return the correct download URL
+  // Download photo - returns the actual image data
   downloadPhoto: (id: string, galleryId?: string) => {
     const params = galleryId ? `?galleryId=${galleryId}` : ''
     return apiRequest(`/photos/${id}/download${params}`)
+  },
+
+  // New function for downloading photo data directly
+  downloadPhotoData: async (id: string, filename: string) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/photos/${id}/download`, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Download failed");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 
   // Like/Favorite APIs
