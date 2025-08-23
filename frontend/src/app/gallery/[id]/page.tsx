@@ -23,6 +23,36 @@ import JSZip from "jszip";
 import { PhotoGrid } from "@/components/photo-grid";
 import { useAuth } from "@/lib/auth-context";
 
+// Import the API base URL and getAuthToken function
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+function getAuthToken() {
+  if (typeof document === "undefined") return null
+  
+  // First try to get token from cookie
+  const cookieToken = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("auth-token="))
+    ?.split("=")[1]
+  
+  if (cookieToken) return cookieToken
+  
+  // Fallback: try to get token from localStorage
+  try {
+    const user = localStorage.getItem("user")
+    if (user) {
+      const userData = JSON.parse(user)
+      // Check if we have a token stored somewhere else
+      const storedToken = localStorage.getItem("auth-token")
+      if (storedToken) return storedToken
+    }
+  } catch (error) {
+    console.error("Error reading from localStorage:", error)
+  }
+  
+  return null
+}
+
 interface Photo {
   id: string;
   filename: string;
@@ -138,21 +168,12 @@ export default function GalleryPage() {
 
   const handleDownload = async (photoId: string) => {
     try {
-      const response = await api.downloadPhoto(photoId, galleryId);
-      const { downloadUrl, filename } = response.data;
-
-      // Fetch the image data
-      const imageResponse = await fetch(downloadUrl);
-      const imageBlob = await imageResponse.blob();
-
-      // Create a temporary link to trigger the download
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(imageBlob);
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      const photo = gallery?.photos.find(p => p.id === photoId);
+      if (!photo) {
+        throw new Error("Photo not found");
+      }
+      
+      await api.downloadPhotoData(photoId, photo.filename);
     } catch (error) {
       console.error("Download failed", error);
       showToast("Download failed", "error");
@@ -173,12 +194,19 @@ export default function GalleryPage() {
       const photoPromises = gallery.photos.map(async (photo) => {
         try {
           // Use backend download endpoint to enforce limits and count
-          const resp = await api.downloadPhoto(photo.id, galleryId);
-          const { downloadUrl, filename } = resp.data;
-          const response = await fetch(downloadUrl);
-          if (!response.ok) throw new Error(`Failed to fetch ${filename}`);
+          const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
+            headers: {
+              ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+            },
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
+          }
+          
           const blob = await response.blob();
-          zip.file(filename, blob);
+          zip.file(photo.filename, blob);
         } catch (error) {
           console.error(`Failed to download ${photo.filename}:`, error);
         }
@@ -369,12 +397,19 @@ export default function GalleryPage() {
                   const zip = new JSZip();
                   await Promise.all(liked.map(async (photo) => {
                     try {
-                      const resp = await api.downloadPhoto(photo.id, galleryId);
-                      const { downloadUrl, filename } = resp.data;
-                      const fileResp = await fetch(downloadUrl);
-                      if (!fileResp.ok) throw new Error(`Failed to fetch ${filename}`);
-                      const blob = await fileResp.blob();
-                      zip.file(filename, blob);
+                      const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
+                        headers: {
+                          ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+                        },
+                      });
+                      
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
+                      }
+                      
+                      const blob = await response.blob();
+                      zip.file(photo.filename, blob);
                     } catch (err) {
                       console.error(`Failed to download ${photo.filename}:`, err);
                     }
@@ -402,7 +437,7 @@ export default function GalleryPage() {
                 Download Liked
               </Button>
             )}
-            {gallery.photos.some((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id)) && (
+                        {gallery.photos.some((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id)) && (
               <Button onClick={async () => {
                 setIsDownloadingAll(true);
                 try {
@@ -410,12 +445,19 @@ export default function GalleryPage() {
                   const zip = new JSZip();
                   await Promise.all(fav.map(async (photo) => {
                     try {
-                      const resp = await api.downloadPhoto(photo.id, galleryId);
-                      const { downloadUrl, filename } = resp.data;
-                      const fileResp = await fetch(downloadUrl);
-                      if (!fileResp.ok) throw new Error(`Failed to fetch ${filename}`);
-                      const blob = await fileResp.blob();
-                      zip.file(filename, blob);
+                      const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
+                        headers: {
+                          ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+                        },
+                      });
+                      
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
+                      }
+                      
+                      const blob = await response.blob();
+                      zip.file(photo.filename, blob);
                     } catch (err) {
                       console.error(`Failed to download ${photo.filename}:`, err);
                     }

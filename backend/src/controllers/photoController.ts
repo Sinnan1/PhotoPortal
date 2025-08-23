@@ -358,6 +358,47 @@ export const getCompressedPhoto = async (req: Request, res: Response) => {
 	}
 }
 
+// Download photo endpoint - returns the actual image data for download
+export const downloadPhoto = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params
+		const { galleryId } = req.query
+
+		const photo = await prisma.photo.findUnique({
+			where: { id }
+		})
+
+		if (!photo) {
+			return res.status(404).json({
+				success: false,
+				error: 'Photo not found'
+			})
+		}
+
+		// Extract the S3 key from the original URL
+		const originalUrl = new URL(photo.originalUrl)
+		const originalKey = originalUrl.pathname.split('/').slice(2).join('/')
+
+		// Get the image data from S3
+		const { getObjectFromS3 } = await import('../utils/s3Storage')
+		const imageBuffer = await getObjectFromS3(originalKey)
+
+		// Set appropriate headers for download
+		res.setHeader('Content-Type', 'application/octet-stream')
+		res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`)
+		res.setHeader('Content-Length', imageBuffer.length)
+
+		// Send the image data
+		res.send(imageBuffer)
+	} catch (error) {
+		console.error('Download photo error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
+
 // Enhanced delete with better cleanup
 export const deletePhoto = async (req: AuthRequest, res: Response) => {
 	try {

@@ -5,6 +5,7 @@ import {
 	getPhotos,
 	deletePhoto,
 	getCompressedPhoto,
+	downloadPhoto,
 	bulkDeletePhotos,
 	likePhoto,
 	unlikePhoto,
@@ -44,6 +45,6 @@ router.get('/favorited', authenticateToken, getFavoritedPhotos)
 
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)
-router.get('/:id/download', getCompressedPhoto)
+router.get('/:id/download', downloadPhoto)
 
 export default router
