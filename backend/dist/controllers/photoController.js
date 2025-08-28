@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
+exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.downloadPhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const multer_1 = tslib_1.__importDefault(require("multer"));
@@ -326,6 +326,42 @@ const getCompressedPhoto = async (req, res) => {
     }
 };
 exports.getCompressedPhoto = getCompressedPhoto;
+// Download photo endpoint - returns the actual image data for download
+const downloadPhoto = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { galleryId } = req.query;
+        const photo = await prisma.photo.findUnique({
+            where: { id }
+        });
+        if (!photo) {
+            return res.status(404).json({
+                success: false,
+                error: 'Photo not found'
+            });
+        }
+        // Extract the S3 key from the original URL
+        const originalUrl = new URL(photo.originalUrl);
+        const originalKey = originalUrl.pathname.split('/').slice(2).join('/');
+        // Get the image data from S3
+        const { getObjectFromS3 } = await Promise.resolve().then(() => tslib_1.__importStar(require('../utils/s3Storage')));
+        const imageBuffer = await getObjectFromS3(originalKey);
+        // Set appropriate headers for download
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`);
+        res.setHeader('Content-Length', imageBuffer.length);
+        // Send the image data
+        res.send(imageBuffer);
+    }
+    catch (error) {
+        console.error('Download photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+};
+exports.downloadPhoto = downloadPhoto;
 // Enhanced delete with better cleanup
 const deletePhoto = async (req, res) => {
     try {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateMultipleThumbnails = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = void 0;
+exports.generateMultipleThumbnails = exports.getObjectFromS3 = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = void 0;
 const tslib_1 = require("tslib");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const sharp_1 = tslib_1.__importDefault(require("sharp"));
@@ -205,6 +205,35 @@ const batchDeleteFromS3 = async (filenames) => {
     await Promise.all(deletePromises);
 };
 exports.batchDeleteFromS3 = batchDeleteFromS3;
+// Function to retrieve objects from S3
+const getObjectFromS3 = async (key) => {
+    try {
+        const command = new client_s3_1.GetObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: key
+        });
+        const response = await s3Client.send(command);
+        const buffer = await streamToBuffer(response.Body);
+        return buffer;
+    }
+    catch (error) {
+        console.error('S3 get object error:', {
+            message: error?.message,
+            key
+        });
+        throw new Error(`Failed to retrieve object ${key} from storage`);
+    }
+};
+exports.getObjectFromS3 = getObjectFromS3;
+// Helper function to convert stream to buffer
+async function streamToBuffer(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+}
 // Function to generate different thumbnail sizes
 const generateMultipleThumbnails = async (file, originalFilename, galleryId) => {
     const thumbnailSizes = {
