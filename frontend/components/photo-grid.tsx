@@ -39,6 +39,28 @@ interface PhotoGridProps {
   lastPhotoElementRef?: (node: HTMLDivElement) => void;
 }
 
+// Skeleton loader component for gold/beige aesthetic
+function PhotoSkeleton() {
+  return (
+    <div className="relative aspect-square bg-muted rounded-xl overflow-hidden border border-border">
+      {/* Main image area */}
+      <div className="w-full h-4/5 bg-gradient-to-br from-muted via-background to-muted animate-pulse">
+        {/* Subtle shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer"></div>
+      </div>
+
+      {/* Action area */}
+      <div className="absolute bottom-0 left-0 right-0 h-1/5 bg-muted/50 border-t border-border">
+        <div className="flex items-center justify-center h-full gap-2">
+          <div className="w-8 h-8 bg-muted-foreground/30 rounded-lg animate-pulse"></div>
+          <div className="w-8 h-8 bg-muted-foreground/30 rounded-lg animate-pulse"></div>
+          <div className="w-8 h-8 bg-muted-foreground/30 rounded-lg animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PhotoGrid({
   photos,
   galleryId,
@@ -50,10 +72,36 @@ export function PhotoGrid({
   columns = { sm: 2, md: 3, lg: 4 },
   className = "",
   lastPhotoElementRef,
-}: PhotoGridProps) {
+  loading = false,
+}: PhotoGridProps & { loading?: boolean }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [photoState, setPhotoState] = useState(photos);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+
+  // Konami Code Easter Egg
+  const [konamiSequence, setKonamiSequence] = useState<string[]>([]);
+  const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+  const [konamiActivated, setKonamiActivated] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const newSequence = [...konamiSequence, e.code];
+      setKonamiSequence(newSequence.slice(-10)); // Keep last 10 keys
+
+      if (newSequence.length >= 10 && newSequence.slice(-10).every((code, index) => code === konamiCode[index])) {
+        setKonamiActivated(true);
+        // Fun animation effect
+        document.body.style.animation = 'rainbow 2s ease-in-out';
+        setTimeout(() => {
+          document.body.style.animation = '';
+        }, 2000);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [konamiSequence]);
 
   // Keep local state in sync with incoming photos (e.g., when applying filters)
   useEffect(() => {
@@ -166,6 +214,17 @@ export function PhotoGrid({
     return breakpoints.join(", ");
   };
 
+  if (loading && photoState.length === 0) {
+    // Show skeleton loaders when loading
+    return (
+      <div className={getGridClasses()}>
+        {Array.from({ length: 12 }).map((_, index) => (
+          <PhotoSkeleton key={index} />
+        ))}
+      </div>
+    );
+  }
+
   if (photoState.length === 0) {
     return (
       <div className="text-center py-12">
@@ -188,26 +247,35 @@ export function PhotoGrid({
           <div
             key={photo.id}
             ref={isLastPhoto ? lastPhotoElementRef : undefined}
-            className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
+            className={`photo-grid-item group relative aspect-square bg-card rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:border-olive-green/30 transition-all duration-300 ${
+              konamiActivated ? 'konami-code' : ''
+            } ${
+              index === 3 ? 'wedding-joke' : '' // Add wedding joke to 4th photo
+            } ${
+              index === 7 ? 'secret-joke' : '' // Add secret joke to 8th photo
+            }`}
           >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
             fill
-            className="object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
+            className={`object-cover cursor-pointer transition-all duration-500 ease-out ${
+              loadedImages.has(photo.id)
+                ? 'opacity-100 scale-100'
+                : 'opacity-0 scale-105'
+            } group-hover:scale-105`}
             onClick={() => onView?.(photo)}
-            // Fix 1: Remove conflicting loading prop when priority is true
             priority={index < columns.lg}
             sizes={getSizes()}
-            // Fix 2: Remove blur placeholder temporarily to test
-            //placeholder="blur"
-            // blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/..."
-            
-            // Fix 3: Add error handling and debugging
-            onLoad={() => console.log(`Image loaded: ${photo.filename}`)}
+            onLoad={() => {
+              setLoadedImages(prev => new Set([...prev, photo.id]));
+              console.log(`Image loaded: ${photo.filename}`);
+            }}
             onError={(e) => {
               console.error(`Failed to load image: ${photo.filename}`, e);
               console.error(`Image URL: ${photo.thumbnailUrl}`);
+              // Still mark as loaded to avoid infinite loading state
+              setLoadedImages(prev => new Set([...prev, photo.id]));
             }}
           />
 
@@ -262,7 +330,7 @@ export function PhotoGrid({
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/30 hover:bg-black/50 p-1.5"
+              className="text-white backdrop-blur-sm bg-black/30 hover:bg-olive-green/40 p-1.5 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLikePhoto(photo.id);
@@ -276,7 +344,7 @@ export function PhotoGrid({
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/30 hover:bg-black/50 p-1.5"
+              className="text-white backdrop-blur-sm bg-black/30 hover:bg-olive-green/40 p-1.5 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
                 handleFavoritePhoto(photo.id);

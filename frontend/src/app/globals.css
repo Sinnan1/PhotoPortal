@@ -1,79 +1,92 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Brand primary: green */
-  --primary: oklch(0.3394 0.0153 145.23);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.96 0.03 149);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.5259 0.12 149);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* Light mode - muted gold/beige variations */
+  --background: oklch(0.98 0.003 85);
+  --foreground: oklch(0.15 0 0);
+  --card: oklch(1 0.002 85);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0.002 85);
+  --popover-foreground: oklch(0.15 0 0);
+  /* Brand primary: warm gold */
+  --primary: oklch(0.6 0.04 85);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.95 0.008 85);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.93 0.01 85);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.88 0.015 85);
+  --accent-foreground: oklch(0.15 0 0);
+  --destructive: oklch(0.55 0.08 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.9 0.008 85);
+  --input: oklch(0.95 0.005 85);
+  --ring: oklch(0.6 0.04 85);
+  --chart-1: oklch(0.6 0.04 85);
+  --chart-2: oklch(0.65 0.035 85);
+  --chart-3: oklch(0.55 0.045 85);
+  --chart-4: oklch(0.7 0.03 85);
+  --chart-5: oklch(0.5 0.05 85);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.97 0.005 85);
+  --sidebar-foreground: oklch(0.18 0 0);
+  --sidebar-primary: oklch(0.6 0.04 85);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.94 0.008 85);
+  --sidebar-accent-foreground: oklch(0.2 0 0);
+  --sidebar-border: oklch(0.9 0.008 85);
+  --sidebar-ring: oklch(0.6 0.04 85);
+
+  /* Olive green accent for complementary contrast */
+  --olive-green: oklch(0.45 0.08 120);
+  --olive-green-light: oklch(0.65 0.06 120);
+  --olive-green-dark: oklch(0.35 0.1 120);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /* Keep brand green in dark mode */
-  --primary: oklch(0.3394 0.0153 145.23);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.55 0.16 149);
+  /* Dark mode - deep gold/beige variations */
+  --background: oklch(0.12 0.008 85);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.18 0.012 85);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0.012 85);
+  --popover-foreground: oklch(0.95 0 0);
+  /* Enhanced warm gold for dark mode */
+  --primary: oklch(0.7 0.06 85);
+  --primary-foreground: oklch(0.12 0 0);
+  --secondary: oklch(0.22 0.015 85);
+  --secondary-foreground: oklch(0.9 0 0);
+  --muted: oklch(0.2 0.012 85);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.25 0.02 85);
+  --accent-foreground: oklch(0.95 0 0);
+  --destructive: oklch(0.55 0.08 25);
+  --destructive-foreground: oklch(0.95 0 0);
+  --border: oklch(0.25 0.015 85);
+  --input: oklch(0.22 0.014 85);
+  --ring: oklch(0.7 0.06 85);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.3394 0.0153 145.23);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.55 0.16 149);
+  --sidebar: oklch(0.18 0.012 85);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.7 0.06 85);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.22 0.015 85);
+  --sidebar-accent-foreground: oklch(0.9 0 0);
+  --sidebar-border: oklch(0.25 0.015 85);
+  --sidebar-ring: oklch(0.7 0.06 85);
+
+  /* Olive green accents for dark mode */
+  --olive-green: oklch(0.55 0.08 120);
+  --olive-green-light: oklch(0.7 0.06 120);
+  --olive-green-dark: oklch(0.4 0.1 120);
 }
 
 @theme inline {
@@ -121,5 +134,168 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' 32;
+
+    /* Muted gold/beige mesh gradient background */
+    background: linear-gradient(135deg,
+      oklch(0.85 0.015 85) 0%,    /* Light gold */
+      oklch(0.82 0.018 85) 25%,   /* Slightly darker gold */
+      oklch(0.78 0.022 85) 50%,   /* Medium gold */
+      oklch(0.82 0.018 85) 75%,   /* Back to slightly darker */
+      oklch(0.85 0.015 85) 100%   /* Light gold */
+    );
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Enhanced dark mode with muted gold gradient */
+  .dark body {
+    background: linear-gradient(135deg,
+      oklch(0.18 0.008 85) 0%,    /* Dark gold */
+      oklch(0.15 0.01 85) 25%,    /* Darker gold */
+      oklch(0.12 0.012 85) 50%,   /* Deep gold */
+      oklch(0.15 0.01 85) 75%,    /* Back to darker */
+      oklch(0.18 0.008 85) 100%   /* Dark gold */
+    );
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* Olive green accent utilities */
+  .accent-olive-green {
+    color: var(--olive-green);
+  }
+
+  .bg-olive-green {
+    background-color: var(--olive-green);
+  }
+
+  .bg-olive-green-light {
+    background-color: var(--olive-green-light);
+  }
+
+  .hover-olive-green:hover {
+    background-color: var(--olive-green);
+    color: white;
+  }
+
+  .border-olive-green {
+    border-color: var(--olive-green);
+  }
+
+  .text-olive-green {
+    color: var(--olive-green);
+  }
+
+  /* Modernist shimmer animation for skeleton loaders */
+  .animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Smooth transitions for all interactive elements */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced photo grid items */
+  .photo-grid-item {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .photo-grid-item:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.02);
+  }
+
+  /* Fun Easter Eggs and Jokes */
+  .konami-code {
+    animation: rainbow 2s ease-in-out infinite;
+  }
+
+  @keyframes rainbow {
+    0% { filter: hue-rotate(0deg); }
+    25% { filter: hue-rotate(90deg); }
+    50% { filter: hue-rotate(180deg); }
+    75% { filter: hue-rotate(270deg); }
+    100% { filter: hue-rotate(360deg); }
+  }
+
+  .wedding-joke:hover::after {
+    content: "💍 'I do... love this photo!' 💕";
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    opacity: 0;
+    animation: joke-fade-in 0.3s ease-out forwards;
+  }
+
+  @keyframes joke-fade-in {
+    to { opacity: 1; transform: translateX(-50%) translateY(-5px); }
+  }
+
+  /* Secret photographer jokes */
+  .secret-joke {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .secret-joke::before {
+    content: "📸";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.3s ease;
+    z-index: 10;
+  }
+
+  .secret-joke:hover::before {
+    opacity: 1;
+    transform: scale(1) rotate(15deg);
+  }
+
+  .secret-joke:hover::after {
+    content: "Say cheese! 🧀";
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    z-index: 10;
+  }
+
+  .secret-joke:hover::after {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

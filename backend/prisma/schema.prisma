@@ -56,7 +56,9 @@ model Photo {
   id            String           @id @default(cuid())
   filename      String
   originalUrl   String
-  thumbnailUrl  String
+  thumbnailUrl  String           // 400x400px - for grid view
+  mediumUrl     String?          // 800x800px - for lightbox view
+  largeUrl      String?          // 1200x1200px - for high-quality viewing
   fileSize      Int
   downloadCount Int              @default(0)
   gallery       Gallery          @relation(fields: [galleryId], references: [id], onDelete: Cascade)

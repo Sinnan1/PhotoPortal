@@ -92,6 +92,7 @@ export default function GalleryPage() {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
+  const [dataSaverMode, setDataSaverMode] = useState(false);
   
   // Infinite scroll state
   const [displayedPhotos, setDisplayedPhotos] = useState<Photo[]>([]);
@@ -515,28 +516,56 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {/* Filter Buttons */}
-      <div className="flex justify-end gap-2 mb-4">
-        <Button
-          variant={filter === "all" ? "secondary" : "ghost"}
-          onClick={() => setFilter("all")}
-        >
-          All ({gallery.photos.length})
-        </Button>
-        <Button
-          variant={filter === "liked" ? "secondary" : "ghost"}
-          onClick={() => setFilter("liked")}
-        >
-          <Heart className="mr-2 h-4 w-4" />
-          Liked ({gallery.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length})
-        </Button>
-        <Button
-          variant={filter === "favorited" ? "secondary" : "ghost"}
-          onClick={() => setFilter("favorited")}
-        >
-          <Star className="mr-2 h-4 w-4" />
-          Favorited ({gallery.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length})
-        </Button>
+      {/* Filter Buttons and Data Saver Toggle */}
+      <div className="flex justify-between items-center mb-4">
+        {/* Data Saver Toggle */}
+        <div className="flex items-center gap-2">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dataSaverMode}
+              onChange={(e) => setDataSaverMode(e.target.checked)}
+              className="sr-only"
+            />
+            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'
+            }`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+                dataSaverMode ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </div>
+            <span className="ml-2 text-sm text-foreground">
+              Data Saver {dataSaverMode && <span className="text-primary font-medium">ON</span>}
+            </span>
+          </label>
+        </div>
+
+        {/* Filter Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant={filter === "all" ? "default" : "ghost"}
+            onClick={() => setFilter("all")}
+            className={filter === "all" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+          >
+            All ({gallery.photos.length})
+          </Button>
+          <Button
+            variant={filter === "liked" ? "default" : "ghost"}
+            onClick={() => setFilter("liked")}
+            className={filter === "liked" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+          >
+            <Heart className="mr-2 h-4 w-4" />
+            Liked ({gallery.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length})
+          </Button>
+          <Button
+            variant={filter === "favorited" ? "default" : "ghost"}
+            onClick={() => setFilter("favorited")}
+            className={filter === "favorited" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+          >
+            <Star className="mr-2 h-4 w-4" />
+            Favorited ({gallery.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length})
+          </Button>
+        </div>
       </div>
 
       {/* Photo Grid */}
@@ -560,6 +589,7 @@ export default function GalleryPage() {
             onPhotoStatusChange={handlePhotoStatusChange}
             columns={{ sm: 2, md: 3, lg: 4 }}
             lastPhotoElementRef={lastPhotoElementRef}
+            loading={loading}
           />
           
           {/* Loading more indicator */}
@@ -602,6 +632,7 @@ export default function GalleryPage() {
           }}
           onDownload={() => handleDownload(selectedPhoto.id)}
           onPhotoStatusChange={handlePhotoStatusChange}
+          dataSaverMode={dataSaverMode}
         />
       )}
     </div>

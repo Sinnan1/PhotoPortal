@@ -206,10 +206,12 @@ const batchDeleteFromS3 = async (filenames) => {
 };
 exports.batchDeleteFromS3 = batchDeleteFromS3;
 // Function to retrieve objects from S3
-const getObjectFromS3 = async (key) => {
+const getObjectFromS3 = async (key, bucketName) => {
     try {
+        const targetBucket = bucketName || process.env.S3_BUCKET_NAME;
+        console.log(`🔍 Attempting to retrieve from bucket: ${targetBucket}, key: ${key}`);
         const command = new client_s3_1.GetObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME,
+            Bucket: targetBucket,
             Key: key
         });
         const response = await s3Client.send(command);
@@ -219,6 +221,7 @@ const getObjectFromS3 = async (key) => {
     catch (error) {
         console.error('S3 get object error:', {
             message: error?.message,
+            bucket: bucketName || process.env.S3_BUCKET_NAME,
             key
         });
         throw new Error(`Failed to retrieve object ${key} from storage`);
@@ -237,9 +240,9 @@ async function streamToBuffer(stream) {
 // Function to generate different thumbnail sizes
 const generateMultipleThumbnails = async (file, originalFilename, galleryId) => {
     const thumbnailSizes = {
-        small: { width: 150, height: 150 },
-        medium: { width: 400, height: 400 },
-        large: { width: 800, height: 800 }
+        small: { width: 400, height: 400 }, // Grid view - crisp thumbnails
+        medium: { width: 1200, height: 1200 }, // Lightbox - high quality viewing  
+        large: { width: 2000, height: 2000 } // Detailed evaluation before full download
     };
     const results = {};
     const uniqueId = (0, uuid_1.v4)();

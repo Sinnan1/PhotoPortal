@@ -19,7 +19,7 @@ export function Navigation() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <nav className="border-b bg-white dark:bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-background/60">
+    <nav className="border-b border-border/20 bg-background/95 dark:bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/90 dark:supports-[backdrop-filter]:bg-background/70 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -42,6 +42,7 @@ export function Navigation() {
               size="icon"
               aria-label="Toggle Theme"
               onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              className="hover:bg-olive-green/10 hover:text-olive-green transition-all duration-300"
             >
               {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
@@ -52,16 +53,16 @@ export function Navigation() {
                 {user.role === "PHOTOGRAPHER" && (
                   <div className="hidden md:flex items-center space-x-2">
                     <Link href="/dashboard">
-                      <Button variant="ghost">Dashboard</Button>
+                      <Button variant="ghost" className="hover:bg-primary/10 hover:text-primary transition-all duration-300">Dashboard</Button>
                     </Link>
                     <Link href="/dashboard/clients">
-                      <Button variant="ghost" className="flex items-center gap-2">
+                      <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
                         <Users className="h-4 w-4" />
                         Clients
                       </Button>
                     </Link>
                     <Link href="/dashboard/analytics">
-                      <Button variant="ghost" className="flex items-center gap-2">
+                      <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
                         <BarChart3 className="h-4 w-4" />
                         Analytics
                       </Button>
@@ -72,7 +73,7 @@ export function Navigation() {
                 {user.role === "CLIENT" && (
                   <div className="hidden md:flex items-center space-x-2">
                     <Link href="/dashboard/client">
-                      <Button variant="ghost">Dashboard</Button>
+                      <Button variant="ghost" className="hover:bg-primary/10 hover:text-primary transition-all duration-300">Dashboard</Button>
                     </Link>
                   </div>
                 )}
@@ -81,7 +82,7 @@ export function Navigation() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="flex items-center space-x-2"
+                      className="flex items-center space-x-2 hover:bg-primary/10 hover:text-primary transition-all duration-300"
                     >
                       <User className="h-4 w-4" />
                       <span>{user.name}</span>
@@ -140,7 +141,7 @@ export function Navigation() {
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/login">
-                  <Button variant="ghost">Sign In</Button>
+                  <Button variant="ghost" className="hover:bg-primary/10 hover:text-primary transition-all duration-300">Sign In</Button>
                 </Link>
               </div>
             )}
