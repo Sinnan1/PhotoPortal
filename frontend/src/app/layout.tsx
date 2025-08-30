@@ -12,7 +12,12 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Yarrow Weddings & Co.",
   description: "Private wedding galleries crafted exclusively for Yarrow Weddings & Co. clients.",
-    generator: 'v0.dev'
+  icons: {
+    icon: "/Logo-Main.png",
+    shortcut: "/Logo-Main.png",
+    apple: "/Logo-Main.png",
+  },
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
