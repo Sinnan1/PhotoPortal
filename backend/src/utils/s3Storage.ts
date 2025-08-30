@@ -247,6 +247,37 @@ export const getObjectFromS3 = async (key: string, bucketName?: string): Promise
 	}
 }
 
+// Function to get S3 object as stream for direct piping (much faster!)
+export const getObjectStreamFromS3 = async (key: string, bucketName?: string): Promise<{ stream: any, contentLength: number }> => {
+	try {
+		const targetBucket = bucketName || process.env.S3_BUCKET_NAME!
+		
+		console.log(`🚀 Setting up stream from bucket: ${targetBucket}, key: ${key}`)
+		
+		const command = new GetObjectCommand({
+			Bucket: targetBucket,
+			Key: key
+		})
+		
+		const response = await s3Client.send(command)
+		const contentLength = response.ContentLength || 0
+		
+		console.log(`⚡ Stream ready, content length: ${contentLength} bytes`)
+		
+		return {
+			stream: response.Body,
+			contentLength
+		}
+	} catch (error) {
+		console.error('S3 stream error:', {
+			message: (error as Error)?.message,
+			bucket: bucketName || process.env.S3_BUCKET_NAME,
+			key
+		})
+		throw new Error(`Failed to stream object ${key} from storage`)
+	}
+}
+
 // Helper function to convert stream to buffer
 async function streamToBuffer(stream: any): Promise<Buffer> {
 	return new Promise((resolve, reject) => {

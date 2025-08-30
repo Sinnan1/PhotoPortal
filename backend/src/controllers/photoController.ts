@@ -404,19 +404,31 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		console.log(`🪣 Extracted bucket: "${bucketName}"`)
 		console.log(`🔑 Extracted S3 key: "${originalKey}"`)
 
-		// Get the image data from S3 using extracted bucket name
-		const { getObjectFromS3 } = await import('../utils/s3Storage')
-		const imageBuffer = await getObjectFromS3(originalKey, bucketName)
+		// Stream the image directly from S3 to client (much faster!)
+		const { getObjectStreamFromS3 } = await import('../utils/s3Storage')
+		const { stream, contentLength } = await getObjectStreamFromS3(originalKey, bucketName)
 
-		console.log(`✅ Successfully retrieved from S3, size: ${imageBuffer.length} bytes`)
+		console.log(`🚀 Streaming from S3, size: ${contentLength} bytes`)
 
 		// Set appropriate headers for download
 		res.setHeader('Content-Type', 'application/octet-stream')
 		res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`)
-		res.setHeader('Content-Length', imageBuffer.length)
+		res.setHeader('Content-Length', contentLength.toString())
 
-		// Send the image data
-		res.send(imageBuffer)
+		// Stream the image data directly from S3 to client (no server buffering!)
+		stream.pipe(res)
+		
+		// Handle stream errors
+		stream.on('error', (error: any) => {
+			console.error('❌ Stream error:', error)
+			if (!res.headersSent) {
+				res.status(500).json({ success: false, error: 'Download failed' })
+			}
+		})
+		
+		stream.on('end', () => {
+			console.log('✅ Stream completed successfully')
+		})
 	} catch (error) {
 		console.error('❌ Download photo error for ID:', req.params.id)
 		console.error('Error details:', error)
