@@ -223,10 +223,14 @@ export const batchDeleteFromS3 = async (filenames: string[]): Promise<void> => {
 }
 
 // Function to retrieve objects from S3
-export const getObjectFromS3 = async (key: string): Promise<Buffer> => {
+export const getObjectFromS3 = async (key: string, bucketName?: string): Promise<Buffer> => {
 	try {
+		const targetBucket = bucketName || process.env.S3_BUCKET_NAME!
+		
+		console.log(`🔍 Attempting to retrieve from bucket: ${targetBucket}, key: ${key}`)
+		
 		const command = new GetObjectCommand({
-			Bucket: process.env.S3_BUCKET_NAME!,
+			Bucket: targetBucket,
 			Key: key
 		})
 		
@@ -236,6 +240,7 @@ export const getObjectFromS3 = async (key: string): Promise<Buffer> => {
 	} catch (error) {
 		console.error('S3 get object error:', {
 			message: (error as Error)?.message,
+			bucket: bucketName || process.env.S3_BUCKET_NAME,
 			key
 		})
 		throw new Error(`Failed to retrieve object ${key} from storage`)
@@ -259,9 +264,9 @@ export const generateMultipleThumbnails = async (
 	galleryId: string
 ): Promise<{ [size: string]: string }> => {
 	const thumbnailSizes = {
-		small: { width: 150, height: 150 },
-		medium: { width: 400, height: 400 },
-		large: { width: 800, height: 800 }
+		small: { width: 400, height: 400 },    // Grid view - crisp thumbnails
+		medium: { width: 1200, height: 1200 }, // Lightbox - high quality viewing  
+		large: { width: 2000, height: 2000 }   // Detailed evaluation before full download
 	}
 	
 	const results: { [size: string]: string } = {}

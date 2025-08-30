@@ -177,12 +177,22 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 						file.originalname,
 						galleryId
 					)
+					
+					// Generate multiple thumbnail sizes
+					const { generateMultipleThumbnails } = await import('../utils/s3Storage')
+					const thumbnailSizes = await generateMultipleThumbnails(
+						fileBuffer,
+						file.originalname,
+						galleryId
+					)
 
 					const photo = await prisma.photo.create({
 						data: {
 							filename: file.originalname,
 							originalUrl,
-							thumbnailUrl,
+							thumbnailUrl, // Keep the original 400x400 thumbnail
+							mediumUrl: thumbnailSizes.medium || null, // 800x800 for lightbox
+							largeUrl: thumbnailSizes.large || null,   // 1200x1200 for high quality
 							fileSize,
 							galleryId
 						}
@@ -364,24 +374,41 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		const { id } = req.params
 		const { galleryId } = req.query
 
+		console.log(`📥 Download request for photo ID: ${id}`)
+
 		const photo = await prisma.photo.findUnique({
 			where: { id }
 		})
 
 		if (!photo) {
+			console.log(`❌ Photo not found: ${id}`)
 			return res.status(404).json({
 				success: false,
 				error: 'Photo not found'
 			})
 		}
 
-		// Extract the S3 key from the original URL
-		const originalUrl = new URL(photo.originalUrl)
-		const originalKey = originalUrl.pathname.split('/').slice(2).join('/')
+		console.log(`📸 Photo found: ${photo.filename}`)
+		console.log(`🔗 Original URL: ${photo.originalUrl}`)
 
-		// Get the image data from S3
+		// Extract the S3 bucket and key from the original URL
+		const originalUrl = new URL(photo.originalUrl)
+		console.log(`🔗 Parsed URL pathname: ${originalUrl.pathname}`)
+		
+		const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
+		console.log(`📂 Path parts: ${JSON.stringify(pathParts)}`)
+		
+		const bucketName = pathParts[0] // First part is bucket name
+		const originalKey = decodeURIComponent(pathParts.slice(1).join('/')) // Rest is the key, decoded
+
+		console.log(`🪣 Extracted bucket: "${bucketName}"`)
+		console.log(`🔑 Extracted S3 key: "${originalKey}"`)
+
+		// Get the image data from S3 using extracted bucket name
 		const { getObjectFromS3 } = await import('../utils/s3Storage')
-		const imageBuffer = await getObjectFromS3(originalKey)
+		const imageBuffer = await getObjectFromS3(originalKey, bucketName)
+
+		console.log(`✅ Successfully retrieved from S3, size: ${imageBuffer.length} bytes`)
 
 		// Set appropriate headers for download
 		res.setHeader('Content-Type', 'application/octet-stream')
@@ -391,7 +418,8 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		// Send the image data
 		res.send(imageBuffer)
 	} catch (error) {
-		console.error('Download photo error:', error)
+		console.error('❌ Download photo error for ID:', req.params.id)
+		console.error('Error details:', error)
 		res.status(500).json({
 			success: false,
 			error: 'Internal server error'

@@ -11,6 +11,8 @@ interface Photo {
   id: string
   filename: string
   thumbnailUrl: string
+  mediumUrl?: string
+  largeUrl?: string
   originalUrl: string
   createdAt: string
   likedBy: { userId: string }[]
@@ -25,16 +27,18 @@ interface PhotoLightboxProps {
   onPrevious: () => void
   onDownload: () => void
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
+  dataSaverMode?: boolean
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onPhotoStatusChange }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onPhotoStatusChange, dataSaverMode = false }: PhotoLightboxProps) {
   const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
-    medium: null as string | null,
-    highRes: null as string | null,
+    highQuality: null as string | null,
+    fullRes: null as string | null,
     currentSrc: photo.thumbnailUrl,
-    isLoading: true
+    isLoading: false,
+    viewMode: 'high' as 'high' | 'full'
   })
   const currentIndex = photos.findIndex((p) => p.id === photo.id)
   const isFirst = currentIndex === 0
@@ -49,83 +53,103 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
     onPhotoStatusChange?.(photo.id, { liked, favorited })
   }
 
-  useEffect(() => {
-    // Reset and load new photo with progressive enhancement
-    setImageStates({
-      thumbnail: photo.thumbnailUrl,
-      medium: null,
-      highRes: null,
-      currentSrc: photo.thumbnailUrl,
-      isLoading: true
-    })
+  // Function to load high quality (2000x2000) - the default for evaluation
+  const loadHighQuality = async () => {
+    if (imageStates.highQuality || imageStates.isLoading) return
+    
+    setImageStates(prev => ({ ...prev, isLoading: true }))
+    
+    const highQualityImg = document.createElement('img')
+    highQualityImg.onload = () => {
+      setImageStates(prev => ({
+        ...prev,
+        highQuality: photo.largeUrl!,
+        currentSrc: photo.largeUrl!,
+        isLoading: false,
+        viewMode: 'high'
+      }))
+    }
+    highQualityImg.onerror = () => {
+      setImageStates(prev => ({ ...prev, isLoading: false }))
+      console.error('Failed to load high quality image:', photo.largeUrl)
+    }
+    highQualityImg.src = photo.largeUrl!
+  }
 
-    // Progressive loading: thumbnail -> medium -> high-res
-    const loadProgressive = async () => {
-      try {
-        // Try to load medium quality first (faster)
-        const mediumUrl = photo.originalUrl.replace('/original/', '/medium/') || photo.originalUrl
-        const mediumImg = document.createElement('img')
+  // Function to toggle full size original (keyboard shortcut: F)
+  const toggleFullSize = async () => {
+    if (imageStates.viewMode === 'full') {
+      // Switch back to high quality
+      const highQualitySrc = imageStates.highQuality || photo.largeUrl || photo.mediumUrl || photo.thumbnailUrl
+      setImageStates(prev => ({
+        ...prev,
+        currentSrc: highQualitySrc,
+        viewMode: 'high'
+      }))
+    } else {
+      // Load full size
+      if (imageStates.fullRes) {
+        setImageStates(prev => ({
+          ...prev,
+          currentSrc: imageStates.fullRes!,
+          viewMode: 'full'
+        }))
+      } else {
+        setImageStates(prev => ({ ...prev, isLoading: true }))
         
-        mediumImg.onload = () => {
+        const originalImg = document.createElement('img')
+        originalImg.onload = () => {
           setImageStates(prev => ({
             ...prev,
-            medium: mediumUrl,
-            currentSrc: mediumUrl,
-            isLoading: false
+            fullRes: photo.originalUrl,
+            currentSrc: photo.originalUrl,
+            isLoading: false,
+            viewMode: 'full'
           }))
-          
-          // Then load high-res in background
-          const highResImg = document.createElement('img')
-          highResImg.onload = () => {
-            setImageStates(prev => ({
-              ...prev,
-              highRes: photo.originalUrl,
-              currentSrc: photo.originalUrl
-            }))
-          }
-          highResImg.onerror = () => {
-            // If high-res fails, stick with medium
-            console.warn('High-res image failed to load:', photo.originalUrl)
-          }
-          highResImg.src = photo.originalUrl
         }
-        
-        mediumImg.onerror = () => {
-          // If medium fails, load original directly
-          const originalImg = document.createElement('img')
-          originalImg.onload = () => {
-            setImageStates(prev => ({
-              ...prev,
-              currentSrc: photo.originalUrl,
-              isLoading: false
-            }))
-          }
-          originalImg.onerror = () => {
-            // Last resort: keep thumbnail
-            setImageStates(prev => ({ ...prev, isLoading: false }))
-          }
-          originalImg.src = photo.originalUrl
+        originalImg.onerror = () => {
+          setImageStates(prev => ({ ...prev, isLoading: false }))
+          console.error('Failed to load full size image:', photo.originalUrl)
         }
-        
-        mediumImg.src = mediumUrl
-      } catch (error) {
-        console.error('Error loading image:', error)
-        setImageStates(prev => ({ ...prev, isLoading: false }))
+        originalImg.src = photo.originalUrl
       }
     }
+  }
 
-    loadProgressive()
+  useEffect(() => {
+    // Determine initial quality based on data saver mode
+    const initialSrc = dataSaverMode 
+      ? (photo.mediumUrl || photo.thumbnailUrl)  // Data saver: start with medium
+      : (photo.largeUrl || photo.mediumUrl || photo.thumbnailUrl)  // Normal: start with high quality
+    
+    // Reset image states when photo changes
+    setImageStates({
+      thumbnail: photo.thumbnailUrl,
+      highQuality: dataSaverMode ? null : (photo.largeUrl || null),
+      fullRes: null,
+      currentSrc: initialSrc,
+      isLoading: false,
+      viewMode: 'high'
+    })
+
+    // Auto-load high quality if not in data saver mode
+    if (!dataSaverMode && photo.largeUrl && !imageStates.highQuality) {
+      loadHighQuality()
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "Escape":
+      switch (e.key.toLowerCase()) {
+        case "escape":
           onClose()
           break
-        case "ArrowLeft":
+        case "arrowleft":
           if (!isFirst) onPrevious()
           break
-        case "ArrowRight":
+        case "arrowright":
           if (!isLast) onNext()
+          break
+        case "f":
+          toggleFullSize()
           break
         case "q":
         case "Q":
@@ -229,16 +253,56 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-4 right-16 text-white hover:bg-white hover:bg-opacity-20 z-10"
+        className="absolute top-4 right-24 text-white hover:bg-white hover:bg-opacity-20 z-10"
         onClick={onDownload}
         aria-label="Download photo"
       >
         <Download className="h-6 w-6" />
       </Button>
 
-      {/* Photo Counter */}
+      {/* Quality Control Buttons - Simplified for Wedding Photography */}
+      <div className="absolute top-4 right-36 flex gap-2 z-10">
+        {/* High Quality Button - only show in data saver mode */}
+        {dataSaverMode && imageStates.viewMode === 'high' && !imageStates.highQuality && photo.largeUrl && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white hover:bg-white hover:bg-opacity-20"
+            onClick={loadHighQuality}
+            disabled={imageStates.isLoading}
+            aria-label="Load high quality (2000x2000)"
+          >
+            {imageStates.isLoading ? "Loading..." : "High Quality"}
+          </Button>
+        )}
+
+        {/* Full Size Toggle Button (Keyboard: F) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white hover:bg-white hover:bg-opacity-20"
+          onClick={toggleFullSize}
+          disabled={imageStates.isLoading}
+          aria-label={imageStates.viewMode === 'full' ? "Back to high quality (F)" : "View full size (F)"}
+        >
+          {imageStates.isLoading ? "Loading..." : 
+           imageStates.viewMode === 'full' ? "High Quality" : "Full Size (F)"}
+        </Button>
+      </div>
+
+      {/* Photo Counter and Quality Indicator */}
       <div className="absolute top-4 left-4 text-white text-sm z-10">
-        {currentIndex + 1} of {photos.length}
+        <div>{currentIndex + 1} of {photos.length}</div>
+        <div className="text-xs text-gray-300 mt-1">
+          {imageStates.viewMode === 'high' && 
+            (dataSaverMode && !imageStates.highQuality 
+              ? 'Medium Quality (1200px)' 
+              : 'High Quality (2000px)')}
+          {imageStates.viewMode === 'full' && 'Full Size Original'}
+          {dataSaverMode && (
+            <div className="text-xs text-blue-300">Data Saver Mode</div>
+          )}
+        </div>
       </div>
 
       {/* Main Image */}
@@ -247,9 +311,9 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           <Image
             src={imageStates.currentSrc || "/placeholder.svg"}
             alt={photo.filename}
-            width={1200}
-            height={800}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
+            width={2000}
+            height={2000}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 80vw"
             className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
               imageStates.isLoading ? 'opacity-50' : 'opacity-100'
             }`}
