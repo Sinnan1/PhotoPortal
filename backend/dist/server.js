@@ -13,6 +13,7 @@ const galleries_1 = tslib_1.__importDefault(require("./routes/galleries"));
 const photos_1 = tslib_1.__importDefault(require("./routes/photos"));
 const photographers_1 = tslib_1.__importDefault(require("./routes/photographers"));
 const uploads_1 = tslib_1.__importDefault(require("./routes/uploads"));
+const folders_1 = tslib_1.__importDefault(require("./routes/folders"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -62,6 +63,7 @@ app.use('/api/galleries', galleries_1.default);
 app.use('/api/photos', photos_1.default);
 app.use('/api/photographers', photographers_1.default);
 app.use('/api/uploads', uploads_1.default);
+app.use('/api/folders', folders_1.default);
 // Upload configuration endpoint for frontend
 app.get('/api/upload-config', (req, res) => {
     res.json({

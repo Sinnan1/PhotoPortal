@@ -21,7 +21,7 @@ const router = Router()
 
 // Protected routes (photographers only)
 router.post(
-	'/upload/:galleryId',
+	'/upload/:folderId',
 	authenticateToken,
 	requireRole('PHOTOGRAPHER'),
 	uploadMiddleware,

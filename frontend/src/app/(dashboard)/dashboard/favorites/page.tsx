@@ -16,11 +16,15 @@ interface Photo {
   createdAt: string;
   likedBy: { userId: string }[];
   favoritedBy: { userId: string }[];
-  gallery: {
+  folder: {
     id: string;
-    title: string;
-    photographer: {
-      name: string;
+    name: string;
+    gallery: {
+      id: string;
+      title: string;
+      photographer: {
+        name: string;
+      };
     };
   };
 }

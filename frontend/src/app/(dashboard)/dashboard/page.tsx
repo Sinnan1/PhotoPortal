@@ -54,6 +54,15 @@ interface Photo {
   createdAt: string;
 }
 
+interface Folder {
+  id: string;
+  name: string;
+  coverPhoto?: Photo;
+  _count: {
+    photos: number;
+  };
+}
+
 interface Gallery {
   id: string;
   title: string;
@@ -63,7 +72,7 @@ interface Gallery {
   expiresAt: string | null;
   createdAt: string;
   isExpired: boolean;
-  photos?: Photo[]; // Add this for preview images
+  folders?: Folder[]; // Updated to use folders instead of direct photos
   likedBy: { userId: string }[];
   favoritedBy: { userId: string }[];
 }
@@ -310,17 +319,32 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {/* Gallery preview - show cover photo */}
-                {gallery.photos && gallery.photos.length > 0 && (
+                {gallery.folders && gallery.folders.length > 0 && (
                   <div className="mb-4">
                     <div className="relative aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 group-hover:ring-[#425146]/30">
-                      <Image
-                        src={gallery.photos[0].thumbnailUrl || "/placeholder.svg"}
-                        alt={gallery.photos[0].filename}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        priority={index === 0}
-                        sizes="(max-width: 1024px) 50vw, 25vw"
-                      />
+                      {gallery.folders[0].coverPhoto ? (
+                        <Image
+                          src={gallery.folders[0].coverPhoto.thumbnailUrl || "/placeholder.svg"}
+                          alt={gallery.folders[0].coverPhoto.filename}
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          priority={index === 0}
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                        />
+                      ) : gallery.folders[0]._count?.photos > 0 ? (
+                        // If no cover photo but folder has photos, show a placeholder with photo count
+                        <div className="w-full h-full bg-gradient-to-br from-[#425146]/20 to-[#425146]/10 flex items-center justify-center">
+                          <div className="text-center">
+                            <Images className="w-12 h-12 text-[#425146] mx-auto mb-2" />
+                            <p className="text-sm font-medium text-[#425146]">{gallery.folders[0]._count.photos} photos</p>
+                          </div>
+                        </div>
+                      ) : (
+                        // Empty folder placeholder
+                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          <Images className="w-12 h-12 text-gray-400" />
+                        </div>
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </div>
                   </div>
@@ -329,7 +353,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-4 px-2">
                   <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
                     <Images className="mr-1 h-4 w-4 text-[#425146]" />
-                    <span className="font-medium">{gallery.photoCount} photos</span>
+                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</span>
                   </div>
                   <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
                     <Download className="mr-1 h-4 w-4 text-[#425146]" />

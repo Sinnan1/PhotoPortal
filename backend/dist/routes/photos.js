@@ -5,7 +5,7 @@ const photoController_1 = require("../controllers/photoController");
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Protected routes (photographers only)
-router.post('/upload/:galleryId', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), photoController_1.uploadMiddleware, photoController_1.uploadPhotos);
+router.post('/upload/:folderId', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), photoController_1.uploadMiddleware, photoController_1.uploadPhotos);
 router.delete('/:id', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), photoController_1.deletePhoto);
 // Bulk operations
 router.post('/bulk-delete', auth_1.authenticateToken, (0, auth_1.requireRole)('PHOTOGRAPHER'), photoController_1.bulkDeletePhotos);

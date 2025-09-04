@@ -16,11 +16,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star } from "lucide-react";
+import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import JSZip from "jszip";
 import { PhotoGrid } from "@/components/photo-grid";
+import { FolderGrid } from "@/components/folder-grid";
+import { BreadcrumbNavigation } from "@/components/breadcrumb-navigation";
+import { CompactFolderTree } from "@/components/compact-folder-tree";
 import { useAuth } from "@/lib/auth-context";
 
 // Import the API base URL and getAuthToken function
@@ -63,6 +66,18 @@ interface Photo {
   favoritedBy: { userId: string }[];
 }
 
+interface Folder {
+  id: string;
+  name: string;
+  children: Folder[];
+  photos: Photo[];
+  coverPhoto?: Photo;
+  _count: {
+    photos: number;
+    children: number;
+  };
+}
+
 interface Gallery {
   id: string;
   title: string;
@@ -74,10 +89,10 @@ interface Gallery {
   photographer: {
     name: string;
   };
-  photos: Photo[];
+  folders: Folder[];
 }
 
-export default function GalleryPage() {
+function GalleryPage() {
   const params = useParams();
   const galleryId = params.id as string;
   const { showToast } = useToast();
@@ -93,6 +108,14 @@ export default function GalleryPage() {
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
   const [dataSaverMode, setDataSaverMode] = useState(false);
+  const [showFolderTree, setShowFolderTree] = useState(true);
+
+  // Folder navigation state
+  const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
+  const [breadcrumbItems, setBreadcrumbItems] = useState<Array<{id: string, name: string, type: 'gallery' | 'folder'}>>([]);
+
+  // Type alias for breadcrumb items
+  type BreadcrumbItemType = 'gallery' | 'folder';
   
   // Infinite scroll state
   const [displayedPhotos, setDisplayedPhotos] = useState<Photo[]>([]);
@@ -101,13 +124,13 @@ export default function GalleryPage() {
   const [hasMore, setHasMore] = useState(true);
   const PHOTOS_PER_PAGE = 30;
 
-  // Keep gallery.photos in sync when a photo's like/favorite status changes without re-fetching
+  // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
   const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
     setGallery((prev) => {
       if (!prev) return prev;
-      const updated = {
-        ...prev,
-        photos: prev.photos.map((p) => {
+      const updatedFolders = prev.folders.map((folder) => ({
+        ...folder,
+        photos: folder.photos.map((p) => {
           if (p.id !== photoId) return p;
           const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
           const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
@@ -127,19 +150,47 @@ export default function GalleryPage() {
                 : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
           } as Photo;
         })
-      } as typeof prev;
-      return updated;
+      }));
+      return { ...prev, folders: updatedFolders };
     });
   };
 
   useEffect(() => {
+    // Check if we need to force refresh (coming from manage page)
+    const searchParams = new URLSearchParams(window.location.search);
+    const shouldRefresh = searchParams.get('refresh');
+
+    if (shouldRefresh) {
+      // Clear URL parameter after using it
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
     fetchGallery();
   }, [galleryId]);
 
   const fetchGallery = async () => {
     try {
-      const response = await api.getGallery(galleryId);
-      setGallery(response.data);
+      // Add cache-busting parameter if refresh is requested
+      const searchParams = new URLSearchParams(window.location.search);
+      const shouldRefresh = searchParams.get('refresh');
+
+      const response = await api.getGallery(galleryId, shouldRefresh ? { refresh: shouldRefresh } : {});
+      const galleryData = response.data;
+      console.log('Fetched gallery data:', galleryData); // Debug log
+      setGallery(galleryData);
+
+      // Set up initial folder navigation
+      if (galleryData.folders && galleryData.folders.length > 0) {
+        const rootFolder = galleryData.folders[0]; // Use first folder as default
+        console.log('Setting current folder:', rootFolder); // Debug log
+        console.log('Folder photos:', rootFolder.photos); // Debug log
+        setCurrentFolder(rootFolder);
+        setBreadcrumbItems([
+          { id: galleryData.id, name: galleryData.title, type: 'gallery' },
+          { id: rootFolder.id, name: rootFolder.name, type: 'folder' }
+        ]);
+      }
     } catch (error: any) {
       if (error.message.toLowerCase().includes("password")) {
         setPasswordRequired(true);
@@ -157,7 +208,7 @@ export default function GalleryPage() {
 
     try {
       // Re-fetch gallery providing password header so backend authorizes
-      const response = await api.getGallery(galleryId, password);
+      const response = await api.getGallery(galleryId, { password });
       setGallery(response.data);
       setPasswordRequired(false);
     } catch (error) {
@@ -169,7 +220,7 @@ export default function GalleryPage() {
 
   const handleDownload = async (photoId: string) => {
     try {
-      const photo = gallery?.photos.find(p => p.id === photoId);
+      const photo = gallery?.folders?.flatMap(f => f?.photos || []).find(p => p.id === photoId);
       if (!photo) {
         throw new Error("Photo not found");
       }
@@ -183,7 +234,8 @@ export default function GalleryPage() {
   };
 
   const handleDownloadAll = async () => {
-    if (!gallery || gallery.photos.length === 0) {
+    const allPhotos = gallery?.folders?.flatMap(f => f?.photos || []) || [];
+    if (!gallery || allPhotos.length === 0) {
       showToast("No photos to download", "info");
       return;
     }
@@ -193,7 +245,7 @@ export default function GalleryPage() {
 
     try {
       const zip = new JSZip();
-      const photoPromises = gallery.photos.map(async (photo) => {
+      const photoPromises = allPhotos.map(async (photo) => {
         try {
           // Use backend download endpoint to enforce limits and count
           const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
@@ -240,7 +292,14 @@ export default function GalleryPage() {
         if (!prevGallery) return null;
         return {
           ...prevGallery,
-          photos: prevGallery.photos.filter((p) => p.id !== photoId),
+          folders: prevGallery.folders?.map(folder => ({
+            ...folder,
+            photos: folder.photos.filter((p) => p.id !== photoId),
+            _count: {
+              ...folder._count,
+              photos: folder.photos.filter((p) => p.id !== photoId).length
+            }
+          }))
         };
       });
       showToast("Photo deleted", "success");
@@ -254,20 +313,107 @@ export default function GalleryPage() {
     setImageErrors(prev => new Set(prev).add(photoId));
   };
 
+  // Folder navigation functions
+  const handleFolderSelect = async (folderId: string) => {
+    try {
+      const response = await api.getFolder(folderId);
+      const folder = response.data;
+
+      // Update current folder
+      setCurrentFolder(folder);
+
+      // Build complete breadcrumb path by traversing folder hierarchy
+      const buildBreadcrumbPath = (targetFolder: any): Array<{id: string, name: string, type: BreadcrumbItemType}> => {
+        const path = [{ id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }];
+
+        // Find the folder in the gallery structure to build the path
+        const findFolderPath = (folders: any[], targetId: string, currentPath: string[] = []): string[] | null => {
+          for (const folder of folders) {
+            if (folder.id === targetId) {
+              return [...currentPath, folder.id];
+            }
+            if (folder.children && folder.children.length > 0) {
+              const childPath = findFolderPath(folder.children, targetId, [...currentPath, folder.id]);
+              if (childPath) {
+                return childPath;
+              }
+            }
+          }
+          return null;
+        };
+
+        const folderPath = findFolderPath(gallery!.folders, targetFolder.id);
+        if (folderPath) {
+          // Build path from gallery root to current folder
+          let currentFolders = gallery!.folders;
+          const breadcrumbItems: Array<{id: string, name: string, type: BreadcrumbItemType}> = [{ id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType }];
+
+          for (let i = 0; i < folderPath.length; i++) {
+            const folderId = folderPath[i];
+            const folder = currentFolders.find(f => f.id === folderId);
+            if (folder) {
+              breadcrumbItems.push({ id: folder.id, name: folder.name, type: 'folder' as BreadcrumbItemType });
+              currentFolders = folder.children || [];
+            }
+          }
+
+          return breadcrumbItems;
+        }
+
+        // Fallback: just show gallery and current folder
+        return [
+          { id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType },
+          { id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }
+        ];
+      };
+
+      const newBreadcrumbs = buildBreadcrumbPath(folder);
+      setBreadcrumbItems(newBreadcrumbs);
+
+      // Reset photo display for new folder
+      setDisplayedPhotos([]);
+      setCurrentPage(1);
+      setHasMore(true);
+
+    } catch (error) {
+      showToast("Failed to load folder", "error");
+    }
+  };
+
+  const handleBreadcrumbNavigate = async (itemId: string, type: 'gallery' | 'folder') => {
+    if (type === 'gallery') {
+      // Navigate back to gallery root
+      if (gallery && gallery.folders && gallery.folders.length > 0) {
+        const rootFolder = gallery.folders[0];
+        setCurrentFolder(rootFolder);
+        setBreadcrumbItems([
+          { id: gallery.id, name: gallery.title, type: 'gallery' },
+          { id: rootFolder.id, name: rootFolder.name, type: 'folder' }
+        ]);
+        setDisplayedPhotos([]);
+        setCurrentPage(1);
+        setHasMore(true);
+      }
+    } else {
+      // Navigate to specific folder
+      await handleFolderSelect(itemId);
+    }
+  };
+
   const filteredPhotos = useMemo(() => {
-    if (!gallery) return [];
+    if (!currentFolder) return [];
     if (filter === "liked") {
-      return gallery.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
+      return currentFolder.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
     }
     if (filter === "favorited") {
-      return gallery.photos.filter((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id));
+      return currentFolder.photos.filter((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id));
     }
-    return gallery.photos;
-  }, [gallery, filter, user]);
+    return currentFolder.photos;
+  }, [currentFolder, filter, user]);
 
   // Load more photos function
   const loadMorePhotos = useCallback(() => {
-    if (!gallery || loadingMore || !hasMore) return;
+    if (!currentFolder || loadingMore || !hasMore) return;
     
     setLoadingMore(true);
     const startIndex = displayedPhotos.length;
@@ -280,7 +426,7 @@ export default function GalleryPage() {
       setHasMore(endIndex < filteredPhotos.length);
       setLoadingMore(false);
     }, 200);
-  }, [gallery, filteredPhotos, displayedPhotos.length, loadingMore, hasMore, PHOTOS_PER_PAGE]);
+  }, [currentFolder, filteredPhotos, displayedPhotos.length, loadingMore, hasMore, PHOTOS_PER_PAGE]);
 
   // Intersection observer for infinite scroll
   const observer = useRef<IntersectionObserver | null>(null);
@@ -295,15 +441,15 @@ export default function GalleryPage() {
     if (node) observer.current.observe(node);
   }, [loadingMore, hasMore, loadMorePhotos]);
 
-  // Reset pagination when filter changes or gallery loads
+  // Reset pagination when filter changes or folder loads
   useEffect(() => {
-    if (gallery && filteredPhotos.length > 0) {
+    if (currentFolder && filteredPhotos.length > 0) {
       const initialPhotos = filteredPhotos.slice(0, PHOTOS_PER_PAGE);
       setDisplayedPhotos(initialPhotos);
       setCurrentPage(2);
       setHasMore(filteredPhotos.length > PHOTOS_PER_PAGE);
     }
-  }, [filteredPhotos, gallery]);
+  }, [filteredPhotos, currentFolder]);
 
   if (loading) {
     return (
@@ -377,143 +523,108 @@ export default function GalleryPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Gallery Header */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
-          <div className="flex items-center space-x-2">
-            {gallery.photos.length > 0 && (
-              <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                {isDownloadingAll ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Download All
+      <div className="mb-8 flex gap-4">
+        {/* Compact Folder Tree - Collapsible */}
+        <div className="hidden lg:block w-64 flex-shrink-0">
+          <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4 sticky top-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-foreground">Folders</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setShowFolderTree(!showFolderTree)}
+              >
+                <ChevronRight className={`h-3 w-3 transition-transform ${showFolderTree ? 'rotate-90' : ''}`} />
               </Button>
-            )}
-            {gallery.photos.some((p) => p.likedBy?.some((like) => like.userId === user?.id)) && (
-              <Button onClick={async () => {
-                setIsDownloadingAll(true);
-                try {
-                  const liked = gallery.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
-                  const zip = new JSZip();
-                  await Promise.all(liked.map(async (photo) => {
-                    try {
-                      const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
-                        headers: {
-                          ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
-                        },
-                      });
-                      
-                      if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
-                      }
-                      
-                      const blob = await response.blob();
-                      zip.file(photo.filename, blob);
-                    } catch (err) {
-                      console.error(`Failed to download ${photo.filename}:`, err);
-                    }
-                  }));
-                  const zipBlob = await zip.generateAsync({ type: "blob" });
-                  const link = document.createElement("a");
-                  link.href = URL.createObjectURL(zipBlob);
-                  link.download = `${gallery.title.replace(/\s+/g, '_')}_liked.zip`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  showToast("Download started!", "success");
-                } catch (e) {
-                  console.error(e);
-                  showToast("Failed to create zip file", "error");
-                } finally {
-                  setIsDownloadingAll(false);
-                }
-              }} disabled={isDownloadingAll}>
-                {isDownloadingAll ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Download Liked
-              </Button>
-            )}
-                        {gallery.photos.some((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id)) && (
-              <Button onClick={async () => {
-                setIsDownloadingAll(true);
-                try {
-                  const fav = gallery.photos.filter((p) => p.favoritedBy?.some((f) => f.userId === user?.id));
-                  const zip = new JSZip();
-                  await Promise.all(fav.map(async (photo) => {
-                    try {
-                      const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
-                        headers: {
-                          ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
-                        },
-                      });
-                      
-                      if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
-                      }
-                      
-                      const blob = await response.blob();
-                      zip.file(photo.filename, blob);
-                    } catch (err) {
-                      console.error(`Failed to download ${photo.filename}:`, err);
-                    }
-                  }));
-                  const zipBlob = await zip.generateAsync({ type: "blob" });
-                  const link = document.createElement("a");
-                  link.href = URL.createObjectURL(zipBlob);
-                  link.download = `${gallery.title.replace(/\s+/g, '_')}_favorites.zip`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  showToast("Download started!", "success");
-                } catch (e) {
-                  console.error(e);
-                  showToast("Failed to create zip file", "error");
-                } finally {
-                  setIsDownloadingAll(false);
-                }
-              }} disabled={isDownloadingAll}>
-                {isDownloadingAll ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Download Favorites
-              </Button>
-            )}
-            {gallery.downloadLimit && (
-              <Badge variant="outline">
-                {gallery.downloadCount}/{gallery.downloadLimit} downloads
-              </Badge>
+            </div>
+
+            {showFolderTree && (
+              <div className="space-y-1 max-h-96 overflow-y-auto">
+                {gallery.folders?.map((folder, index) => (
+                  <CompactFolderTree
+                    key={folder.id}
+                    folder={folder as any}
+                    level={0}
+                    currentFolderId={currentFolder?.id}
+                    onFolderSelect={handleFolderSelect}
+                    isFirst={index === 0}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
 
-        {gallery.description && (
-          <p className="text-muted-foreground mb-4">{gallery.description}</p>
-        )}
+        <div className="flex-1 min-w-0">
+          {/* Mobile Folder Tree Toggle */}
+          <div className="lg:hidden mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFolderTree(!showFolderTree)}
+              className="flex items-center gap-2"
+            >
+              <Folder className="h-4 w-4" />
+              {showFolderTree ? 'Hide' : 'Show'} Folders
+              <ChevronRight className={`h-3 w-3 transition-transform ${showFolderTree ? 'rotate-90' : ''}`} />
+            </Button>
 
-        <div className="flex items-center space-x-6 text-sm text-muted-foreground">
-          <div className="flex items-center">
-            <User className="mr-1 h-4 w-4" />
-            {gallery.photographer.name}
+            {showFolderTree && (
+              <div className="mt-3 bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-3 max-h-64 overflow-y-auto">
+                <div className="space-y-1">
+                  {gallery.folders?.map((folder, index) => (
+                    <CompactFolderTree
+                      key={folder.id}
+                      folder={folder as any}
+                      level={0}
+                      currentFolderId={currentFolder?.id}
+                      onFolderSelect={handleFolderSelect}
+                      isFirst={index === 0}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-center">
-            <Images className="mr-1 h-4 w-4" />
-            {gallery.photos.length} photos
-          </div>
-          {gallery.expiresAt && (
-            <div className="flex items-center">
-              <Calendar className="mr-1 h-4 w-4" />
-              Expires {new Date(gallery.expiresAt).toLocaleDateString()}
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
+            <div className="flex items-center space-x-2">
+              {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
+                <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                  {isDownloadingAll ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Download All
+                </Button>
+              )}
             </div>
+          </div>
+
+          {gallery.description && (
+            <p className="text-muted-foreground mb-4">{gallery.description}</p>
           )}
+
+          {/* Breadcrumb Navigation */}
+          <BreadcrumbNavigation
+            items={breadcrumbItems}
+            onNavigate={handleBreadcrumbNavigate}
+            className="mb-4"
+          />
+
+          <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+            <div className="flex items-center">
+              <User className="mr-1 h-4 w-4" />
+              {gallery.photographer.name}
+            </div>
+            <div className="flex items-center">
+              <Images className="mr-1 h-4 w-4" />
+              {currentFolder?._count?.photos ?? 0} photos
+            </div>
+          </div>
         </div>
       </div>
 
@@ -548,7 +659,7 @@ export default function GalleryPage() {
             onClick={() => setFilter("all")}
             className={filter === "all" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
           >
-            All ({gallery.photos.length})
+            All ({currentFolder ? currentFolder.photos.length : 0})
           </Button>
           <Button
             variant={filter === "liked" ? "default" : "ghost"}
@@ -556,7 +667,7 @@ export default function GalleryPage() {
             className={filter === "liked" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
           >
             <Heart className="mr-2 h-4 w-4" />
-            Liked ({gallery.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length})
+            Liked ({currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0})
           </Button>
           <Button
             variant={filter === "favorited" ? "default" : "ghost"}
@@ -564,7 +675,7 @@ export default function GalleryPage() {
             className={filter === "favorited" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
           >
             <Star className="mr-2 h-4 w-4" />
-            Favorited ({gallery.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length})
+            Favorited ({currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0})
           </Button>
         </div>
       </div>
@@ -582,17 +693,16 @@ export default function GalleryPage() {
         </div>
       ) : (
         <>
-          <PhotoGrid
-            photos={displayedPhotos}
-            onView={(p) => setSelectedPhoto(p as any)}
-            onDownload={handleDownload}
-            onDelete={handleDelete}
-            onPhotoStatusChange={handlePhotoStatusChange}
-            columns={{ sm: 2, md: 3, lg: 4 }}
-            lastPhotoElementRef={lastPhotoElementRef}
-            loading={loading}
-          />
-          
+          {currentFolder && (
+            <FolderGrid
+              folder={currentFolder}
+              isPhotographer={false} // Clients can't edit
+              onPhotoView={(photo) => setSelectedPhoto(photo)}
+              onFolderSelect={handleFolderSelect}
+              onPhotoStatusChange={handlePhotoStatusChange}
+            />
+          )}
+
           {/* Loading more indicator */}
           {loadingMore && (
             <div className="flex justify-center py-8">
@@ -600,7 +710,7 @@ export default function GalleryPage() {
               <span className="ml-2 text-muted-foreground">Loading more photos...</span>
             </div>
           )}
-          
+
           {/* End of photos indicator */}
           {!hasMore && displayedPhotos.length > 0 && (
             <div className="text-center py-8 text-muted-foreground">
@@ -639,3 +749,8 @@ export default function GalleryPage() {
     </div>
   );
 }
+
+export default GalleryPage;
+
+
+

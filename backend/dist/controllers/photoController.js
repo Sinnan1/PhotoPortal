@@ -119,10 +119,10 @@ exports.handleUploadErrors = handleUploadErrors;
 // Enhanced upload function with better error handling and cleanup
 const uploadPhotos = async (req, res) => {
     try {
-        const { galleryId } = req.params;
+        const { folderId } = req.params;
         const photographerId = req.user.id;
         const files = req.files;
-        console.log(`Upload started: ${files?.length || 0} files for gallery ${galleryId}`);
+        console.log(`Upload started: ${files?.length || 0} files for folder ${folderId}`);
         if (!files || files.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -132,14 +132,23 @@ const uploadPhotos = async (req, res) => {
         // Log file sizes for monitoring
         const totalSize = files.reduce((sum, file) => sum + file.size, 0);
         console.log(`Total upload size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
-        // Verify gallery exists and belongs to photographer
-        const gallery = await prisma.gallery.findFirst({
-            where: { id: galleryId, photographerId }
+        // Verify folder exists and belongs to photographer's gallery
+        const folder = await prisma.folder.findFirst({
+            where: { id: folderId },
+            include: {
+                gallery: true
+            }
         });
-        if (!gallery) {
+        if (!folder) {
             return res.status(404).json({
                 success: false,
-                error: 'Gallery not found or access denied'
+                error: 'Folder not found'
+            });
+        }
+        if (folder.gallery.photographerId !== photographerId) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied'
             });
         }
         // Process in smaller batches to manage memory
@@ -153,10 +162,10 @@ const uploadPhotos = async (req, res) => {
                     // Read file from disk since we're using diskStorage
                     const filePath = file.path;
                     const fileBuffer = await promises_1.default.readFile(filePath);
-                    const { originalUrl, thumbnailUrl, fileSize } = await (0, s3Storage_1.uploadToS3)(fileBuffer, file.originalname, galleryId);
+                    const { originalUrl, thumbnailUrl, fileSize } = await (0, s3Storage_1.uploadToS3)(fileBuffer, file.originalname, folderId);
                     // Generate multiple thumbnail sizes
                     const { generateMultipleThumbnails } = await Promise.resolve().then(() => tslib_1.__importStar(require('../utils/s3Storage')));
-                    const thumbnailSizes = await generateMultipleThumbnails(fileBuffer, file.originalname, galleryId);
+                    const thumbnailSizes = await generateMultipleThumbnails(fileBuffer, file.originalname, folderId);
                     const photo = await prisma.photo.create({
                         data: {
                             filename: file.originalname,
@@ -165,7 +174,7 @@ const uploadPhotos = async (req, res) => {
                             mediumUrl: thumbnailSizes.medium || null, // 800x800 for lightbox
                             largeUrl: thumbnailSizes.large || null, // 1200x1200 for high quality
                             fileSize,
-                            galleryId
+                            folderId
                         }
                     });
                     return {
@@ -332,12 +341,22 @@ const getPhotos = async (req, res) => {
         }
         const [photos, total] = await Promise.all([
             prisma.photo.findMany({
-                where: { galleryId },
+                where: {
+                    folder: {
+                        galleryId
+                    }
+                },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit
             }),
-            prisma.photo.count({ where: { galleryId } })
+            prisma.photo.count({
+                where: {
+                    folder: {
+                        galleryId
+                    }
+                }
+            })
         ]);
         res.json({
             success: true,
@@ -405,12 +424,16 @@ const downloadPhoto = async (req, res) => {
         const photo = await prisma.photo.findUnique({
             where: { id },
             include: {
-                gallery: {
-                    select: {
-                        id: true,
-                        password: true,
-                        photographerId: true,
-                        expiresAt: true
+                folder: {
+                    include: {
+                        gallery: {
+                            select: {
+                                id: true,
+                                password: true,
+                                photographerId: true,
+                                expiresAt: true
+                            }
+                        }
                     }
                 }
             }
@@ -423,7 +446,7 @@ const downloadPhoto = async (req, res) => {
             });
         }
         // Check if gallery has expired
-        if (photo.gallery.expiresAt && photo.gallery.expiresAt < new Date()) {
+        if (photo.folder.gallery.expiresAt && photo.folder.gallery.expiresAt < new Date()) {
             console.log(`❌ Gallery expired for photo: ${id}`);
             return res.status(410).json({
                 success: false,
@@ -431,7 +454,7 @@ const downloadPhoto = async (req, res) => {
             });
         }
         // Check gallery access permissions
-        if (photo.gallery.password) {
+        if (photo.folder.gallery.password) {
             let isAuthorized = false;
             // 1) If user is authenticated, allow if photographer owner or client with access
             const authHeader = req.headers['authorization'];
@@ -442,13 +465,13 @@ const downloadPhoto = async (req, res) => {
                     const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
                     const userId = decoded.userId;
                     // Photographer who owns the gallery
-                    if (decoded.role === 'PHOTOGRAPHER' && userId === photo.gallery.photographerId) {
+                    if (decoded.role === 'PHOTOGRAPHER' && userId === photo.folder.gallery.photographerId) {
                         isAuthorized = true;
                     }
                     else {
                         // Client with explicit access
                         const hasAccess = await prisma.galleryAccess.findUnique({
-                            where: { userId_galleryId: { userId, galleryId: photo.gallery.id } }
+                            where: { userId_galleryId: { userId, galleryId: photo.folder.gallery.id } }
                         });
                         if (hasAccess)
                             isAuthorized = true;
@@ -466,7 +489,7 @@ const downloadPhoto = async (req, res) => {
                     console.log(`❌ Password required for photo download: ${id}`);
                     return res.status(401).json({ success: false, error: 'Password required' });
                 }
-                const isValidPassword = await (await Promise.resolve().then(() => tslib_1.__importStar(require('bcryptjs')))).default.compare(providedPassword, photo.gallery.password);
+                const isValidPassword = await (await Promise.resolve().then(() => tslib_1.__importStar(require('bcryptjs')))).default.compare(providedPassword, photo.folder.gallery.password);
                 if (!isValidPassword) {
                     console.log(`❌ Invalid password for photo download: ${id}`);
                     return res.status(401).json({ success: false, error: 'Invalid password' });
@@ -524,12 +547,16 @@ const deletePhoto = async (req, res) => {
         const photo = await prisma.photo.findUnique({
             where: { id },
             include: {
-                gallery: {
-                    select: { photographerId: true }
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { photographerId: true }
+                        }
+                    }
                 }
             }
         });
-        if (!photo || photo.gallery.photographerId !== photographerId) {
+        if (!photo || photo.folder.gallery.photographerId !== photographerId) {
             return res.status(404).json({
                 success: false,
                 error: 'Photo not found or access denied'
@@ -579,7 +606,9 @@ const bulkDeletePhotos = async (req, res) => {
         const photos = await prisma.photo.findMany({
             where: {
                 id: { in: photoIds },
-                gallery: { photographerId }
+                folder: {
+                    gallery: { photographerId }
+                }
             }
         });
         if (photos.length !== photoIds.length) {
@@ -627,19 +656,30 @@ const likePhoto = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         // Ensure photo exists
-        const photo = await prisma.photo.findUnique({ where: { id } });
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
         if (!photo) {
             return res.status(404).json({ success: false, error: 'Photo not found' });
         }
         // Sync likes across photographer and all clients with access to this gallery
         // 1) Find gallery photographer
         const galleryOwner = await prisma.gallery.findUnique({
-            where: { id: photo.galleryId },
+            where: { id: photo.folder.galleryId },
             select: { photographerId: true }
         });
         // 2) Find all clients who have access to this gallery
         const accessUsers = await prisma.galleryAccess.findMany({
-            where: { galleryId: photo.galleryId },
+            where: { galleryId: photo.folder.galleryId },
             select: { userId: true }
         });
         // 3) Build the set of users to mirror the like to (owner + all clients with access)
@@ -667,17 +707,28 @@ const unlikePhoto = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         // Ensure photo exists to derive gallery
-        const photo = await prisma.photo.findUnique({ where: { id } });
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
         if (!photo) {
             return res.status(404).json({ success: false, error: 'Photo not found' });
         }
         // Get gallery owner and all clients with access
         const galleryOwner = await prisma.gallery.findUnique({
-            where: { id: photo.galleryId },
+            where: { id: photo.folder.galleryId },
             select: { photographerId: true }
         });
         const accessUsers = await prisma.galleryAccess.findMany({
-            where: { galleryId: photo.galleryId },
+            where: { galleryId: photo.folder.galleryId },
             select: { userId: true }
         });
         const userIdsToUnlike = new Set([
@@ -701,17 +752,28 @@ const favoritePhoto = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
-        const photo = await prisma.photo.findUnique({ where: { id } });
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
         if (!photo) {
             return res.status(404).json({ success: false, error: 'Photo not found' });
         }
         // Sync favorites across photographer and all clients with access
         const galleryOwner = await prisma.gallery.findUnique({
-            where: { id: photo.galleryId },
+            where: { id: photo.folder.galleryId },
             select: { photographerId: true }
         });
         const accessUsers = await prisma.galleryAccess.findMany({
-            where: { galleryId: photo.galleryId },
+            where: { galleryId: photo.folder.galleryId },
             select: { userId: true }
         });
         const userIdsToFavorite = new Set([
@@ -737,17 +799,28 @@ const unfavoritePhoto = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         // Ensure photo exists to derive gallery
-        const photo = await prisma.photo.findUnique({ where: { id } });
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
         if (!photo) {
             return res.status(404).json({ success: false, error: 'Photo not found' });
         }
         // Get gallery owner and all clients with access
         const galleryOwner = await prisma.gallery.findUnique({
-            where: { id: photo.galleryId },
+            where: { id: photo.folder.galleryId },
             select: { photographerId: true }
         });
         const accessUsers = await prisma.galleryAccess.findMany({
-            where: { galleryId: photo.galleryId },
+            where: { galleryId: photo.folder.galleryId },
             select: { userId: true }
         });
         const userIdsToUnfavorite = new Set([
@@ -793,8 +866,12 @@ const getLikedPhotos = async (req, res) => {
             include: {
                 photo: {
                     include: {
-                        gallery: {
-                            include: { photographer: { select: { name: true } } }
+                        folder: {
+                            include: {
+                                gallery: {
+                                    include: { photographer: { select: { name: true } } }
+                                }
+                            }
                         }
                     }
                 }
@@ -819,8 +896,12 @@ const getFavoritedPhotos = async (req, res) => {
             include: {
                 photo: {
                     include: {
-                        gallery: {
-                            include: { photographer: { select: { name: true } } }
+                        folder: {
+                            include: {
+                                gallery: {
+                                    include: { photographer: { select: { name: true } } }
+                                }
+                            }
                         }
                     }
                 }

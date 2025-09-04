@@ -84,10 +84,10 @@ export const api = {
     }),
 
   // Fixed: Use correct endpoint for public gallery access, optional password header
-  getGallery: (id: string, password?: string) =>
-    apiRequest(`/galleries/${id}`, {
+  getGallery: (id: string, options?: { password?: string; refresh?: string }) =>
+    apiRequest(`/galleries/${id}${options?.refresh ? `?refresh=${options.refresh}` : ''}`, {
       headers: {
-        ...(password ? { 'x-gallery-password': password } : {}),
+        ...(options?.password ? { 'x-gallery-password': options.password } : {}),
       },
     }),
 
@@ -240,4 +240,59 @@ export const api = {
   getMostFavoritedPhotos: () => apiRequest("/photographers/stats/most-favorited-photos"),
 
   getMostViewedGalleries: () => apiRequest("/photographers/stats/most-viewed-galleries"),
+
+  // Folder APIs
+  createFolder: (galleryId: string, folderData: { name: string; parentId?: string }) =>
+    apiRequest(`/folders/galleries/${galleryId}/folders`, {
+      method: "POST",
+      body: JSON.stringify(folderData),
+    }),
+
+  getFolderTree: (galleryId: string) =>
+    apiRequest(`/folders/galleries/${galleryId}/folders/tree`),
+
+  getFolder: (folderId: string) =>
+    apiRequest(`/folders/${folderId}`),
+
+  updateFolder: (folderId: string, data: { name: string }) =>
+    apiRequest(`/folders/${folderId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteFolder: (folderId: string) =>
+    apiRequest(`/folders/${folderId}`, {
+      method: "DELETE",
+    }),
+
+  setFolderCover: (folderId: string, photoId?: string) =>
+    apiRequest(`/folders/${folderId}/set-cover`, {
+      method: "POST",
+      body: JSON.stringify({ photoId }),
+    }),
+
+  moveFolder: (folderId: string, newParentId?: string) =>
+    apiRequest(`/folders/${folderId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ newParentId }),
+    }),
+
+  // Updated photo upload to use folderId instead of galleryId
+  uploadPhotosToFolder: (folderId: string, formData: FormData) => {
+    const token = getAuthToken()
+    return fetch(`${API_BASE_URL}/photos/upload/${folderId}`, {
+      method: "POST",
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        // Don't set Content-Type for FormData - browser sets it automatically
+      },
+      body: formData,
+    }).then(async (response) => {
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Upload failed")
+      }
+      return data
+    })
+  },
 }

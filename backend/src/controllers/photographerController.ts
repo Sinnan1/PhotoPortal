@@ -140,7 +140,7 @@ export const getTotals = async (req: AuthRequest, res: Response) => {
 		const photographerId = (req.user as any).id
 
 		const [photos, galleries, clients] = await Promise.all([
-			prisma.photo.count({ where: { gallery: { photographerId } } }),
+			prisma.photo.count({ where: { folder: { gallery: { photographerId } } } }),
 			prisma.gallery.count({ where: { photographerId } }),
 			prisma.user.count({ where: { photographerId } })
 		])
@@ -157,7 +157,7 @@ export const getMostLikedPhotos = async (req: AuthRequest, res: Response) => {
 		const photographerId = (req.user as any).id
 
 		const photos = await prisma.photo.findMany({
-			where: { gallery: { photographerId } },
+			where: { folder: { gallery: { photographerId } } },
 			orderBy: { likedBy: { _count: 'desc' } },
 			take: 10,
 			include: { _count: { select: { likedBy: true } } }
@@ -175,7 +175,7 @@ export const getMostFavoritedPhotos = async (req: AuthRequest, res: Response) =>
 		const photographerId = (req.user as any).id
 
 		const photos = await prisma.photo.findMany({
-			where: { gallery: { photographerId } },
+			where: { folder: { gallery: { photographerId } } },
 			orderBy: { favoritedBy: { _count: 'desc' } },
 			take: 10,
 			include: { _count: { select: { favoritedBy: true } } }

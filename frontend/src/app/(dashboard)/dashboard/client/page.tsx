@@ -40,16 +40,24 @@ interface Photo {
   createdAt: string;
 }
 
+interface Folder {
+  id: string;
+  name: string;
+  photos: Photo[];
+  _count: {
+    photos: number;
+  };
+}
+
 interface Gallery {
   id: string;
   title: string;
   description: string;
-  photoCount: number;
   downloadCount: number;
   expiresAt: string | null;
   createdAt: string;
   isExpired: boolean;
-  photos?: Photo[];
+  folders: Folder[];
   photographer: {
     name: string;
   };
@@ -242,12 +250,12 @@ export default function ClientDashboardPage() {
               </CardHeader>
               <CardContent>
                 {/* Gallery preview - show cover photo */}
-                {gallery.photos && gallery.photos.length > 0 && (
+                {gallery.folders && gallery.folders.length > 0 && gallery.folders[0].photos && gallery.folders[0].photos.length > 0 && (
                   <div className="mb-4">
                     <div className="relative aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 group-hover:ring-[#425146]/30">
                       <Image
-                        src={gallery.photos[0].thumbnailUrl || "/placeholder.svg"}
-                        alt={gallery.photos[0].filename}
+                        src={gallery.folders[0].photos[0].thumbnailUrl || "/placeholder.svg"}
+                        alt={gallery.folders[0].photos[0].filename}
                         fill
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
                         priority={index === 0}
@@ -265,7 +273,7 @@ export default function ClientDashboardPage() {
                   </div>
                   <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
                     <Images className="mr-1 h-4 w-4 text-[#425146]" />
-                    <span className="font-medium">{gallery.photoCount} photos</span>
+                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</span>
                   </div>
                 </div>
 
