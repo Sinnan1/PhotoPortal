@@ -173,8 +173,9 @@ export default function GalleryPage() {
       if (!photo) {
         throw new Error("Photo not found");
       }
-      
-      await api.downloadPhotoData(photoId, photo.filename);
+
+      // Pass gallery password if gallery is password-protected
+      await api.downloadPhotoData(photoId, photo.filename, passwordRequired ? password : undefined);
     } catch (error) {
       console.error("Download failed", error);
       showToast("Download failed", "error");

@@ -82,13 +82,20 @@ export function Navigation() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="flex items-center space-x-2 hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                      className="flex items-center space-x-2 hover:bg-primary/10 hover:text-primary transition-all duration-300 min-w-0 sm:min-w-fit"
                     >
-                      <User className="h-4 w-4" />
-                      <span>{user.name}</span>
+                      <User className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate max-w-20 sm:max-w-none">{user.name}</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {/* Main Dashboard Link - Always first */}
+                    <Link href={user.role === "PHOTOGRAPHER" ? "/dashboard" : "/dashboard/client"}>
+                      <DropdownMenuItem>
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </DropdownMenuItem>
+                    </Link>
                     <DropdownMenuItem>
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>

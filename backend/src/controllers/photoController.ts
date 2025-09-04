@@ -177,7 +177,7 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 						file.originalname,
 						galleryId
 					)
-					
+
 					// Generate multiple thumbnail sizes
 					const { generateMultipleThumbnails } = await import('../utils/s3Storage')
 					const thumbnailSizes = await generateMultipleThumbnails(
@@ -301,6 +301,78 @@ export const getPhotos = async (req: Request, res: Response) => {
 		
 		const skip = (page - 1) * limit
 
+		// First, check if gallery exists and get its access information
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				id: true,
+				password: true,
+				photographerId: true,
+				expiresAt: true,
+				title: true
+			}
+		})
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: 'Gallery not found'
+			})
+		}
+
+		// Check if gallery has expired
+		if (gallery.expiresAt && gallery.expiresAt < new Date()) {
+			return res.status(410).json({
+				success: false,
+				error: 'Gallery has expired'
+			})
+		}
+
+		// Check gallery access permissions
+		if (gallery.password) {
+			let isAuthorized = false
+
+			// 1) If user is authenticated, allow if photographer owner or client with access
+			const authHeader = req.headers['authorization']
+			const token = authHeader && (authHeader as string).split(' ')[1]
+			if (token) {
+				try {
+					const jwt = await import('jsonwebtoken')
+					const decoded = jwt.default.verify(token, process.env.JWT_SECRET!) as any
+					const userId = decoded.userId as string
+
+					// Photographer who owns the gallery
+					if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+						isAuthorized = true
+					} else {
+						// Client with explicit access
+						const hasAccess = await prisma.galleryAccess.findUnique({
+							where: { userId_galleryId: { userId, galleryId } }
+						})
+						if (hasAccess) isAuthorized = true
+					}
+				} catch {
+					// ignore token errors; will fall back to password header
+				}
+			}
+
+			// 2) If not authorized yet, validate provided password (via header or query)
+			if (!isAuthorized) {
+				const providedPassword =
+					(req.headers['x-gallery-password'] as string | undefined) ||
+					(req.query.password as string | undefined)
+
+				if (!providedPassword) {
+					return res.status(401).json({ success: false, error: 'Password required' })
+				}
+
+				const isValidPassword = await (await import('bcryptjs')).default.compare(providedPassword, gallery.password)
+				if (!isValidPassword) {
+					return res.status(401).json({ success: false, error: 'Invalid password' })
+				}
+			}
+		}
+
 		const [photos, total] = await Promise.all([
 			prisma.photo.findMany({
 				where: { galleryId },
@@ -377,7 +449,17 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		console.log(`📥 Download request for photo ID: ${id}`)
 
 		const photo = await prisma.photo.findUnique({
-			where: { id }
+			where: { id },
+			include: {
+				gallery: {
+					select: {
+						id: true,
+						password: true,
+						photographerId: true,
+						expiresAt: true
+					}
+				}
+			}
 		})
 
 		if (!photo) {
@@ -386,6 +468,62 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 				success: false,
 				error: 'Photo not found'
 			})
+		}
+
+		// Check if gallery has expired
+		if (photo.gallery.expiresAt && photo.gallery.expiresAt < new Date()) {
+			console.log(`❌ Gallery expired for photo: ${id}`)
+			return res.status(410).json({
+				success: false,
+				error: 'Gallery has expired'
+			})
+		}
+
+		// Check gallery access permissions
+		if (photo.gallery.password) {
+			let isAuthorized = false
+
+			// 1) If user is authenticated, allow if photographer owner or client with access
+			const authHeader = req.headers['authorization']
+			const token = authHeader && (authHeader as string).split(' ')[1]
+			if (token) {
+				try {
+					const jwt = await import('jsonwebtoken')
+					const decoded = jwt.default.verify(token, process.env.JWT_SECRET!) as any
+					const userId = decoded.userId as string
+
+					// Photographer who owns the gallery
+					if (decoded.role === 'PHOTOGRAPHER' && userId === photo.gallery.photographerId) {
+						isAuthorized = true
+					} else {
+						// Client with explicit access
+						const hasAccess = await prisma.galleryAccess.findUnique({
+							where: { userId_galleryId: { userId, galleryId: photo.gallery.id } }
+						})
+						if (hasAccess) isAuthorized = true
+					}
+				} catch {
+					// ignore token errors; will fall back to password header
+				}
+			}
+
+			// 2) If not authorized yet, validate provided password (via header or query)
+			if (!isAuthorized) {
+				const providedPassword =
+					(req.headers['x-gallery-password'] as string | undefined) ||
+					(req.query.password as string | undefined)
+
+				if (!providedPassword) {
+					console.log(`❌ Password required for photo download: ${id}`)
+					return res.status(401).json({ success: false, error: 'Password required' })
+				}
+
+				const isValidPassword = await (await import('bcryptjs')).default.compare(providedPassword, photo.gallery.password)
+				if (!isValidPassword) {
+					console.log(`❌ Invalid password for photo download: ${id}`)
+					return res.status(401).json({ success: false, error: 'Invalid password' })
+				}
+			}
 		}
 
 		console.log(`📸 Photo found: ${photo.filename}`)

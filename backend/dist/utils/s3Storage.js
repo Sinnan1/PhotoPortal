@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateMultipleThumbnails = exports.getObjectFromS3 = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = void 0;
+exports.generateMultipleThumbnails = exports.getObjectStreamFromS3 = exports.getObjectFromS3 = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = void 0;
 const tslib_1 = require("tslib");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const sharp_1 = tslib_1.__importDefault(require("sharp"));
@@ -228,6 +228,33 @@ const getObjectFromS3 = async (key, bucketName) => {
     }
 };
 exports.getObjectFromS3 = getObjectFromS3;
+// Function to get S3 object as stream for direct piping (much faster!)
+const getObjectStreamFromS3 = async (key, bucketName) => {
+    try {
+        const targetBucket = bucketName || process.env.S3_BUCKET_NAME;
+        console.log(`🚀 Setting up stream from bucket: ${targetBucket}, key: ${key}`);
+        const command = new client_s3_1.GetObjectCommand({
+            Bucket: targetBucket,
+            Key: key
+        });
+        const response = await s3Client.send(command);
+        const contentLength = response.ContentLength || 0;
+        console.log(`⚡ Stream ready, content length: ${contentLength} bytes`);
+        return {
+            stream: response.Body,
+            contentLength
+        };
+    }
+    catch (error) {
+        console.error('S3 stream error:', {
+            message: error?.message,
+            bucket: bucketName || process.env.S3_BUCKET_NAME,
+            key
+        });
+        throw new Error(`Failed to stream object ${key} from storage`);
+    }
+};
+exports.getObjectStreamFromS3 = getObjectStreamFromS3;
 // Helper function to convert stream to buffer
 async function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
