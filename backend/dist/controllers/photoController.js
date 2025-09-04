@@ -265,6 +265,71 @@ const getPhotos = async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 24; // Good for grid display
         const skip = (page - 1) * limit;
+        // First, check if gallery exists and get its access information
+        const gallery = await prisma.gallery.findUnique({
+            where: { id: galleryId },
+            select: {
+                id: true,
+                password: true,
+                photographerId: true,
+                expiresAt: true,
+                title: true
+            }
+        });
+        if (!gallery) {
+            return res.status(404).json({
+                success: false,
+                error: 'Gallery not found'
+            });
+        }
+        // Check if gallery has expired
+        if (gallery.expiresAt && gallery.expiresAt < new Date()) {
+            return res.status(410).json({
+                success: false,
+                error: 'Gallery has expired'
+            });
+        }
+        // Check gallery access permissions
+        if (gallery.password) {
+            let isAuthorized = false;
+            // 1) If user is authenticated, allow if photographer owner or client with access
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.split(' ')[1];
+            if (token) {
+                try {
+                    const jwt = await Promise.resolve().then(() => tslib_1.__importStar(require('jsonwebtoken')));
+                    const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
+                    const userId = decoded.userId;
+                    // Photographer who owns the gallery
+                    if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+                        isAuthorized = true;
+                    }
+                    else {
+                        // Client with explicit access
+                        const hasAccess = await prisma.galleryAccess.findUnique({
+                            where: { userId_galleryId: { userId, galleryId } }
+                        });
+                        if (hasAccess)
+                            isAuthorized = true;
+                    }
+                }
+                catch {
+                    // ignore token errors; will fall back to password header
+                }
+            }
+            // 2) If not authorized yet, validate provided password (via header or query)
+            if (!isAuthorized) {
+                const providedPassword = req.headers['x-gallery-password'] ||
+                    req.query.password;
+                if (!providedPassword) {
+                    return res.status(401).json({ success: false, error: 'Password required' });
+                }
+                const isValidPassword = await (await Promise.resolve().then(() => tslib_1.__importStar(require('bcryptjs')))).default.compare(providedPassword, gallery.password);
+                if (!isValidPassword) {
+                    return res.status(401).json({ success: false, error: 'Invalid password' });
+                }
+            }
+        }
         const [photos, total] = await Promise.all([
             prisma.photo.findMany({
                 where: { galleryId },
@@ -338,7 +403,17 @@ const downloadPhoto = async (req, res) => {
         const { galleryId } = req.query;
         console.log(`📥 Download request for photo ID: ${id}`);
         const photo = await prisma.photo.findUnique({
-            where: { id }
+            where: { id },
+            include: {
+                gallery: {
+                    select: {
+                        id: true,
+                        password: true,
+                        photographerId: true,
+                        expiresAt: true
+                    }
+                }
+            }
         });
         if (!photo) {
             console.log(`❌ Photo not found: ${id}`);
@@ -347,25 +422,88 @@ const downloadPhoto = async (req, res) => {
                 error: 'Photo not found'
             });
         }
+        // Check if gallery has expired
+        if (photo.gallery.expiresAt && photo.gallery.expiresAt < new Date()) {
+            console.log(`❌ Gallery expired for photo: ${id}`);
+            return res.status(410).json({
+                success: false,
+                error: 'Gallery has expired'
+            });
+        }
+        // Check gallery access permissions
+        if (photo.gallery.password) {
+            let isAuthorized = false;
+            // 1) If user is authenticated, allow if photographer owner or client with access
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.split(' ')[1];
+            if (token) {
+                try {
+                    const jwt = await Promise.resolve().then(() => tslib_1.__importStar(require('jsonwebtoken')));
+                    const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
+                    const userId = decoded.userId;
+                    // Photographer who owns the gallery
+                    if (decoded.role === 'PHOTOGRAPHER' && userId === photo.gallery.photographerId) {
+                        isAuthorized = true;
+                    }
+                    else {
+                        // Client with explicit access
+                        const hasAccess = await prisma.galleryAccess.findUnique({
+                            where: { userId_galleryId: { userId, galleryId: photo.gallery.id } }
+                        });
+                        if (hasAccess)
+                            isAuthorized = true;
+                    }
+                }
+                catch {
+                    // ignore token errors; will fall back to password header
+                }
+            }
+            // 2) If not authorized yet, validate provided password (via header or query)
+            if (!isAuthorized) {
+                const providedPassword = req.headers['x-gallery-password'] ||
+                    req.query.password;
+                if (!providedPassword) {
+                    console.log(`❌ Password required for photo download: ${id}`);
+                    return res.status(401).json({ success: false, error: 'Password required' });
+                }
+                const isValidPassword = await (await Promise.resolve().then(() => tslib_1.__importStar(require('bcryptjs')))).default.compare(providedPassword, photo.gallery.password);
+                if (!isValidPassword) {
+                    console.log(`❌ Invalid password for photo download: ${id}`);
+                    return res.status(401).json({ success: false, error: 'Invalid password' });
+                }
+            }
+        }
         console.log(`📸 Photo found: ${photo.filename}`);
         console.log(`🔗 Original URL: ${photo.originalUrl}`);
         // Extract the S3 bucket and key from the original URL
         const originalUrl = new URL(photo.originalUrl);
+        console.log(`🔗 Parsed URL pathname: ${originalUrl.pathname}`);
         const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0);
+        console.log(`📂 Path parts: ${JSON.stringify(pathParts)}`);
         const bucketName = pathParts[0]; // First part is bucket name
-        const originalKey = pathParts.slice(1).join('/'); // Rest is the key
-        console.log(`🪣 Extracted bucket: ${bucketName}`);
-        console.log(`🔑 Extracted S3 key: ${originalKey}`);
-        // Get the image data from S3 using extracted bucket name
-        const { getObjectFromS3 } = await Promise.resolve().then(() => tslib_1.__importStar(require('../utils/s3Storage')));
-        const imageBuffer = await getObjectFromS3(originalKey, bucketName);
-        console.log(`✅ Successfully retrieved from S3, size: ${imageBuffer.length} bytes`);
+        const originalKey = decodeURIComponent(pathParts.slice(1).join('/')); // Rest is the key, decoded
+        console.log(`🪣 Extracted bucket: "${bucketName}"`);
+        console.log(`🔑 Extracted S3 key: "${originalKey}"`);
+        // Stream the image directly from S3 to client (much faster!)
+        const { getObjectStreamFromS3 } = await Promise.resolve().then(() => tslib_1.__importStar(require('../utils/s3Storage')));
+        const { stream, contentLength } = await getObjectStreamFromS3(originalKey, bucketName);
+        console.log(`🚀 Streaming from S3, size: ${contentLength} bytes`);
         // Set appropriate headers for download
         res.setHeader('Content-Type', 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`);
-        res.setHeader('Content-Length', imageBuffer.length);
-        // Send the image data
-        res.send(imageBuffer);
+        res.setHeader('Content-Length', contentLength.toString());
+        // Stream the image data directly from S3 to client (no server buffering!)
+        stream.pipe(res);
+        // Handle stream errors
+        stream.on('error', (error) => {
+            console.error('❌ Stream error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, error: 'Download failed' });
+            }
+        });
+        stream.on('end', () => {
+            console.log('✅ Stream completed successfully');
+        });
     }
     catch (error) {
         console.error('❌ Download photo error for ID:', req.params.id);

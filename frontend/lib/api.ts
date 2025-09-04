@@ -145,11 +145,12 @@ export const api = {
   },
 
   // New function for downloading photo data directly
-  downloadPhotoData: async (id: string, filename: string) => {
+  downloadPhotoData: async (id: string, filename: string, galleryPassword?: string) => {
     const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}/photos/${id}/download`, {
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
       },
     });
 
