@@ -209,12 +209,12 @@ export default function ClientDashboardPage() {
           {accessibleGalleries.map((gallery, index) => (
             <Card
               key={gallery.id}
-              className="hover:shadow-lg transition-shadow"
+              className="hover:shadow-2xl hover:shadow-[#425146]/20 transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50/80 dark:from-gray-900 dark:to-gray-800/80 backdrop-blur-sm hover:scale-[1.02] group"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="flex-1">
-                  <CardTitle className="text-lg">{gallery.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">
+                  <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-[#425146] transition-colors duration-300">{gallery.title}</CardTitle>
+                  <CardDescription className="line-clamp-2 text-gray-600 dark:text-gray-300 mt-1">
                     {gallery.description}
                   </CardDescription>
                 </div>
@@ -241,37 +241,31 @@ export default function ClientDashboardPage() {
                 </DropdownMenu>
               </CardHeader>
               <CardContent>
-                {/* Gallery preview - show first few photos if available */}
+                {/* Gallery preview - show cover photo */}
                 {gallery.photos && gallery.photos.length > 0 && (
                   <div className="mb-4">
-                    <div className="grid grid-cols-3 gap-1">
-                      {gallery.photos.slice(0, 3).map((photo, photoIndex) => (
-                        <div
-                          key={photo.id}
-                          className="relative aspect-square bg-gray-100 rounded overflow-hidden"
-                        >
-                          <Image
-                            src={photo.thumbnailUrl || "/placeholder.svg"}
-                            alt={photo.filename}
-                            fill
-                            className="object-cover"
-                            priority={index === 0 && photoIndex === 0}
-                            sizes="(max-width: 1024px) 33vw, 11vw"
-                          />
-                        </div>
-                      ))}
+                    <div className="relative aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 group-hover:ring-[#425146]/30">
+                      <Image
+                        src={gallery.photos[0].thumbnailUrl || "/placeholder.svg"}
+                        alt={gallery.photos[0].filename}
+                        fill
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        priority={index === 0}
+                        sizes="(max-width: 1024px) 50vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                  <div className="flex items-center">
-                    <User className="mr-1 h-4 w-4" />
-                    {gallery.photographer.name}
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4 px-2">
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
+                    <User className="mr-1 h-4 w-4 text-[#425146]" />
+                    <span className="font-medium">{gallery.photographer.name}</span>
                   </div>
-                  <div className="flex items-center">
-                    <Images className="mr-1 h-4 w-4" />
-                    {gallery.photoCount} photos
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
+                    <Images className="mr-1 h-4 w-4 text-[#425146]" />
+                    <span className="font-medium">{gallery.photoCount} photos</span>
                   </div>
                 </div>
 
@@ -293,7 +287,7 @@ export default function ClientDashboardPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 mt-4">
+                <div className="flex items-center justify-end gap-2 mt-4 px-2">
                   <Button
                     variant="ghost"
                     size="sm"

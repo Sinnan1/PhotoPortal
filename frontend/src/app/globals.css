@@ -298,4 +298,9 @@
     opacity: 1;
     transform: translateY(0);
   }
+
+  /* Logo color filter - changes white to #425146 */
+  .logo-color-filter {
+    filter: brightness(0.3) saturate(2) hue-rotate(80deg) contrast(1.2);
+  }
 }

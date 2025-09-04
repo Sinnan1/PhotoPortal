@@ -19,7 +19,7 @@ export function Navigation() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <nav className="border-b border-border/20 bg-background/95 dark:bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/90 dark:supports-[backdrop-filter]:bg-background/70 shadow-sm">
+    <nav className="border-b border-border/20 bg-[#425146] backdrop-blur-xl supports-[backdrop-filter]:bg-[#425146]/90 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -30,7 +30,7 @@ export function Navigation() {
                 width={500}
                 height={500}
                 priority
-                className="h-40 w-auto"
+                className="h-45 w-auto logo-color-filter"
               />
             </Link>
           </div>
