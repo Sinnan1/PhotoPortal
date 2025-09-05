@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder } from "lucide-react";
+import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import JSZip from "jszip";
@@ -109,6 +109,10 @@ function GalleryPage() {
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
   const [dataSaverMode, setDataSaverMode] = useState(false);
   const [showFolderTree, setShowFolderTree] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
+
+  // Debug log
+  console.log('Current viewMode:', viewMode);
 
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
@@ -177,14 +181,11 @@ function GalleryPage() {
 
       const response = await api.getGallery(galleryId, shouldRefresh ? { refresh: shouldRefresh } : {});
       const galleryData = response.data;
-      console.log('Fetched gallery data:', galleryData); // Debug log
       setGallery(galleryData);
 
       // Set up initial folder navigation
       if (galleryData.folders && galleryData.folders.length > 0) {
         const rootFolder = galleryData.folders[0]; // Use first folder as default
-        console.log('Setting current folder:', rootFolder); // Debug log
-        console.log('Folder photos:', rootFolder.photos); // Debug log
         setCurrentFolder(rootFolder);
         setBreadcrumbItems([
           { id: galleryData.id, name: galleryData.title, type: 'gallery' },
@@ -588,25 +589,25 @@ function GalleryPage() {
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
-            <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
+          <div className="flex items-center space-x-2">
               {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
-                <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                  {isDownloadingAll ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-4 w-4" />
-                  )}
-                  Download All
-                </Button>
-              )}
-            </div>
+              <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                {isDownloadingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download All
+              </Button>
+            )}
           </div>
+        </div>
 
-          {gallery.description && (
-            <p className="text-muted-foreground mb-4">{gallery.description}</p>
-          )}
+        {gallery.description && (
+          <p className="text-muted-foreground mb-4">{gallery.description}</p>
+        )}
 
           {/* Breadcrumb Navigation */}
           <BreadcrumbNavigation
@@ -615,21 +616,21 @@ function GalleryPage() {
             className="mb-4"
           />
 
-          <div className="flex items-center space-x-6 text-sm text-muted-foreground">
-            <div className="flex items-center">
-              <User className="mr-1 h-4 w-4" />
-              {gallery.photographer.name}
-            </div>
-            <div className="flex items-center">
-              <Images className="mr-1 h-4 w-4" />
-              {currentFolder?._count?.photos ?? 0} photos
-            </div>
+        <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+          <div className="flex items-center">
+            <User className="mr-1 h-4 w-4" />
+            {gallery.photographer.name}
           </div>
+          <div className="flex items-center">
+            <Images className="mr-1 h-4 w-4" />
+              {currentFolder?._count?.photos ?? 0} photos
+          </div>
+            </div>
         </div>
       </div>
 
-      {/* Filter Buttons and Data Saver Toggle */}
-      <div className="flex justify-between items-center mb-4">
+      {/* Controls Section - Fixed Layout */}
+      <div className="space-y-4 mb-6">
         {/* Data Saver Toggle */}
         <div className="flex items-center gap-2">
           <label className="flex items-center cursor-pointer">
@@ -652,31 +653,59 @@ function GalleryPage() {
           </label>
         </div>
 
+        {/* View Mode and Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          {/* View Mode Toggle */}
+          <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className="h-8 px-3"
+            >
+              <Grid3X3 className="h-4 w-4 mr-1" />
+              Grid
+            </Button>
+            <Button
+              variant={viewMode === "tile" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("tile")}
+              className="h-8 px-3"
+            >
+              <RectangleHorizontal className="h-4 w-4 mr-1" />
+              Tile
+            </Button>
+        </div>
+
         {/* Filter Buttons */}
-        <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
           <Button
-            variant={filter === "all" ? "default" : "ghost"}
+              variant={filter === "all" ? "default" : "outline"}
+              size="sm"
             onClick={() => setFilter("all")}
-            className={filter === "all" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+              className="h-8"
           >
             All ({currentFolder ? currentFolder.photos.length : 0})
           </Button>
           <Button
-            variant={filter === "liked" ? "default" : "ghost"}
+              variant={filter === "liked" ? "default" : "outline"}
+              size="sm"
             onClick={() => setFilter("liked")}
-            className={filter === "liked" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+              className="h-8"
           >
             <Heart className="mr-2 h-4 w-4" />
             Liked ({currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0})
           </Button>
           <Button
-            variant={filter === "favorited" ? "default" : "ghost"}
+              variant={filter === "favorited" ? "default" : "outline"}
+              size="sm"
             onClick={() => setFilter("favorited")}
-            className={filter === "favorited" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary/10 hover:text-primary"}
+              className="h-8"
           >
             <Star className="mr-2 h-4 w-4" />
             Favorited ({currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0})
           </Button>
+          </div>
         </div>
       </div>
 
@@ -699,10 +728,11 @@ function GalleryPage() {
               isPhotographer={false} // Clients can't edit
               onPhotoView={(photo) => setSelectedPhoto(photo)}
               onFolderSelect={handleFolderSelect}
-              onPhotoStatusChange={handlePhotoStatusChange}
-            />
+            onPhotoStatusChange={handlePhotoStatusChange}
+              viewMode={viewMode}
+          />
           )}
-
+          
           {/* Loading more indicator */}
           {loadingMore && (
             <div className="flex justify-center py-8">
@@ -710,7 +740,7 @@ function GalleryPage() {
               <span className="ml-2 text-muted-foreground">Loading more photos...</span>
             </div>
           )}
-
+          
           {/* End of photos indicator */}
           {!hasMore && displayedPhotos.length > 0 && (
             <div className="text-center py-8 text-muted-foreground">
@@ -751,6 +781,3 @@ function GalleryPage() {
 }
 
 export default GalleryPage;
-
-
-

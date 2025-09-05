@@ -24,14 +24,8 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3">
-              <Image
-                src="/Logo-Main.png"
-                alt="Yarrow Weddings & Co."
-                width={500}
-                height={500}
-                priority
-                className="h-45 w-auto logo-color-filter"
-              />
+              
+              <span className="text-[#90856c] font-semibold text-xl font-['Lato']">Yarrow Weddings & Co.</span>
             </Link>
           </div>
 

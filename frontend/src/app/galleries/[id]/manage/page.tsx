@@ -552,8 +552,8 @@ export default function ManageGalleryPage() {
           <Badge variant="outline">{gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</Badge>
           {gallery?.id && (
             <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
-              <Button variant="outline">View Gallery</Button>
-            </Link>
+            <Button variant="outline">View Gallery</Button>
+          </Link>
           )}
         </div>
       </div>
@@ -727,8 +727,8 @@ export default function ManageGalleryPage() {
                   </CardContent>
                 </Card>
               )}
-            </div>
-          </div>
+                      </div>
+                    </div>
         </TabsContent>
 
         <TabsContent value="settings">

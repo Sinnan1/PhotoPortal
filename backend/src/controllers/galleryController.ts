@@ -132,20 +132,39 @@ export const getGallery = async (req: Request, res: Response) => {
 
         const gallery = await prisma.gallery.findUnique({
 			where: { id },
-			include: {
-				folders: {
 					include: {
-						photos: {
-							include: {
-								likedBy: true,
-								favoritedBy: true
-							},
-							orderBy: { createdAt: 'desc' }
+			folders: {
+				where: { parentId: null }, // Only get root folders
+				include: {
+					photos: {
+						include: {
+							likedBy: true,
+							favoritedBy: true
 						},
-						children: true,
-						coverPhoto: true
+						orderBy: { createdAt: 'desc' }
+					},
+					children: {
+						include: {
+							photos: {
+								include: {
+									likedBy: true,
+									favoritedBy: true
+								},
+								orderBy: { createdAt: 'desc' }
+							},
+							children: true, // For deeper nesting
+							coverPhoto: true,
+							_count: {
+								select: { photos: true, children: true }
+							}
+						}
+					},
+					coverPhoto: true,
+					_count: {
+						select: { photos: true, children: true }
 					}
-				},
+				}
+			},
 				photographer: {
 					select: { name: true }
 				}
