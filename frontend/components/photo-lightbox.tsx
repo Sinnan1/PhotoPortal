@@ -558,7 +558,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
       </div>
 
       {/* Click outside to close */}
-      <div className="absolute inset-0 -z-10 cursor-pointer" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={onClose} />
     </div>
   )
 }

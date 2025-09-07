@@ -249,6 +249,10 @@ export function PhotoGrid({
       {photoState.map((photo, index) => {
         const isLastPhoto = index === photoState.length - 1;
 
+        // Debug: Check if postBy data exists
+        const isPosted = (photo.postBy ?? []).some((post) => post.userId === user?.id);
+        console.log(`Photo ${photo.id}: isPosted = ${isPosted}, postBy =`, photo.postBy);
+
         return (
                   <div
           key={photo.id}

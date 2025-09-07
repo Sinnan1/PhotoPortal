@@ -249,6 +249,11 @@ function GalleryPage() {
 
       const response = await api.getGallery(galleryId, shouldRefresh ? { refresh: shouldRefresh } : {});
       const galleryData = response.data;
+
+      // Debug: Check if postBy data is included
+      console.log('Gallery data received:', galleryData);
+      console.log('First folder photos:', galleryData.folders?.[0]?.photos?.slice(0, 2));
+
       setGallery(galleryData);
 
       // Set up initial folder navigation

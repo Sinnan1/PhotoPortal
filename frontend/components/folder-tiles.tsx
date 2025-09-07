@@ -106,7 +106,7 @@ export function FolderTiles({
           {folders.map((folder) => (
             <div
               key={`folder-${folder.id}`}
-              className="group relative flex-shrink-0 w-28 h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-muted dark:to-muted/80 rounded-md overflow-hidden border border-gray-200 dark:border-border hover:shadow-sm hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
+              className="group relative flex-shrink-0 w-28 h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-sm hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
               onClick={() => handleFolderClick(folder.id)}
             >
               {/* Cover Photo Background (if available) */}

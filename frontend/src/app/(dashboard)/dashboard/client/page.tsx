@@ -37,8 +37,6 @@ interface Photo {
   filename: string;
   thumbnailUrl: string;
   originalUrl: string;
-  mediumUrl?: string;
-  largeUrl?: string;
   createdAt: string;
 }
 
@@ -219,12 +217,12 @@ export default function ClientDashboardPage() {
           {accessibleGalleries.map((gallery, index) => (
             <Card
               key={gallery.id}
-              className="hover:shadow-lg transition-shadow duration-200 border border-gray-200 bg-white dark:bg-card dark:border-border"
+              className="hover:shadow-2xl hover:shadow-[#425146]/20 transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50/80 dark:from-gray-900 dark:to-gray-800/80 backdrop-blur-sm hover:scale-[1.02] group"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="flex-1">
-                  <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">{gallery.title}</CardTitle>
-                  <CardDescription className="line-clamp-1 text-gray-600 dark:text-gray-300 mt-1 text-sm">
+                  <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-[#425146] transition-colors duration-300">{gallery.title}</CardTitle>
+                  <CardDescription className="line-clamp-2 text-gray-600 dark:text-gray-300 mt-1">
                     {gallery.description}
                   </CardDescription>
                 </div>
@@ -250,58 +248,61 @@ export default function ClientDashboardPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </CardHeader>
-              <CardContent className="pt-2 pb-3">
+              <CardContent>
                 {/* Gallery preview - show cover photo */}
                 {gallery.folders && gallery.folders.length > 0 && gallery.folders[0].photos && gallery.folders[0].photos.length > 0 && (
-                  <div className="mb-3">
-                    <div className="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden shadow-sm ring-1 ring-gray-200/50">
+                  <div className="mb-4">
+                    <div className="relative aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 group-hover:ring-[#425146]/30">
                       <Image
-                        src={gallery.folders[0].photos[0].largeUrl || gallery.folders[0].photos[0].mediumUrl || gallery.folders[0].photos[0].thumbnailUrl || "/placeholder.svg"}
+                        src={gallery.folders[0].photos[0].thumbnailUrl || "/placeholder.svg"}
                         alt={gallery.folders[0].photos[0].filename}
                         fill
-                        className="object-cover"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
                         priority={index === 0}
                         sizes="(max-width: 1024px) 50vw, 25vw"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
-                  <div className="flex items-center bg-gray-50 dark:bg-muted rounded-full px-2 py-0.5">
-                    <User className="mr-1 h-3 w-3 text-[#425146]" />
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4 px-2">
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
+                    <User className="mr-1 h-4 w-4 text-[#425146]" />
                     <span className="font-medium">{gallery.photographer.name}</span>
                   </div>
-                  <div className="flex items-center bg-gray-50 dark:bg-muted rounded-full px-2 py-0.5">
-                    <Images className="mr-1 h-3 w-3 text-[#425146]" />
-                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-3 py-1">
+                    <Images className="mr-1 h-4 w-4 text-[#425146]" />
+                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="mr-1 h-3 w-3" />
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Calendar className="mr-1 h-4 w-4" />
                     {gallery.expiresAt ? (
-                      <span>Expires {new Date(gallery.expiresAt).toLocaleDateString()}</span>
+                      <span>
+                        Expires{" "}
+                        {new Date(gallery.expiresAt).toLocaleDateString()}
+                      </span>
                     ) : (
                       <span>No expiry</span>
                     )}
                   </div>
 
                   {gallery.isExpired && (
-                    <Badge variant="destructive" className="text-xs py-0 px-1">Expired</Badge>
+                    <Badge variant="destructive">Expired</Badge>
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-1 mt-2 px-1">
+                <div className="flex items-center justify-end gap-2 mt-4 px-2">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs"
                     onClick={() => handleLikeGallery(gallery.id)}
                   >
                     <Heart
-                      className={`mr-1 h-3 w-3 ${
+                      className={`mr-2 h-4 w-4 ${
                         gallery.likedBy?.some((like) => like.userId === user?.id)
                           ? "text-red-500 fill-current"
                           : ""
@@ -312,11 +313,10 @@ export default function ClientDashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs"
                     onClick={() => handleFavoriteGallery(gallery.id)}
                   >
                     <Star
-                      className={`mr-1 h-3 w-3 ${
+                      className={`mr-2 h-4 w-4 ${
                         gallery.favoritedBy?.some(
                           (favorite) => favorite.userId === user?.id
                         )

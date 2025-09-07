@@ -286,7 +286,7 @@ export default function DashboardPage() {
           {galleries.map((gallery, index) => (
             <Card
               key={gallery.id}
-              className="hover:shadow-lg transition-shadow duration-200 border border-gray-200 bg-white dark:bg-card dark:border-border"
+              className="hover:shadow-lg transition-shadow duration-200 border border-gray-200 bg-white dark:bg-gray-900"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
                 <div className="flex-1">
@@ -368,11 +368,11 @@ export default function DashboardPage() {
                 )}
 
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
-                  <div className="flex items-center bg-gray-50 dark:bg-muted rounded-full px-2 py-0.5">
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
                     <Images className="mr-1 h-3 w-3 text-[#425146]" />
                     <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
                   </div>
-                  <div className="flex items-center bg-gray-50 dark:bg-muted rounded-full px-2 py-0.5">
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
                     <Download className="mr-1 h-3 w-3 text-[#425146]" />
                     <span className="font-medium">{gallery.downloadCount}</span>
                   </div>
