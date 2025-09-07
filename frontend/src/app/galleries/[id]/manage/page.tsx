@@ -29,6 +29,7 @@ interface Photo {
   createdAt: string
   likedBy: { userId: string }[]
   favoritedBy: { userId: string }[]
+  postBy: { userId: string }[]
 }
 
 interface Folder {

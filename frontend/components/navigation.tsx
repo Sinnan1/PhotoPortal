@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
-import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun } from "lucide-react";
+import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import {
@@ -59,6 +59,12 @@ export function Navigation() {
                       <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
                         <BarChart3 className="h-4 w-4" />
                         Analytics
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard/posts">
+                      <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
+                        <Share2 className="h-4 w-4" />
+                        Posts
                       </Button>
                     </Link>
                   </div>
@@ -152,3 +158,4 @@ export function Navigation() {
     </nav>
   );
 }
+

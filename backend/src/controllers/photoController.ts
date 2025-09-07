@@ -392,7 +392,12 @@ export const getPhotos = async (req: Request, res: Response) => {
 				},
 				orderBy: { createdAt: 'desc' },
 				skip,
-				take: limit
+				take: limit,
+				include: {
+					likedBy: true,
+					favoritedBy: true,
+					postBy: true
+				} as any
 			}),
 			prisma.photo.count({
 				where: {
@@ -935,12 +940,13 @@ export const getPhotoStatus = async (req: AuthRequest, res: Response) => {
         const { id } = req.params
         const userId = req.user!.id
 
-        const [liked, favorited] = await Promise.all([
+        const [liked, favorited, posted] = await Promise.all([
             prisma.likedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } }),
-            prisma.favoritedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } })
+            prisma.favoritedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } }),
+            (prisma as any).postPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } })
         ])
 
-        return res.json({ success: true, data: { liked: !!liked, favorited: !!favorited } })
+        return res.json({ success: true, data: { liked: !!liked, favorited: !!favorited, posted: !!posted } })
     } catch (error) {
         console.error('Get photo status error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
@@ -1003,6 +1009,125 @@ export const getFavoritedPhotos = async (req: AuthRequest, res: Response) => {
         return res.json({ success: true, data: photos })
     } catch (error) {
         console.error('Get favorited photos error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
+}
+
+// Mark a photo for posting (photographer only)
+export const postPhoto = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
+
+        // Ensure photo exists and belongs to the photographer
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
+
+        // Ensure the user is the photographer of this gallery
+        if (photo.folder.gallery.photographerId !== userId) {
+            return res.status(403).json({ success: false, error: 'Only the photographer can mark photos for posting' })
+        }
+
+        // Check if already marked for posting
+        const existingPost = await (prisma as any).postPhoto.findUnique({
+            where: { userId_photoId: { userId, photoId: id } }
+        })
+
+        if (existingPost) {
+            return res.json({ success: true, message: 'Photo already marked for posting' })
+        }
+
+        // Create the post record
+        await (prisma as any).postPhoto.create({
+            data: { userId, photoId: id }
+        })
+
+        return res.json({ success: true, message: 'Photo marked for posting' })
+    } catch (error) {
+        console.error('Post photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
+}
+
+// Unmark a photo for posting (photographer only)
+export const unpostPhoto = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params
+        const userId = req.user!.id
+
+        // Ensure photo exists and belongs to the photographer
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        })
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' })
+        }
+
+        // Ensure the user is the photographer of this gallery
+        if (photo.folder.gallery.photographerId !== userId) {
+            return res.status(403).json({ success: false, error: 'Only the photographer can unmark photos for posting' })
+        }
+
+        // Delete the post record
+        await (prisma as any).postPhoto.deleteMany({
+            where: { userId, photoId: id }
+        })
+
+        return res.json({ success: true, message: 'Photo unmarked for posting' })
+    } catch (error) {
+        console.error('Unpost photo error:', error)
+        return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
+}
+
+// Get all photos marked for posting for the current photographer
+export const getPosts = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user!.id
+        const posts = await (prisma as any).postPhoto.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                photo: {
+                    include: {
+                        folder: {
+                            include: {
+                                gallery: {
+                                    include: { photographer: { select: { name: true } } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+
+        const photos = posts.map((pp: any) => pp.photo)
+        return res.json({ success: true, data: photos })
+    } catch (error) {
+        console.error('Get posts error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
     }
 }

@@ -90,15 +90,24 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				folders: {
 					include: {
 						photos: {
+							include: {
+								likedBy: true,
+								favoritedBy: true,
+								postBy: true
+							}
+						},
+						children: true,
+						coverPhoto: {
 							select: {
 								id: true,
 								filename: true,
 								thumbnailUrl: true,
+								mediumUrl: true,
+								largeUrl: true,
+								originalUrl: true,
 								createdAt: true
 							}
 						},
-						children: true,
-						coverPhoto: true,
 						_count: {
 							select: { photos: true, children: true }
 						}
@@ -139,7 +148,8 @@ export const getGallery = async (req: Request, res: Response) => {
 					photos: {
 						include: {
 							likedBy: true,
-							favoritedBy: true
+							favoritedBy: true,
+							postBy: true
 						},
 						orderBy: { createdAt: 'desc' }
 					},
@@ -148,18 +158,39 @@ export const getGallery = async (req: Request, res: Response) => {
 							photos: {
 								include: {
 									likedBy: true,
-									favoritedBy: true
+									favoritedBy: true,
+									postBy: true
 								},
 								orderBy: { createdAt: 'desc' }
 							},
 							children: true, // For deeper nesting
-							coverPhoto: true,
+							coverPhoto: {
+								select: {
+									id: true,
+									filename: true,
+									thumbnailUrl: true,
+									mediumUrl: true,
+									largeUrl: true,
+									originalUrl: true,
+									createdAt: true
+								}
+							},
 							_count: {
 								select: { photos: true, children: true }
 							}
 						}
 					},
-					coverPhoto: true,
+					coverPhoto: {
+						select: {
+							id: true,
+							filename: true,
+							thumbnailUrl: true,
+							mediumUrl: true,
+							largeUrl: true,
+							originalUrl: true,
+							createdAt: true
+						}
+					},
 					_count: {
 						select: { photos: true, children: true }
 					}
@@ -613,15 +644,24 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 						folders: {
 							include: {
 								photos: {
+									include: {
+										likedBy: true,
+										favoritedBy: true,
+										postBy: true
+									}
+								},
+								children: true,
+								coverPhoto: {
 									select: {
 										id: true,
 										filename: true,
 										thumbnailUrl: true,
+										mediumUrl: true,
+										largeUrl: true,
+										originalUrl: true,
 										createdAt: true
 									}
 								},
-								children: true,
-								coverPhoto: true,
 								_count: {
 									select: { photos: true, children: true }
 								}

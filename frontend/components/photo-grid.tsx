@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Trash2, Heart, Star } from "lucide-react";
+import { Download, Eye, Trash2, Heart, Star, Share2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -19,6 +19,7 @@ interface Photo {
   createdAt: string;
   likedBy?: { userId: string }[];
   favoritedBy?: { userId: string }[];
+  postBy?: { userId: string }[];
 }
 
 interface PhotoGridProps {
@@ -28,6 +29,7 @@ interface PhotoGridProps {
   onDelete?: (photoId: string) => void;
   onView?: (photo: Photo) => void;
   onDownload?: (photoId: string) => void;
+  onUnpost?: (photoId: string) => void;
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void;
   columns?: {
     sm: number;
@@ -69,6 +71,7 @@ export function PhotoGrid({
   onDelete,
   onView,
   onDownload,
+  onUnpost,
   onPhotoStatusChange,
   columns = { sm: 3, md: 4, lg: 5, xl: 6 },
   viewMode = "grid",
@@ -245,6 +248,7 @@ export function PhotoGrid({
     <div className={getGridClasses()}>
       {photoState.map((photo, index) => {
         const isLastPhoto = index === photoState.length - 1;
+
         return (
                   <div
           key={photo.id}
@@ -315,9 +319,25 @@ export function PhotoGrid({
                 </Button>
               )}
 
+              {onUnpost && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="backdrop-blur-sm bg-white/80 hover:bg-white h-7 w-7 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUnpost(photo.id);
+                  }}
+                  title="Remove from posts"
+                >
+                  <Share2 className="h-3.5 w-3.5 text-purple-600" />
+                </Button>
+              )}
+
               {isAdmin && onDelete && (
                 <Button
                   size="sm"
+                  
                   variant="destructive"
                   className="backdrop-blur-sm h-7 w-7 p-0"
                   onClick={(e) => {

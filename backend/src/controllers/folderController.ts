@@ -51,7 +51,13 @@ export const createFolder = async (req: AuthRequest, res: Response) => {
 				parentId: parentId || null
 			},
 			include: {
-				photos: true,
+				photos: {
+					include: {
+						likedBy: true,
+						favoritedBy: true,
+						postBy: true
+					}
+				},
 				children: true,
 				coverPhoto: true
 			}
@@ -109,10 +115,10 @@ export const getFolderTree = async (req: AuthRequest, res: Response) => {
 					include: {
 						children: true, // For deeper nesting
 						photos: {
-							select: {
-								id: true,
-								filename: true,
-								thumbnailUrl: true
+							include: {
+								likedBy: true,
+								favoritedBy: true,
+								postBy: true
 							}
 						},
 						coverPhoto: true,
@@ -122,10 +128,10 @@ export const getFolderTree = async (req: AuthRequest, res: Response) => {
 					}
 				},
 				photos: {
-					select: {
-						id: true,
-						filename: true,
-						thumbnailUrl: true
+					include: {
+						likedBy: true,
+						favoritedBy: true,
+						postBy: true
 					}
 				},
 				coverPhoto: true,
@@ -177,7 +183,8 @@ export const getFolder = async (req: AuthRequest, res: Response) => {
 				photos: {
 					include: {
 						likedBy: true,
-						favoritedBy: true
+						favoritedBy: true,
+						postBy: true
 					},
 					orderBy: { createdAt: 'desc' }
 				},
@@ -264,7 +271,13 @@ export const updateFolder = async (req: AuthRequest, res: Response) => {
 			where: { id: folderId },
 			data: { name },
 			include: {
-				photos: true,
+				photos: {
+					include: {
+						likedBy: true,
+						favoritedBy: true,
+						postBy: true
+					}
+				},
 				children: true,
 				coverPhoto: true
 			}

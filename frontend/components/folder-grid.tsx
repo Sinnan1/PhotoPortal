@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Download, Eye, Trash2, Heart, Star, Folder, ImageIcon, MoreHorizontal, Edit } from "lucide-react"
+import { Download, Eye, Trash2, Heart, Star, Folder, ImageIcon, MoreHorizontal, Edit, Share2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/toast"
@@ -22,6 +22,7 @@ interface Photo {
   createdAt: string
   likedBy: { userId: string }[]
   favoritedBy: { userId: string }[]
+  postBy: { userId: string }[]
 }
 
 interface Folder {
@@ -44,7 +45,7 @@ interface FolderGridProps {
   onFolderSelect: (folderId: string) => void
   onFolderRename?: (folderId: string, newName: string) => void
   onFolderDelete?: (folderId: string) => void
-  onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
+  onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean; posted?: boolean }) => void
   onSetCoverPhoto?: (folderId: string, photoId: string) => void
   viewMode?: "grid" | "tile"
 }
@@ -142,6 +143,38 @@ export function FolderGrid({
     } catch (error) {
       console.error('Favorite photo error:', error)
       showToast("Failed to update favorite status", "error")
+    }
+  }
+
+  const handlePostPhoto = async (photoId: string) => {
+    try {
+      const photo = (folder.photos || []).find((p) => p.id === photoId)
+      if (!photo) return
+
+      if (!user?.id) {
+        showToast("Please log in to mark photos for posting", "error")
+        return
+      }
+
+      if (!isPhotographer) {
+        showToast("Only photographers can mark photos for posting", "error")
+        return
+      }
+
+      const isPosted = (photo.postBy ?? []).some((post) => post.userId === user.id)
+
+      if (isPosted) {
+        await api.unpostPhoto(photoId)
+      } else {
+        await api.postPhoto(photoId)
+      }
+
+      // Notify parent so it can update its source list for filtering
+      onPhotoStatusChange?.(photoId, { posted: !isPosted })
+
+    } catch (error) {
+      console.error('Post photo error:', error)
+      showToast("Failed to update post status", "error")
     }
   }
 
@@ -290,6 +323,21 @@ export function FolderGrid({
                 className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
               />
             </Button>
+            {isPhotographer && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handlePostPhoto(photo.id)
+                }}
+              >
+                <Share2
+                  className={`h-3 w-3 ${(photo.postBy ?? []).some((post) => post.userId === user?.id) ? "text-purple-500 fill-current" : ""}`}
+                />
+              </Button>
+            )}
           </div>
         </div>
       ))}

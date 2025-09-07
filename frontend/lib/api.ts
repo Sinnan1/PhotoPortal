@@ -191,6 +191,19 @@ export const api = {
         method: "DELETE",
     }),
 
+  postPhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/post`, {
+      method: "POST",
+    }),
+
+  unpostPhoto: (photoId: string) =>
+    apiRequest(`/photos/${photoId}/post`, {
+        method: "DELETE",
+    }),
+
+  getPosts: () =>
+    apiRequest('/photos/posts'),
+
   getPhotoStatus: (photoId: string) =>
     apiRequest(`/photos/${photoId}/status`),
 

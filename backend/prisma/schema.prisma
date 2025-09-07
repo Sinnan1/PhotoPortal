@@ -19,6 +19,7 @@ model User {
   galleries          Gallery[]
   likedPhotos        LikedPhoto[]
   favoritedPhotos    FavoritedPhoto[]
+  postPhotos         PostPhoto[]
   likedGalleries     LikedGallery[]
   favoritedGalleries FavoritedGallery[]
   createdAt          DateTime           @default(now())
@@ -82,6 +83,7 @@ model Photo {
   folderId      String
   likedBy       LikedPhoto[]
   favoritedBy   FavoritedPhoto[]
+  postBy        PostPhoto[]
   createdAt     DateTime         @default(now())
   // Relations for folder cover functionality
   coverFolders  Folder[]         @relation("FolderCover")
@@ -109,6 +111,17 @@ model FavoritedPhoto {
 
   @@id([userId, photoId])
   @@map("favorited_photos")
+}
+
+model PostPhoto {
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  photoId String
+  createdAt DateTime @default(now())
+
+  @@id([userId, photoId])
+  @@map("post_photos")
 }
 
 model LikedGallery {

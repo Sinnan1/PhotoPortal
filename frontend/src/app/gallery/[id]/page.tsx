@@ -66,6 +66,7 @@ interface Photo {
   createdAt: string;
   likedBy: { userId: string }[];
   favoritedBy: { userId: string }[];
+  postBy: { userId: string }[];
 }
 
 interface Folder {
@@ -134,7 +135,7 @@ function GalleryPage() {
   const PHOTOS_PER_PAGE = 30;
 
   // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
-  const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
+  const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean; posted?: boolean }) => {
 
     // Update current folder state
     setCurrentFolder((prevFolder) => {
@@ -146,6 +147,7 @@ function GalleryPage() {
           if (p.id !== photoId) return p;
           const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
           const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
+          const currentPosted = (p.postBy ?? []).some((post) => post.userId === user?.id);
           return {
             ...p,
             likedBy:
@@ -160,6 +162,12 @@ function GalleryPage() {
                 : status.favorited
                 ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
                 : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+            postBy:
+              status.posted === undefined
+                ? p.postBy
+                : status.posted
+                ? [ ...(p.postBy ?? []), { userId: user!.id } ]
+                : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
           } as Photo;
         })
       };
@@ -174,6 +182,7 @@ function GalleryPage() {
           if (p.id !== photoId) return p;
           const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
           const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
+          const currentPosted = (p.postBy ?? []).some((post) => post.userId === user?.id);
           return {
             ...p,
             likedBy:
@@ -188,6 +197,12 @@ function GalleryPage() {
                 : status.favorited
                 ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
                 : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+            postBy:
+              status.posted === undefined
+                ? p.postBy
+                : status.posted
+                ? [ ...(p.postBy ?? []), { userId: user!.id } ]
+                : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
           } as Photo;
         })
       }));
@@ -901,7 +916,7 @@ function GalleryPage() {
             {currentFolder && (
               <FolderGrid
                 folder={currentFolder}
-                isPhotographer={false} // Clients can't edit
+                isPhotographer={user?.role === "PHOTOGRAPHER"}
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}
                 onPhotoStatusChange={handlePhotoStatusChange}
