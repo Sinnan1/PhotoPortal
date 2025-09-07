@@ -3,7 +3,8 @@
 import type React from "react";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -16,12 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal } from "lucide-react";
+import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import JSZip from "jszip";
 import { PhotoGrid } from "@/components/photo-grid";
 import { FolderGrid } from "@/components/folder-grid";
+import { FolderTiles } from "@/components/folder-tiles";
 import { BreadcrumbNavigation } from "@/components/breadcrumb-navigation";
 import { CompactFolderTree } from "@/components/compact-folder-tree";
 import { useAuth } from "@/lib/auth-context";
@@ -98,6 +100,7 @@ function GalleryPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
 
+
   const [gallery, setGallery] = useState<Gallery | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRequired, setPasswordRequired] = useState(false);
@@ -106,9 +109,11 @@ function GalleryPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isDownloadingCurrent, setIsDownloadingCurrent] = useState(false);
   const [filter, setFilter] = useState<"all" | "liked" | "favorited">("all");
   const [dataSaverMode, setDataSaverMode] = useState(false);
   const [showFolderTree, setShowFolderTree] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
 
   // Debug log
@@ -130,6 +135,37 @@ function GalleryPage() {
 
   // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
   const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
+
+    // Update current folder state
+    setCurrentFolder((prevFolder) => {
+      if (!prevFolder) return prevFolder;
+
+      return {
+        ...prevFolder,
+        photos: prevFolder.photos.map((p) => {
+          if (p.id !== photoId) return p;
+          const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
+          const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
+          return {
+            ...p,
+            likedBy:
+              status.liked === undefined
+                ? p.likedBy
+                : status.liked
+                ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
+                : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+            favoritedBy:
+              status.favorited === undefined
+                ? p.favoritedBy
+                : status.favorited
+                ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
+                : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+          } as Photo;
+        })
+      };
+    });
+
+    // Update gallery state to keep everything in sync
     setGallery((prev) => {
       if (!prev) return prev;
       const updatedFolders = prev.folders.map((folder) => ({
@@ -172,6 +208,23 @@ function GalleryPage() {
 
     fetchGallery();
   }, [galleryId]);
+
+  // Set initial sidebar state - collapsed by default for slideout behavior
+  useEffect(() => {
+    setSidebarCollapsed(true);
+  }, []);
+
+  // Handle ESC key to close slideout menu
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarCollapsed]);
 
   const fetchGallery = async () => {
     try {
@@ -234,6 +287,58 @@ function GalleryPage() {
     }
   };
 
+  const handleDownloadCurrentFolder = async () => {
+    const currentPhotos = currentFolder?.photos || [];
+    if (!currentFolder || currentPhotos.length === 0) {
+      showToast("No photos in current folder", "info");
+      return;
+    }
+
+    setIsDownloadingCurrent(true);
+    showToast("Preparing download...", "info");
+
+    try {
+      const zip = new JSZip();
+      const photoPromises = currentPhotos.map(async (photo) => {
+        try {
+          // Use backend download endpoint to enforce limits and count
+          const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
+            headers: {
+              ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
+          }
+
+          const blob = await response.blob();
+          zip.file(photo.filename, blob);
+        } catch (error) {
+          console.error(`Failed to download ${photo.filename}:`, error);
+        }
+      });
+
+      await Promise.all(photoPromises);
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `${currentFolder.name.replace(/\s+/g, '_')}_photos.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast("Download started!", "success");
+    } catch (error) {
+      console.error("Failed to create zip file", error);
+      showToast("Failed to create zip file", "error");
+    } finally {
+      setIsDownloadingCurrent(false);
+    }
+  };
+
   const handleDownloadAll = async () => {
     const allPhotos = gallery?.folders?.flatMap(f => f?.photos || []) || [];
     if (!gallery || allPhotos.length === 0) {
@@ -254,12 +359,12 @@ function GalleryPage() {
               ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
             },
           });
-          
+
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
           }
-          
+
           const blob = await response.blob();
           zip.file(photo.filename, blob);
         } catch (error) {
@@ -313,6 +418,7 @@ function GalleryPage() {
   const handleImageError = (photoId: string) => {
     setImageErrors(prev => new Set(prev).add(photoId));
   };
+
 
   // Folder navigation functions
   const handleFolderSelect = async (folderId: string) => {
@@ -523,13 +629,42 @@ function GalleryPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Gallery Header */}
-      <div className="mb-8 flex gap-4">
-        {/* Compact Folder Tree - Collapsible */}
-        <div className="hidden lg:block w-64 flex-shrink-0">
-          <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4 sticky top-4">
+      {/* Slideout Sidebar */}
+      <div
+        className={`fixed inset-0 z-50 ${
+          sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
+            sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+          }`}
+          onClick={() => setSidebarCollapsed(true)}
+        />
+
+        {/* Sidebar */}
+        <div
+          className={`absolute left-0 top-0 h-full w-80 bg-background border-r border-border shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col ${
+            sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'
+          }`}
+        >
+          {/* Main Content Area */}
+          <div className="flex-1 p-4 overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Folders</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setSidebarCollapsed(true)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-foreground">Folders</h3>
+              <span className="text-sm text-muted-foreground">Toggle Folders</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -555,44 +690,67 @@ function GalleryPage() {
               </div>
             )}
           </div>
+
+          {/* Edit Gallery Button - At the very bottom */}
+          {user?.role === "PHOTOGRAPHER" && (
+            <div className="flex-shrink-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm">
+              <Link href={`/galleries/${galleryId}/manage`}>
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={() => setSidebarCollapsed(true)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Edit Gallery
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
+      </div>
 
+      {/* Gallery Header */}
+      <div className="mb-8">
         <div className="flex-1 min-w-0">
-          {/* Mobile Folder Tree Toggle */}
-          <div className="lg:hidden mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFolderTree(!showFolderTree)}
-              className="flex items-center gap-2"
-            >
-              <Folder className="h-4 w-4" />
-              {showFolderTree ? 'Hide' : 'Show'} Folders
-              <ChevronRight className={`h-3 w-3 transition-transform ${showFolderTree ? 'rotate-90' : ''}`} />
-            </Button>
-
-            {showFolderTree && (
-              <div className="mt-3 bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-3 max-h-64 overflow-y-auto">
-                <div className="space-y-1">
-                  {gallery.folders?.map((folder, index) => (
-                    <CompactFolderTree
-                      key={folder.id}
-                      folder={folder as any}
-                      level={0}
-                      currentFolderId={currentFolder?.id}
-                      onFolderSelect={handleFolderSelect}
-                      isFirst={index === 0}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h1 className="text-3xl font-bold mb-2 sm:mb-0">{gallery.title}</h1>
+          <div className="flex items-center gap-3 mb-2 sm:mb-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-muted"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <Menu className="h-4 w-4" />
+              ) : (
+                <X className="h-4 w-4" />
+              )}
+            </Button>
+            <h1 className="text-3xl font-bold">{gallery.title}</h1>
+          </div>
           <div className="flex items-center space-x-2">
-              {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
+            {/* Download Current Folder Button */}
+            {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadCurrentFolder}
+                disabled={isDownloadingCurrent}
+                className="mr-2"
+              >
+                {isDownloadingCurrent ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Current Folder
+              </Button>
+            )}
+
+            {/* Download All Button */}
+            {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
               <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
                 {isDownloadingAll ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -653,102 +811,121 @@ function GalleryPage() {
           </label>
         </div>
 
-        {/* View Mode and Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          {/* View Mode Toggle */}
-          <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
-              className="h-8 px-3"
-            >
-              <Grid3X3 className="h-4 w-4 mr-1" />
-              Grid
-            </Button>
-            <Button
-              variant={viewMode === "tile" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("tile")}
-              className="h-8 px-3"
-            >
-              <RectangleHorizontal className="h-4 w-4 mr-1" />
-              Tile
-            </Button>
+      </div>
+
+      {/* Folder Tiles Section */}
+      {currentFolder && currentFolder.children && currentFolder.children.length > 0 && (
+        <FolderTiles
+          folders={currentFolder.children}
+          isPhotographer={user?.role === "PHOTOGRAPHER"}
+          onFolderSelect={handleFolderSelect}
+        />
+      )}
+
+      {/* View Mode and Filter Controls */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6">
+        {/* View Mode Toggle */}
+        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            className="h-8 px-3"
+          >
+            <Grid3X3 className="h-4 w-4 mr-1" />
+            Grid
+          </Button>
+          <Button
+            variant={viewMode === "tile" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("tile")}
+            className="h-8 px-3"
+          >
+            <RectangleHorizontal className="h-4 w-4 mr-1" />
+            Tile
+          </Button>
         </div>
 
         {/* Filter Buttons */}
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
-              variant={filter === "all" ? "default" : "outline"}
-              size="sm"
+            variant={filter === "all" ? "default" : "outline"}
+            size="sm"
             onClick={() => setFilter("all")}
-              className="h-8"
+            className="h-8"
           >
             All ({currentFolder ? currentFolder.photos.length : 0})
           </Button>
           <Button
-              variant={filter === "liked" ? "default" : "outline"}
-              size="sm"
+            variant={filter === "liked" ? "default" : "outline"}
+            size="sm"
             onClick={() => setFilter("liked")}
-              className="h-8"
+            className="h-8"
           >
             <Heart className="mr-2 h-4 w-4" />
             Liked ({currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0})
           </Button>
           <Button
-              variant={filter === "favorited" ? "default" : "outline"}
-              size="sm"
+            variant={filter === "favorited" ? "default" : "outline"}
+            size="sm"
             onClick={() => setFilter("favorited")}
-              className="h-8"
+            className="h-8"
           >
             <Star className="mr-2 h-4 w-4" />
             Favorited ({currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0})
           </Button>
-          </div>
         </div>
       </div>
 
-      {/* Photo Grid */}
-      {displayedPhotos.length === 0 && !loading ? (
-        <div className="text-center py-12">
-          <Images className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-medium">
-            No photos to display
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {filter === "all" ? "This gallery is empty." : `You have no ${filter} photos in this gallery.`}
-          </p>
+      {/* Photo Grid Section */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-foreground">Photos</h2>
+          <span className="text-sm text-muted-foreground">
+            {currentFolder ? currentFolder.photos.length : 0} photo{(currentFolder?.photos.length ?? 0) !== 1 ? 's' : ''}
+          </span>
         </div>
-      ) : (
-        <>
-          {currentFolder && (
-            <FolderGrid
-              folder={currentFolder}
-              isPhotographer={false} // Clients can't edit
-              onPhotoView={(photo) => setSelectedPhoto(photo)}
-              onFolderSelect={handleFolderSelect}
-            onPhotoStatusChange={handlePhotoStatusChange}
-              viewMode={viewMode}
-          />
-          )}
-          
-          {/* Loading more indicator */}
-          {loadingMore && (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading more photos...</span>
-            </div>
-          )}
-          
-          {/* End of photos indicator */}
-          {!hasMore && displayedPhotos.length > 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>You've reached the end! {displayedPhotos.length} photos total.</p>
-            </div>
-          )}
-        </>
-      )}
+
+        {displayedPhotos.length === 0 && !loading ? (
+          <div className="text-center py-12">
+            <Images className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-2 text-sm font-medium">
+              No photos to display
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {filter === "all" ? "This folder is empty." : `You have no ${filter} photos in this folder.`}
+            </p>
+          </div>
+        ) : (
+          <>
+            {currentFolder && (
+              <FolderGrid
+                folder={currentFolder}
+                isPhotographer={false} // Clients can't edit
+                onPhotoView={(photo) => setSelectedPhoto(photo)}
+                onFolderSelect={handleFolderSelect}
+                onPhotoStatusChange={handlePhotoStatusChange}
+                viewMode={viewMode}
+              />
+            )}
+
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading more photos...</span>
+              </div>
+            )}
+
+            {/* End of photos indicator */}
+            {!hasMore && displayedPhotos.length > 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>You've reached the end! {displayedPhotos.length} photos total.</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Photo Lightbox */}
       {selectedPhoto && (
@@ -780,4 +957,4 @@ function GalleryPage() {
   );
 }
 
-export default GalleryPage;
+export default GalleryPage; 

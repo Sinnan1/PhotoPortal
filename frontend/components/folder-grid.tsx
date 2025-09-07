@@ -96,7 +96,12 @@ export function FolderGrid({
       const photo = (folder.photos || []).find((p) => p.id === photoId)
       if (!photo) return
 
-      const isLiked = (photo.likedBy ?? []).some((like) => like.userId === user?.id)
+      if (!user?.id) {
+        showToast("Please log in to like photos", "error")
+        return
+      }
+
+      const isLiked = (photo.likedBy ?? []).some((like) => like.userId === user.id)
 
       if (isLiked) {
         await api.unlikePhoto(photoId)
@@ -108,6 +113,7 @@ export function FolderGrid({
       onPhotoStatusChange?.(photoId, { liked: !isLiked })
 
     } catch (error) {
+      console.error('Like photo error:', error)
       showToast("Failed to update like status", "error")
     }
   }
@@ -117,7 +123,12 @@ export function FolderGrid({
       const photo = (folder.photos || []).find((p) => p.id === photoId)
       if (!photo) return
 
-      const isFavorited = (photo.favoritedBy ?? []).some((favorite) => favorite.userId === user?.id)
+      if (!user?.id) {
+        showToast("Please log in to favorite photos", "error")
+        return
+      }
+
+      const isFavorited = (photo.favoritedBy ?? []).some((favorite) => favorite.userId === user.id)
 
       if (isFavorited) {
         await api.unfavoritePhoto(photoId)
@@ -129,6 +140,7 @@ export function FolderGrid({
       onPhotoStatusChange?.(photoId, { favorited: !isFavorited })
 
     } catch (error) {
+      console.error('Favorite photo error:', error)
       showToast("Failed to update favorite status", "error")
     }
   }
@@ -162,84 +174,10 @@ export function FolderGrid({
     }
   }
 
-  const totalItems = (folder.children || []).length + (folder.photos || []).length
-
+  // Only render photos (folders are now handled separately)
   return (
-    <div className={getGridClasses(totalItems)}>
-      {/* Render Subfolders First */}
-      {(folder.children || []).map((subfolder) => (
-        <div
-          key={`folder-${subfolder?.id || 'unknown'}`}
-          className={`group relative ${
-            viewMode === "tile"
-              ? "aspect-[16/9] bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-md hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.01]"
-              : "aspect-square bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-md hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.01]"
-          }`}
-          onClick={() => handleFolderClick(subfolder?.id)}
-        >
-          {/* Folder Icon Overlay */}
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-center">
-              <Folder className="w-16 h-16 text-[#425146] mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate px-4">
-                {subfolder?.name || 'Unnamed Folder'}
-              </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {subfolder?._count?.photos ?? 0} photos
-              </p>
-            </div>
-          </div>
-
-          {/* Cover Photo Background (if available) */}
-          {subfolder?.coverPhoto && (
-            <div className="absolute inset-0 opacity-20">
-              <Image
-                src={subfolder.coverPhoto.thumbnailUrl}
-                alt={subfolder.coverPhoto.filename}
-                fill
-                className="object-cover"
-              />
-            </div>
-          )}
-
-          {/* Actions Menu for Photographers */}
-          {isPhotographer && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-black/50 hover:bg-black/70 text-white h-8 w-8 p-0 z-20"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleFolderRename(subfolder?.id, subfolder?.name || 'Unnamed Folder')}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Rename
-                </DropdownMenuItem>
-                {subfolder?.coverPhoto && onSetCoverPhoto && (
-                  <DropdownMenuItem onClick={() => onSetCoverPhoto(subfolder.id, '')}>
-                    <ImageIcon className="w-4 h-4 mr-2" />
-                    Remove Cover Photo
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => handleFolderDelete(subfolder?.id, subfolder?.name || 'Unnamed Folder')}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      ))}
-
-      {/* Render Photos */}
+    <div className={getGridClasses(folder.photos?.length || 0)}>
+      {/* Render Photos Only */}
       {(folder.photos || []).map((photo) => (
         <div
           key={`photo-${photo.id}`}
@@ -357,7 +295,7 @@ export function FolderGrid({
       ))}
 
       {/* Empty State */}
-      {totalItems === 0 && (
+      {(folder.photos?.length || 0) === 0 && (
         <div className="col-span-full text-center py-12">
           <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-2 text-sm font-medium">
