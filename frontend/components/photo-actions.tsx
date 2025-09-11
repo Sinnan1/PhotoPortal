@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Heart, Star } from "lucide-react";
+import { Heart, Star, Share2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -10,6 +10,7 @@ interface PhotoActionsProps {
   photoId: string;
   initialLiked?: boolean;
   initialFavorited?: boolean;
+  onUnpost?: () => void;
   onStatusChange?: (liked: boolean, favorited: boolean) => void;
   className?: string;
 }
@@ -18,6 +19,7 @@ export function PhotoActions({
   photoId,
   initialLiked = false,
   initialFavorited = false,
+  onUnpost,
   onStatusChange,
   className = "",
 }: PhotoActionsProps) {
@@ -138,10 +140,27 @@ export function PhotoActions({
           favorited ? "bg-yellow-500 hover:bg-yellow-600" : ""
         }`}
       >
-        <Star 
-          className={`h-4 w-4 ${favorited ? "fill-current" : ""}`} 
+        <Star
+          className={`h-4 w-4 ${favorited ? "fill-current" : ""}`}
         />
       </Button>
+
+      {onUnpost && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnpost();
+          }}
+          disabled={loading}
+          data-action="unpost"
+          title="Remove from posts"
+          className="transition-all duration-200 border-purple-500 text-purple-600 hover:bg-purple-50"
+        >
+          <Share2 className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 } 

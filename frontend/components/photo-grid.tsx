@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Trash2, Heart, Star } from "lucide-react";
+import { Download, Eye, Trash2, Heart, Star, Share2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -19,6 +19,7 @@ interface Photo {
   createdAt: string;
   likedBy?: { userId: string }[];
   favoritedBy?: { userId: string }[];
+  postBy?: { userId: string }[];
 }
 
 interface PhotoGridProps {
@@ -28,6 +29,7 @@ interface PhotoGridProps {
   onDelete?: (photoId: string) => void;
   onView?: (photo: Photo) => void;
   onDownload?: (photoId: string) => void;
+  onUnpost?: (photoId: string) => void;
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void;
   columns?: {
     sm: number;
@@ -35,6 +37,7 @@ interface PhotoGridProps {
     lg: number;
     xl?: number;
   };
+  viewMode?: "grid" | "tile";
   className?: string;
   lastPhotoElementRef?: (node: HTMLDivElement) => void;
 }
@@ -68,8 +71,10 @@ export function PhotoGrid({
   onDelete,
   onView,
   onDownload,
+  onUnpost,
   onPhotoStatusChange,
-  columns = { sm: 2, md: 3, lg: 4 },
+  columns = { sm: 3, md: 4, lg: 5, xl: 6 },
+  viewMode = "grid",
   className = "",
   lastPhotoElementRef,
   loading = false,
@@ -188,7 +193,7 @@ export function PhotoGrid({
   };
 
   const getGridClasses = () => {
-    const baseClasses = "grid gap-4";
+    const baseClasses = "grid gap-3";
     const responsiveClasses = [
       "grid-cols-1",
       `sm:grid-cols-${columns.sm}`,
@@ -243,18 +248,27 @@ export function PhotoGrid({
     <div className={getGridClasses()}>
       {photoState.map((photo, index) => {
         const isLastPhoto = index === photoState.length - 1;
+
+        // Debug: Check if postBy data exists
+        const isPosted = (photo.postBy ?? []).some((post) => post.userId === user?.id);
+        console.log(`Photo ${photo.id}: isPosted = ${isPosted}, postBy =`, photo.postBy);
+
         return (
-          <div
-            key={photo.id}
-            ref={isLastPhoto ? lastPhotoElementRef : undefined}
-            className={`photo-grid-item group relative aspect-square bg-card rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:border-olive-green/30 transition-all duration-300 ${
-              konamiActivated ? 'konami-code' : ''
-            } ${
-              index === 3 ? 'wedding-joke' : '' // Add wedding joke to 4th photo
-            } ${
-              index === 7 ? 'secret-joke' : '' // Add secret joke to 8th photo
-            }`}
-          >
+                  <div
+          key={photo.id}
+          ref={isLastPhoto ? lastPhotoElementRef : undefined}
+          className={`photo-grid-item group relative ${
+            viewMode === "tile"
+              ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:border-olive-green/20 transition-all duration-200"
+              : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:border-olive-green/20 transition-all duration-200"
+          } ${
+            konamiActivated ? 'konami-code' : ''
+          } ${
+            index === 3 ? 'wedding-joke' : '' // Add wedding joke to 4th photo
+          } ${
+            index === 7 ? 'secret-joke' : '' // Add secret joke to 8th photo
+          }`}
+        >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
@@ -280,57 +294,73 @@ export function PhotoGrid({
           />
 
           {/* Action overlay - positioned at bottom to avoid overlap with like/favorite */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-end justify-center pb-4">
-            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all flex items-end justify-center pb-2">
+            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
               {onView && (
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="backdrop-blur-sm bg-white/90 hover:bg-white"
+                  className="backdrop-blur-sm bg-white/80 hover:bg-white h-7 w-7 p-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     onView(photo);
                   }}
                 >
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-3.5 w-3.5" />
                 </Button>
               )}
 
               {onDownload && (
                 <Button
                   size="sm"
-                  className="backdrop-blur-sm"
+                  className="backdrop-blur-sm h-7 w-7 p-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDownload(photo.id);
                   }}
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              {onUnpost && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="backdrop-blur-sm bg-white/80 hover:bg-white h-7 w-7 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUnpost(photo.id);
+                  }}
+                  title="Remove from posts"
+                >
+                  <Share2 className="h-3.5 w-3.5 text-purple-600" />
                 </Button>
               )}
 
               {isAdmin && onDelete && (
                 <Button
                   size="sm"
+                  
                   variant="destructive"
-                  className="backdrop-blur-sm"
+                  className="backdrop-blur-sm h-7 w-7 p-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(photo.id);
                   }}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
           </div>
 
           {/* Like/Favorite buttons - positioned at top-left to avoid overlap */}
-          <div className="absolute top-2 left-2 flex gap-1">
+          <div className="absolute top-1.5 left-1.5 flex gap-1">
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/30 hover:bg-olive-green/40 p-1.5 transition-all duration-300"
+              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLikePhoto(photo.id);
@@ -338,13 +368,13 @@ export function PhotoGrid({
               aria-label="Like photo"
             >
               <Heart
-                className={`h-4 w-4 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
+                className={`h-3 w-3 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
               />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/30 hover:bg-olive-green/40 p-1.5 transition-all duration-300"
+              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
               onClick={(e) => {
                 e.stopPropagation();
                 handleFavoritePhoto(photo.id);
@@ -352,7 +382,7 @@ export function PhotoGrid({
               aria-label="Favorite photo"
             >
               <Star
-                className={`h-4 w-4 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
+                className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
               />
             </Button>
           </div>

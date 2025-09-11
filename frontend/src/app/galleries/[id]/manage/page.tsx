@@ -14,9 +14,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Trash2, Save, ArrowLeft, Images, Settings, Loader2, X } from "lucide-react"
+import { Upload, Trash2, Save, ArrowLeft, Images, Settings, Loader2, X, Folder, FolderOpen } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { FolderTree } from "@/components/folder-tree"
+import { FolderGrid } from "@/components/folder-grid"
+import { PhotoLightbox } from "@/components/photo-lightbox"
 
 interface Photo {
   id: string
@@ -24,6 +27,21 @@ interface Photo {
   thumbnailUrl: string
   originalUrl: string
   createdAt: string
+  likedBy: { userId: string }[]
+  favoritedBy: { userId: string }[]
+  postBy: { userId: string }[]
+}
+
+interface Folder {
+  id: string
+  name: string
+  children: Folder[]
+  photos: Photo[]
+  coverPhoto?: Photo
+  _count: {
+    photos: number
+    children: number
+  }
 }
 
 interface Gallery {
@@ -34,7 +52,7 @@ interface Gallery {
   expiresAt: string | null
   downloadLimit: number | null
   downloadCount: number
-  photos: Photo[]
+  folders: Folder[]
 }
 
 export default function ManageGalleryPage() {
@@ -53,6 +71,11 @@ export default function ManageGalleryPage() {
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'queued' | 'uploading' | 'processing' | 'success' | 'failed' }>({})
   const [uploadAttempts, setUploadAttempts] = useState<{ [key: string]: number }>({})
   const [activeUploads, setActiveUploads] = useState<{ [key: string]: XMLHttpRequest }>({})
+
+  // Folder management state
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null)
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -91,6 +114,13 @@ export default function ManageGalleryPage() {
         expiresAt: galleryData.expiresAt ? new Date(galleryData.expiresAt).toISOString().slice(0, 16) : "",
         downloadLimit: galleryData.downloadLimit?.toString() || "",
       })
+
+      // Set default folder (first folder or create one)
+      if (galleryData.folders && galleryData.folders.length > 0) {
+        const defaultFolder = galleryData.folders[0]
+        setSelectedFolderId(defaultFolder.id)
+        setSelectedFolder(defaultFolder)
+      }
     } catch (error) {
       showToast("Failed to load gallery", "error")
       router.push("/dashboard")
@@ -208,6 +238,12 @@ export default function ManageGalleryPage() {
     const fileArray = Array.isArray(files) ? files : Array.from(files)
     if (fileArray.length === 0) return
 
+    // Check if a folder is selected
+    if (!selectedFolderId) {
+      showToast("Please select a folder first", "error")
+      return
+    }
+
     setUploading(true)
 
     // Initialize progress, status and attempts
@@ -229,7 +265,10 @@ export default function ManageGalleryPage() {
 
       if (successCount > 0) {
         showToast(`Successfully uploaded ${successCount} ${successCount === 1 ? 'photo' : 'photos'}`, 'success')
-        fetchGallery()
+        // Refresh the selected folder to show new photos
+        if (selectedFolderId) {
+          handleFolderSelect(selectedFolderId)
+        }
       }
       if (failureCount > 0) {
         showToast(`${failureCount} ${failureCount === 1 ? 'upload' : 'uploads'} failed`, 'error')
@@ -321,7 +360,7 @@ export default function ManageGalleryPage() {
           }
         }
 
-        xhr.open('POST', `${BASE_URL}/photos/upload/${galleryId}`)
+        xhr.open('POST', `${BASE_URL}/photos/upload/${selectedFolderId}`)
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
         xhr.send(formData)
       })
@@ -330,15 +369,137 @@ export default function ManageGalleryPage() {
     return attemptUpload(1)
   }
 
+  // Folder management functions
+  const handleFolderSelect = async (folderId: string) => {
+    try {
+      const response = await api.getFolder(folderId)
+      setSelectedFolderId(folderId)
+      setSelectedFolder(response.data)
+    } catch (error) {
+      showToast("Failed to load folder", "error")
+    }
+  }
+
+  const handleCreateFolder = async (parentId?: string) => {
+    const folderName = prompt("Enter folder name:", "New Folder")
+    if (!folderName || !folderName.trim()) return
+
+    try {
+      await api.createFolder(galleryId, {
+        name: folderName.trim(),
+        parentId: parentId || undefined
+      })
+      showToast("Folder created successfully", "success")
+      fetchGallery() // Refresh to get updated folder structure
+    } catch (error) {
+      showToast("Failed to create folder", "error")
+    }
+  }
+
+  const handleRenameFolder = async (folderId: string, newName: string) => {
+    try {
+      await api.updateFolder(folderId, { name: newName })
+      showToast("Folder renamed successfully", "success")
+      fetchGallery()
+
+      // Update selected folder if it's the one being renamed
+      if (selectedFolderId === folderId) {
+        setSelectedFolder(prev => prev ? { ...prev, name: newName } : null)
+      }
+    } catch (error) {
+      showToast("Failed to rename folder", "error")
+    }
+  }
+
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      await api.deleteFolder(folderId)
+      showToast("Folder deleted successfully", "success")
+      fetchGallery()
+
+      // Reset selection if deleted folder was selected
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null)
+        setSelectedFolder(null)
+      }
+    } catch (error) {
+      showToast("Failed to delete folder", "error")
+    }
+  }
+
+  const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean }) => {
+    if (!selectedFolder) return
+
+    setSelectedFolder(prev => {
+      if (!prev) return prev
+      const updatedPhotos = prev.photos.map((p) => {
+        if (p.id !== photoId) return p
+        const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id)
+        const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id)
+        return {
+          ...p,
+          likedBy:
+            status.liked === undefined
+              ? p.likedBy
+              : status.liked
+              ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
+              : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+          favoritedBy:
+            status.favorited === undefined
+              ? p.favoritedBy
+              : status.favorited
+              ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
+              : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+        } as Photo
+      })
+
+      return {
+        ...prev,
+        photos: updatedPhotos
+      }
+    })
+  }
+
   const handleDeletePhoto = async (photoId: string) => {
     if (!confirm("Are you sure you want to delete this photo?")) return
 
     try {
       await api.deletePhoto(photoId)
       showToast("Photo deleted successfully", "success")
-      fetchGallery()
+
+      // Update local state
+      if (selectedFolder) {
+        setSelectedFolder(prev => prev ? {
+          ...prev,
+          photos: prev.photos.filter(p => p.id !== photoId),
+          _count: {
+            ...prev._count,
+            photos: (prev._count?.photos ?? 0) - 1
+          }
+        } : null)
+      }
     } catch (error) {
       showToast("Failed to delete photo", "error")
+    }
+  }
+
+  const handleSetCoverPhoto = async (folderId: string, photoId: string) => {
+    try {
+      // If photoId is empty, remove the cover photo
+      if (photoId === '') {
+        await api.setFolderCover(folderId, undefined)
+        showToast("Cover photo removed successfully", "success")
+      } else {
+        await api.setFolderCover(folderId, photoId)
+        showToast("Cover photo updated successfully", "success")
+      }
+
+      // Refresh the folder to show the new cover photo
+      if (selectedFolderId === folderId) {
+        handleFolderSelect(folderId)
+      }
+    } catch (error) {
+      showToast("Failed to update cover photo", "error")
     }
   }
 
@@ -385,14 +546,16 @@ export default function ManageGalleryPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Manage Gallery</h1>
-            <p className="text-gray-600">{gallery.title}</p>
+            <p className="text-gray-600">{gallery?.title || 'Loading...'}</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Badge variant="outline">{gallery.photos.length} photos</Badge>
-          <Link href={`/gallery/${gallery.id}`}>
+          <Badge variant="outline">{gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</Badge>
+          {gallery?.id && (
+            <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
             <Button variant="outline">View Gallery</Button>
           </Link>
+          )}
         </div>
       </div>
 
@@ -409,15 +572,41 @@ export default function ManageGalleryPage() {
         </TabsList>
 
         <TabsContent value="photos" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Folder Tree Sidebar */}
+            <div className="lg:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Folders</CardTitle>
+                  <CardDescription>Organize your photos</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {gallery && (
+                    <FolderTree
+                      galleryId={galleryId}
+                      onFolderSelect={handleFolderSelect}
+                      selectedFolderId={selectedFolderId || undefined}
+                      onFolderCreate={handleCreateFolder}
+                      onFolderRename={handleRenameFolder}
+                      onFolderDelete={handleDeleteFolder}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="lg:col-span-3 space-y-6">
           {/* Upload Section */}
+              {selectedFolder && (
           <Card>
             <CardHeader>
-              <CardTitle>Upload Photos</CardTitle>
-              <CardDescription>Add new photos to this gallery. Supported formats: JPG, PNG, WEBP</CardDescription>
+                    <CardTitle>Upload to "{selectedFolder.name}"</CardTitle>
+                    <CardDescription>Add new photos to this folder. Supported formats: JPG, PNG, WEBP</CardDescription>
             </CardHeader>
             <CardContent>
               <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#425146] transition-colors cursor-pointer"
                 role="button"
                 tabIndex={0}
                 aria-label="Upload photos by clicking or dragging files here"
@@ -491,7 +680,7 @@ export default function ManageGalleryPage() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`${status === 'failed' ? 'bg-red-500' : 'bg-blue-600'} h-2 rounded-full transition-all`}
+                                  className={`${status === 'failed' ? 'bg-red-500' : 'bg-[#425146]'} h-2 rounded-full transition-all`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -505,50 +694,42 @@ export default function ManageGalleryPage() {
               )}
             </CardContent>
           </Card>
+              )}
 
-          {/* Photos Grid */}
+              {/* Folder Content */}
+              {selectedFolder ? (
           <Card>
             <CardHeader>
-              <CardTitle>Gallery Photos ({gallery.photos.length})</CardTitle>
-              <CardDescription>Manage the photos in this gallery</CardDescription>
+                    <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
+                    <CardDescription>
+                      {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
+                    </CardDescription>
             </CardHeader>
             <CardContent>
-              {gallery.photos.length === 0 ? (
-                <div className="text-center py-12">
-                  <Images className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No photos yet</h3>
-                  <p className="mt-1 text-sm text-gray-500">Upload some photos to get started.</p>
-                </div>
+                    <FolderGrid
+                      folder={selectedFolder}
+                      isPhotographer={user?.role === "PHOTOGRAPHER"}
+                      onPhotoView={(photo) => setSelectedPhoto(photo)}
+                      onPhotoDelete={handleDeletePhoto}
+                      onFolderSelect={handleFolderSelect}
+                      onFolderRename={handleRenameFolder}
+                      onFolderDelete={handleDeleteFolder}
+                      onPhotoStatusChange={handlePhotoStatusChange}
+                      onSetCoverPhoto={handleSetCoverPhoto}
+                    />
+                  </CardContent>
+                </Card>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {gallery.photos.map((photo) => (
-                    <div key={photo.id} className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                      <Image
-                        src={photo.thumbnailUrl || "/placeholder.svg"}
-                        alt={photo.filename}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleDeletePhoto(photo.id)}
-                          aria-label={`Delete photo ${photo.filename}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity/75 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <p className="truncate">{photo.filename}</p>
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Folder className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Folder</h3>
+                    <p className="text-gray-500">Choose a folder from the sidebar to view and manage its contents.</p>
+                  </CardContent>
+                </Card>
+              )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="settings">
@@ -614,7 +795,7 @@ export default function ManageGalleryPage() {
                     placeholder="Maximum number of downloads (optional)"
                     min="1"
                   />
-                  <p className="text-sm text-gray-500">Current downloads: {gallery.downloadCount}</p>
+                  <p className="text-sm text-gray-500">Current downloads: {gallery?.downloadCount ?? 0}</p>
                 </div>
               </CardContent>
 
@@ -629,6 +810,36 @@ export default function ManageGalleryPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Photo Lightbox */}
+      {selectedPhoto && selectedFolder && (
+        <PhotoLightbox
+          photo={selectedPhoto}
+          photos={selectedFolder.photos || []}
+          onClose={() => setSelectedPhoto(null)}
+          onNext={() => {
+            const photos = selectedFolder.photos || []
+            const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+            const nextIndex = (currentIndex + 1) % photos.length
+            setSelectedPhoto(photos[nextIndex])
+          }}
+          onPrevious={() => {
+            const photos = selectedFolder.photos || []
+            const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+            const prevIndex = currentIndex === 0 ? photos.length - 1 : currentIndex - 1
+            setSelectedPhoto(photos[prevIndex])
+          }}
+          onDownload={() => {
+            if (selectedPhoto) {
+              api.downloadPhotoData(selectedPhoto.id, selectedPhoto.filename).catch(() => {
+                showToast("Download failed", "error")
+              })
+            }
+          }}
+          onPhotoStatusChange={handlePhotoStatusChange}
+          dataSaverMode={false}
+        />
+      )}
     </div>
   )
 }

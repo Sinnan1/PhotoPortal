@@ -11,9 +11,12 @@ import {
 	unlikePhoto,
 	favoritePhoto,
 	unfavoritePhoto,
+	postPhoto,
+	unpostPhoto,
 	getPhotoStatus,
 	getLikedPhotos,
-	getFavoritedPhotos
+	getFavoritedPhotos,
+	getPosts
 } from '../controllers/photoController'
 import { authenticateToken, requireRole } from '../middleware/auth'
 
@@ -21,7 +24,7 @@ const router = Router()
 
 // Protected routes (photographers only)
 router.post(
-	'/upload/:galleryId',
+	'/upload/:folderId',
 	authenticateToken,
 	requireRole('PHOTOGRAPHER'),
 	uploadMiddleware,
@@ -38,10 +41,15 @@ router.delete('/:id/like', authenticateToken, unlikePhoto)
 router.post('/:id/favorite', authenticateToken, favoritePhoto)
 router.delete('/:id/favorite', authenticateToken, unfavoritePhoto)
 
+// Post routes (photographer only)
+router.post('/:id/post', authenticateToken, requireRole('PHOTOGRAPHER'), postPhoto)
+router.delete('/:id/post', authenticateToken, requireRole('PHOTOGRAPHER'), unpostPhoto)
+
 // Status and lists
 router.get('/:id/status', authenticateToken, getPhotoStatus)
 router.get('/liked', authenticateToken, getLikedPhotos)
 router.get('/favorited', authenticateToken, getFavoritedPhotos)
+router.get('/posts', authenticateToken, requireRole('PHOTOGRAPHER'), getPosts)
 
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)

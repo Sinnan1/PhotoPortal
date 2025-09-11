@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { PhotoGrid } from "@/components/photo-grid";
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { Star, Loader2 } from "lucide-react";
+import { Share2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Photo {
@@ -29,26 +29,26 @@ interface Photo {
   };
 }
 
-export default function FavoritesPage() {
+export default function PostsPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchFavoritedPhotos();
+    fetchPosts();
   }, []);
 
-  const fetchFavoritedPhotos = async () => {
+  const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await api.getFavoritedPhotos();
+      const response = await api.getPosts();
       setPhotos(response.data);
     } catch (error) {
-      console.error("Failed to fetch favorited photos:", error);
+      console.error("Failed to fetch posts:", error);
       toast({
         title: "Error",
-        description: "Failed to load favorited photos",
+        description: "Failed to load posts",
         variant: "destructive",
       });
     } finally {
@@ -87,6 +87,24 @@ export default function FavoritesPage() {
     }
   };
 
+  const handleUnpostPhoto = async (photoId: string) => {
+    try {
+      await api.unpostPhoto(photoId);
+      setPhotos(photos.filter(p => p.id !== photoId));
+      toast({
+        title: "Photo unmarked",
+        description: "Photo removed from posts collection",
+      });
+    } catch (error) {
+      console.error("Unpost failed", error);
+      toast({
+        title: "Failed to unmark photo",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -100,24 +118,24 @@ export default function FavoritesPage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <Star className="h-8 w-8 text-yellow-500" />
-          <h1 className="text-3xl font-bold">Favorites</h1>
+          <Share2 className="h-8 w-8 text-purple-500" />
+          <h1 className="text-3xl font-bold">For Posts</h1>
         </div>
         <p className="text-muted-foreground">
-          Your collection of favorited photos from all galleries
+          Photos marked for social media posting across all your galleries
         </p>
       </div>
 
       {/* Stats Card */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="text-lg">Your Favorites</CardTitle>
+          <CardTitle className="text-lg">Photos for Posting</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <div className="text-2xl font-bold text-yellow-500">{photos.length}</div>
+            <div className="text-2xl font-bold text-purple-500">{photos.length}</div>
             <div className="text-gray-600">
-              {photos.length === 1 ? "photo" : "photos"} favorited
+              {photos.length === 1 ? "photo" : "photos"} marked for posting
             </div>
           </div>
         </CardContent>
@@ -126,12 +144,12 @@ export default function FavoritesPage() {
       {/* Photo Grid */}
       {photos.length === 0 ? (
         <div className="text-center py-12">
-          <Star className="mx-auto h-12 w-12 text-muted-foreground" />
+          <Share2 className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-2 text-sm font-medium">
-            No favorited photos yet
+            No photos marked for posting yet
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Favorite photos from galleries to see them here.
+            Mark photos for posting from your galleries to see them here.
           </p>
         </div>
       ) : (
@@ -139,6 +157,7 @@ export default function FavoritesPage() {
           photos={photos as any}
           onView={(p) => setSelectedPhoto(p as any)}
           onDownload={handleDownload}
+          onUnpost={handleUnpostPhoto}
           columns={{ sm: 2, md: 3, lg: 4 }}
         />
       )}
@@ -165,8 +184,10 @@ export default function FavoritesPage() {
             setSelectedPhoto(photos[prevIndex]);
           }}
           onDownload={() => handleDownload(selectedPhoto.id)}
+          onUnpost={() => handleUnpostPhoto(selectedPhoto.id)}
         />
       )}
     </div>
   );
-} 
+}
+

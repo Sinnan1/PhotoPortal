@@ -52,13 +52,18 @@ export const createGallery = async (req: AuthRequest, res: Response) => {
 				password: hashedPassword,
 				expiresAt: expiryDate,
 				downloadLimit: downloadLimit || 0,
-				photographerId
+				photographerId,
+				folders: {
+					create: {
+						name: "Photos" // Default folder for the gallery
+					}
+				}
 			},
 			include: {
 				photographer: {
 					select: { id: true, name: true, email: true }
 				},
-				photos: true
+				folders: true
 			}
 		})
 
@@ -82,18 +87,36 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 		const galleries = await prisma.gallery.findMany({
 			where: { photographerId },
 			include: {
-				photos: {
-					select: {
-						id: true,
-						filename: true,
-						thumbnailUrl: true,
-						createdAt: true
+				folders: {
+					include: {
+						photos: {
+							include: {
+								likedBy: true,
+								favoritedBy: true,
+								postBy: true
+							}
+						},
+						children: true,
+						coverPhoto: {
+							select: {
+								id: true,
+								filename: true,
+								thumbnailUrl: true,
+								mediumUrl: true,
+								largeUrl: true,
+								originalUrl: true,
+								createdAt: true
+							}
+						},
+						_count: {
+							select: { photos: true, children: true }
+						}
 					}
 				},
 				likedBy: true,
 				favoritedBy: true,
 				_count: {
-					select: { photos: true }
+					select: { folders: true }
 				}
 			},
 			orderBy: { createdAt: 'desc' }
@@ -118,14 +141,61 @@ export const getGallery = async (req: Request, res: Response) => {
 
         const gallery = await prisma.gallery.findUnique({
 			where: { id },
-			include: {
-				photos: {
 					include: {
-						likedBy: true,
-						favoritedBy: true
+			folders: {
+				where: { parentId: null }, // Only get root folders
+				include: {
+					photos: {
+						include: {
+							likedBy: true,
+							favoritedBy: true,
+							postBy: true
+						},
+						orderBy: { createdAt: 'desc' }
 					},
-					orderBy: { createdAt: 'desc' }
-				},
+					children: {
+						include: {
+							photos: {
+								include: {
+									likedBy: true,
+									favoritedBy: true,
+									postBy: true
+								},
+								orderBy: { createdAt: 'desc' }
+							},
+							children: true, // For deeper nesting
+							coverPhoto: {
+								select: {
+									id: true,
+									filename: true,
+									thumbnailUrl: true,
+									mediumUrl: true,
+									largeUrl: true,
+									originalUrl: true,
+									createdAt: true
+								}
+							},
+							_count: {
+								select: { photos: true, children: true }
+							}
+						}
+					},
+					coverPhoto: {
+						select: {
+							id: true,
+							filename: true,
+							thumbnailUrl: true,
+							mediumUrl: true,
+							largeUrl: true,
+							originalUrl: true,
+							createdAt: true
+						}
+					},
+					_count: {
+						select: { photos: true, children: true }
+					}
+				}
+			},
 				photographer: {
 					select: { name: true }
 				}
@@ -306,7 +376,7 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 			where: { id },
 			data: updateData,
 			include: {
-				photos: true,
+				folders: true,
 				photographer: {
 					select: { name: true }
 				}
@@ -335,7 +405,11 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 		const existingGallery = await prisma.gallery.findFirst({
 			where: { id, photographerId },
 			include: {
-				photos: true
+				folders: {
+					include: {
+						photos: true
+					}
+				}
 			}
 		})
 
@@ -347,9 +421,10 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 		}
 
 		// Delete all photos from S3 storage
-		if (existingGallery.photos.length > 0) {
+		const allPhotos = existingGallery.folders.flatMap(folder => folder.photos)
+		if (allPhotos.length > 0) {
 			try {
-				const deletePromises = existingGallery.photos.map(async (photo) => {
+				const deletePromises = allPhotos.map(async (photo) => {
 					// Extract the S3 keys from the URLs
 					const originalUrl = new URL(photo.originalUrl);
 					const thumbnailUrl = new URL(photo.thumbnailUrl);
@@ -369,7 +444,7 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 				});
 				
 				await Promise.all(deletePromises);
-				console.log(`Deleted ${existingGallery.photos.length} photos from S3 for gallery ${id}`);
+				console.log(`Deleted ${allPhotos.length} photos from S3 for gallery ${id}`);
 			} catch (storageError) {
 				console.error('Storage deletion error during gallery deletion:', storageError);
 				// Continue with database deletion even if storage fails
@@ -566,18 +641,36 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 						photographer: {
 							select: { id: true, name: true, email: true }
 						},
-						photos: {
-							select: {
-								id: true,
-								filename: true,
-								thumbnailUrl: true,
-								createdAt: true
+						folders: {
+							include: {
+								photos: {
+									include: {
+										likedBy: true,
+										favoritedBy: true,
+										postBy: true
+									}
+								},
+								children: true,
+								coverPhoto: {
+									select: {
+										id: true,
+										filename: true,
+										thumbnailUrl: true,
+										mediumUrl: true,
+										largeUrl: true,
+										originalUrl: true,
+										createdAt: true
+									}
+								},
+								_count: {
+									select: { photos: true, children: true }
+								}
 							}
 						},
 						likedBy: true,
 						favoritedBy: true,
 						_count: {
-							select: { photos: true }
+							select: { folders: true }
 						}
 					}
 				}
@@ -590,11 +683,16 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 		})
 
 		// Transform the data to match the expected format
-		const galleries = accessibleGalleries.map((access) => ({
-			...access.gallery,
-			photoCount: access.gallery._count.photos,
-			isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
-		}))
+		const galleries = accessibleGalleries.map((access) => {
+			// Calculate total photo count from all folders
+			const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => sum + folder._count.photos, 0)
+
+			return {
+				...access.gallery,
+				photoCount: totalPhotoCount,
+				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
+			}
+		})
 
 		res.json({
 			success: true,

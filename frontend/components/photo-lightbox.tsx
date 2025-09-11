@@ -26,11 +26,12 @@ interface PhotoLightboxProps {
   onNext: () => void
   onPrevious: () => void
   onDownload: () => void
+  onUnpost?: () => void
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
   dataSaverMode?: boolean
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onPhotoStatusChange, dataSaverMode = false }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false }: PhotoLightboxProps) {
   const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
@@ -389,8 +390,9 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           photoId={photo.id}
           initialLiked={initialLiked}
           initialFavorited={initialFavorited}
+          onUnpost={onUnpost}
           onStatusChange={handleStatusChange}
-          className="flex-col [&>button]:text-white [&>button]:backdrop-blur-md [&>button]:bg-white/10 [&>button]:hover:bg-olive-green/30 [&>button]:border [&>button]:border-white/20 [&>button]:rounded-xl [&>button]:transition-all [&>button]:duration-300 [&>button]:hover:scale-105 [&>button]:sm:w-10 [&>button]:sm:h-10"
+          className="flex-col [&>button]:text-white [&>button]:backdrop-blur-md [&>button]:bg-white/10 [&>button]:hover:bg-olive-green/30 [&>button]:border [&>button]:border-white/20 [&>button]:rounded-xl [&>button]:transition-all [&>button]:duration-all [&>button]:hover:scale-105 [&>button]:sm:w-10 [&>button]:sm:h-10"
         />
       </div>
 

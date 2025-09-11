@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
-import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun } from "lucide-react";
+import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import {
@@ -19,19 +19,13 @@ export function Navigation() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <nav className="border-b border-border/20 bg-background/95 dark:bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/90 dark:supports-[backdrop-filter]:bg-background/70 shadow-sm">
+    <nav className="border-b border-border/20 bg-[#425146] backdrop-blur-xl supports-[backdrop-filter]:bg-[#425146]/90 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3">
-              <Image
-                src="/Logo-Main.png"
-                alt="Yarrow Weddings & Co."
-                width={500}
-                height={500}
-                priority
-                className="h-40 w-auto"
-              />
+              
+              <span className="text-[#90856c] font-semibold text-xl font-['Lato']">Yarrow Weddings & Co.</span>
             </Link>
           </div>
 
@@ -65,6 +59,12 @@ export function Navigation() {
                       <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
                         <BarChart3 className="h-4 w-4" />
                         Analytics
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard/posts">
+                      <Button variant="ghost" className="flex items-center gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-300">
+                        <Share2 className="h-4 w-4" />
+                        Posts
                       </Button>
                     </Link>
                   </div>
@@ -158,3 +158,4 @@ export function Navigation() {
     </nav>
   );
 }
+

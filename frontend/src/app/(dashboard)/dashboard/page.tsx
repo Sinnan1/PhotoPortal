@@ -51,7 +51,18 @@ interface Photo {
   filename: string;
   thumbnailUrl: string;
   originalUrl: string;
+  mediumUrl?: string;
+  largeUrl?: string;
   createdAt: string;
+}
+
+interface Folder {
+  id: string;
+  name: string;
+  coverPhoto?: Photo;
+  _count: {
+    photos: number;
+  };
 }
 
 interface Gallery {
@@ -63,7 +74,7 @@ interface Gallery {
   expiresAt: string | null;
   createdAt: string;
   isExpired: boolean;
-  photos?: Photo[]; // Add this for preview images
+  folders?: Folder[]; // Updated to use folders instead of direct photos
   likedBy: { userId: string }[];
   favoritedBy: { userId: string }[];
 }
@@ -185,7 +196,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Access Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Link href="/dashboard/liked">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-6">
@@ -212,6 +223,22 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Favorites</h3>
                   <p className="text-gray-600">View your favorited photos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/posts">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <Share2 className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">For Posts</h3>
+                  <p className="text-gray-600">Photos for social media</p>
                 </div>
               </div>
             </CardContent>
@@ -259,12 +286,12 @@ export default function DashboardPage() {
           {galleries.map((gallery, index) => (
             <Card
               key={gallery.id}
-              className="hover:shadow-lg transition-shadow"
+              className="hover:shadow-lg transition-shadow duration-200 border border-gray-200 bg-white dark:bg-gray-900"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
                 <div className="flex-1">
-                  <CardTitle className="text-lg">{gallery.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">
+                  <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">{gallery.title}</CardTitle>
+                  <CardDescription className="line-clamp-1 text-gray-600 dark:text-gray-300 mt-1 text-sm">
                     {gallery.description}
                   </CardDescription>
                 </div>
@@ -308,68 +335,73 @@ export default function DashboardPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </CardHeader>
-              <CardContent>
-                {/* Gallery preview - show first few photos if available */}
-                {gallery.photos && gallery.photos.length > 0 && (
-                  <div className="mb-4">
-                    <div className="grid grid-cols-3 gap-1">
-                      {gallery.photos.slice(0, 3).map((photo, photoIndex) => (
-                        <div
-                          key={photo.id}
-                          className="relative aspect-square bg-gray-100 rounded overflow-hidden"
-                        >
-                          <Image
-                            src={photo.thumbnailUrl || "/placeholder.svg"}
-                            alt={photo.filename}
-                            fill
-                            className="object-cover"
-                            // CRITICAL: Add priority to first gallery's first photos
-                            priority={index === 0 && photoIndex === 0}
-                            sizes="(max-width: 1024px) 33vw, 11vw"
-                          />
+              <CardContent className="pt-2 pb-3">
+                {/* Gallery preview - show cover photo */}
+                {gallery.folders && gallery.folders.length > 0 && (
+                  <div className="mb-3">
+                    <div className="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden shadow-sm ring-1 ring-gray-200/50">
+                      {gallery.folders[0].coverPhoto ? (
+                        <Image
+                          src={gallery.folders[0].coverPhoto.largeUrl || gallery.folders[0].coverPhoto.mediumUrl || gallery.folders[0].coverPhoto.thumbnailUrl || "/placeholder.svg"}
+                          alt={gallery.folders[0].coverPhoto.filename}
+                          fill
+                          className="object-cover"
+                          priority={index === 0}
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                        />
+                      ) : gallery.folders[0]._count?.photos > 0 ? (
+                        // If no cover photo but folder has photos, show a placeholder with photo count
+                        <div className="w-full h-full bg-gradient-to-br from-[#425146]/20 to-[#425146]/10 flex items-center justify-center">
+                          <div className="text-center">
+                            <Images className="w-8 h-8 text-[#425146] mx-auto mb-1" />
+                            <p className="text-xs font-medium text-[#425146]">{gallery.folders[0]._count.photos} photos</p>
+                          </div>
                         </div>
-                      ))}
+                      ) : (
+                        // Empty folder placeholder
+                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          <Images className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                  <div className="flex items-center">
-                    <Images className="mr-1 h-4 w-4" />
-                    {gallery.photoCount} photos
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
+                    <Images className="mr-1 h-3 w-3 text-[#425146]" />
+                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
                   </div>
-                  <div className="flex items-center">
-                    <Download className="mr-1 h-4 w-4" />
-                    {gallery.downloadCount} downloads
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
+                    <Download className="mr-1 h-3 w-3 text-[#425146]" />
+                    <span className="font-medium">{gallery.downloadCount}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Calendar className="mr-1 h-4 w-4" />
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Calendar className="mr-1 h-3 w-3" />
                     {gallery.expiresAt ? (
-                      <span>
-                        Expires{" "}
-                        {new Date(gallery.expiresAt).toLocaleDateString()}
-                      </span>
+                      <span>Expires {new Date(gallery.expiresAt).toLocaleDateString()}</span>
                     ) : (
                       <span>No expiry</span>
                     )}
                   </div>
 
                   {gallery.isExpired && (
-                    <Badge variant="destructive">Expired</Badge>
+                    <Badge variant="destructive" className="text-xs py-0 px-1">Expired</Badge>
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 mt-4">
+                <div className="flex items-center justify-end gap-1 mt-2 px-1">
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-6 px-2 text-xs"
                     onClick={() => handleLikeGallery(gallery.id)}
                   >
                     <Heart
-                      className={`mr-2 h-4 w-4 ${
+                      className={`mr-1 h-3 w-3 ${
                         gallery.likedBy?.some((like) => like.userId === user?.id)
                           ? "text-red-500 fill-current"
                           : ""
@@ -380,10 +412,11 @@ export default function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-6 px-2 text-xs"
                     onClick={() => handleFavoriteGallery(gallery.id)}
                   >
                     <Star
-                      className={`mr-2 h-4 w-4 ${
+                      className={`mr-1 h-3 w-3 ${
                         gallery.favoritedBy?.some(
                           (favorite) => favorite.userId === user?.id
                         )
