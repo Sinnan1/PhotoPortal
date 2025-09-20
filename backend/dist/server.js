@@ -9,11 +9,20 @@ const dotenv_1 = tslib_1.__importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
 // Import routes
 const auth_1 = tslib_1.__importDefault(require("./routes/auth"));
+const adminAuth_1 = tslib_1.__importDefault(require("./routes/adminAuth"));
+const adminUsers_1 = tslib_1.__importDefault(require("./routes/adminUsers"));
+const adminGalleries_1 = tslib_1.__importDefault(require("./routes/adminGalleries"));
+const adminAnalytics_1 = tslib_1.__importDefault(require("./routes/adminAnalytics"));
+const adminSystemConfig_1 = tslib_1.__importDefault(require("./routes/adminSystemConfig"));
+const adminInvitations_1 = tslib_1.__importDefault(require("./routes/adminInvitations"));
+const audit_1 = tslib_1.__importDefault(require("./routes/audit"));
 const galleries_1 = tslib_1.__importDefault(require("./routes/galleries"));
 const photos_1 = tslib_1.__importDefault(require("./routes/photos"));
 const photographers_1 = tslib_1.__importDefault(require("./routes/photographers"));
 const uploads_1 = tslib_1.__importDefault(require("./routes/uploads"));
 const folders_1 = tslib_1.__importDefault(require("./routes/folders"));
+// Import admin session manager
+const adminSessionManager_1 = require("./utils/adminSessionManager");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -59,6 +68,13 @@ app.use((req, res, next) => {
 });
 // Routes
 app.use('/api/auth', auth_1.default);
+app.use('/api/admin/auth', adminAuth_1.default);
+app.use('/api/admin/users', adminUsers_1.default);
+app.use('/api/admin/galleries', adminGalleries_1.default);
+app.use('/api/admin/analytics', adminAnalytics_1.default);
+app.use('/api/admin/system-config', adminSystemConfig_1.default);
+app.use('/api/admin/invitations', adminInvitations_1.default);
+app.use('/api/admin/audit', audit_1.default);
 app.use('/api/galleries', galleries_1.default);
 app.use('/api/photos', photos_1.default);
 app.use('/api/photographers', photographers_1.default);
@@ -188,11 +204,17 @@ process.on('SIGINT', async () => {
     await prisma.$disconnect();
     process.exit(0);
 });
+// Export app for testing
+exports.default = app;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📋 Features: Batch uploads, RAW support, Extended timeouts`);
+    console.log(`� Env ironment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`� Feataures: Batch uploads, RAW support, Extended timeouts, Admin system`);
     console.log(`⏰ Upload timeout: 10 minutes`);
     console.log(`💾 Max file size: 50MB, Max batch: 50 files`);
     console.log(`🔗 Upload config: http://localhost:${PORT}/api/upload-config`);
+    console.log(`🔐 Admin auth: http://localhost:${PORT}/api/admin/auth`);
+    // Start admin session cleanup
+    adminSessionManager_1.adminSessionManager.startAutomaticCleanup();
+    console.log(`🧹 Admin session cleanup started`);
 });

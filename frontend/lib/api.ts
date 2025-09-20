@@ -1,16 +1,44 @@
+/**
+ * Frontend API Library - Unified Server-Side Download Integration
+ * 
+ * This library provides frontend integration with the unified server-side download system.
+ * All download functions now use server-side processing instead of client-side JSZip.
+ * 
+ * Download Functions:
+ * - downloadAllPhotosUnified() - Downloads all photos in a gallery
+ * - downloadFolderPhotosUnified() - Downloads photos in a specific folder
+ * - downloadLikedPhotos() - Downloads user's liked photos
+ * - downloadFavoritedPhotos() - Downloads user's favorited photos
+ * 
+ * All download functions:
+ * - Return download IDs for progress tracking
+ * - Use server-side zip creation with Archiver
+ * - Support real-time progress updates
+ * - Handle authentication automatically
+ * - Provide consistent error handling
+ * 
+ * Migration Benefits:
+ * - Eliminated client-side memory usage for zip creation
+ * - Consistent progress tracking across all download types
+ * - Better error handling and recovery
+ * - Improved performance and reliability
+ * 
+ * @since Client-side JSZip migration completed
+ */
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 function getAuthToken() {
   if (typeof document === "undefined") return null
-  
+
   // First try to get token from cookie
   const cookieToken = document.cookie
     .split("; ")
     .find((row) => row.startsWith("auth-token="))
     ?.split("=")[1]
-  
+
   if (cookieToken) return cookieToken
-  
+
   // Fallback: try to get token from localStorage
   try {
     const user = localStorage.getItem("user")
@@ -23,7 +51,7 @@ function getAuthToken() {
   } catch (error) {
     console.error("Error reading from localStorage:", error)
   }
-  
+
   return null
 }
 
@@ -74,7 +102,7 @@ export const api = {
 
   // Gallery APIs - Fixed endpoints to match your backend
   getGalleries: () => apiRequest("/galleries"),
-  
+
   getClientGalleries: () => apiRequest("/galleries/client/accessible"),
 
   createGallery: (galleryData: any) =>
@@ -178,7 +206,7 @@ export const api = {
 
   unlikePhoto: (photoId: string) =>
     apiRequest(`/photos/${photoId}/like`, {
-        method: "DELETE",
+      method: "DELETE",
     }),
 
   favoritePhoto: (photoId: string) =>
@@ -188,7 +216,7 @@ export const api = {
 
   unfavoritePhoto: (photoId: string) =>
     apiRequest(`/photos/${photoId}/favorite`, {
-        method: "DELETE",
+      method: "DELETE",
     }),
 
   postPhoto: (photoId: string) =>
@@ -198,7 +226,7 @@ export const api = {
 
   unpostPhoto: (photoId: string) =>
     apiRequest(`/photos/${photoId}/post`, {
-        method: "DELETE",
+      method: "DELETE",
     }),
 
   getPosts: () =>
@@ -213,22 +241,22 @@ export const api = {
 
   likeGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/like`, {
-        method: "POST",
+      method: "POST",
     }),
 
   unlikeGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/like`, {
-        method: "DELETE",
+      method: "DELETE",
     }),
 
   favoriteGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/favorite`, {
-        method: "POST",
+      method: "POST",
     }),
 
   unfavoriteGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/favorite`, {
-        method: "DELETE",
+      method: "DELETE",
     }),
 
   // Client Management APIs
@@ -307,5 +335,112 @@ export const api = {
       }
       return data
     })
+  },
+
+  // Filtered Download APIs
+  downloadLikedPhotos: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/liked`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to download liked photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      downloadId: response.headers.get('X-Download-ID'),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'liked_photos.zip'
+    };
+  },
+
+  downloadFavoritedPhotos: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/favorited`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to download favorited photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      downloadId: response.headers.get('X-Download-ID'),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'favorited_photos.zip'
+    };
+  },
+
+  getDownloadProgress: (downloadId: string) => apiRequest(`/photos/download/${downloadId}/progress`),
+
+  downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/all`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to download all photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      downloadId: response.headers.get('X-Download-ID'),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip'
+    };
+  },
+
+  downloadFolderPhotosUnified: async (galleryId: string, folderId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/folder/${folderId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to download folder photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      downloadId: response.headers.get('X-Download-ID'),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'folder_photos.zip'
+    };
   },
 }

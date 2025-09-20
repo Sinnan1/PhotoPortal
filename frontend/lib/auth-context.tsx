@@ -9,15 +9,29 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: "PHOTOGRAPHER" | "CLIENT";
+  role: "PHOTOGRAPHER" | "CLIENT" | "ADMIN";
+}
+
+// Admin-specific error types
+export enum AdminErrorType {
+  INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
+  ADMIN_SESSION_EXPIRED = 'ADMIN_SESSION_EXPIRED',
+  INVALID_ADMIN_ACTION = 'INVALID_ADMIN_ACTION',
+  SYSTEM_CONFIG_ERROR = 'SYSTEM_CONFIG_ERROR',
+  AUDIT_LOG_FAILURE = 'AUDIT_LOG_FAILURE'
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   clientLogin: (email: string, password: string) => Promise<void>;
+  adminLogin: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  adminLogout: () => Promise<void>;
+  extendAdminSession: () => Promise<boolean>;
+  validateAdminSession: () => Promise<boolean>;
+  handleAdminError: (error: any) => void;
   loading: boolean;
 }
 
@@ -25,7 +39,7 @@ interface RegisterData {
   email: string;
   password: string;
   name: string;
-  role: "PHOTOGRAPHER" | "CLIENT";
+  role: "PHOTOGRAPHER" | "CLIENT" | "ADMIN";
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,10 +70,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // Determine which endpoint to use based on last known user role in localStorage
         const storedUser = localStorage.getItem("user");
-        const role = storedUser ? (JSON.parse(storedUser).role as "PHOTOGRAPHER" | "CLIENT") : undefined;
+        const role = storedUser ? (JSON.parse(storedUser).role as "PHOTOGRAPHER" | "CLIENT" | "ADMIN") : undefined;
 
         const url = role === "CLIENT"
           ? `${process.env.NEXT_PUBLIC_API_URL}/auth/client-profile`
+          : role === "ADMIN"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/profile`
           : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
 
         const response = await fetch(url, {
@@ -115,7 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
-    router.push("/dashboard");
+    
+    // Redirect based on role
+    if (userData.role === "ADMIN") {
+      router.push("/admin");
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   const clientLogin = async (email: string, password: string) => {
@@ -174,16 +196,188 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
+  const adminLogin = async (email: string, password: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Admin login failed");
+    }
+
+    const { admin, token, sessionId, expiresAt } = data.data;
+
+    // Store admin session with shorter expiration (2 hours)
+    document.cookie = `auth-token=${token}; path=/; max-age=7200; secure; samesite=strict`;
+    localStorage.setItem("user", JSON.stringify(admin));
+    localStorage.setItem("admin-session", JSON.stringify({
+      sessionId,
+      expiresAt,
+      loginTime: new Date().toISOString()
+    }));
+    
+    setUser(admin);
+    router.push("/admin");
+  };
+
+  const adminLogout = async () => {
+    try {
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("auth-token="))
+        ?.split("=")[1];
+
+      if (token) {
+        // Call admin logout endpoint for proper session cleanup
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Admin logout error:", error);
+    } finally {
+      // Clear all session data
+      document.cookie = "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      localStorage.removeItem("user");
+      localStorage.removeItem("admin-session");
+      setUser(null);
+      router.push("/admin/login");
+    }
+  };
+
+  const extendAdminSession = async (): Promise<boolean> => {
+    try {
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("auth-token="))
+        ?.split("=")[1];
+
+      if (!token || !user || user.role !== "ADMIN") {
+        return false;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/extend-session`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.newExpiresAt) {
+          // Update session expiration in localStorage
+          const adminSession = localStorage.getItem("admin-session");
+          if (adminSession) {
+            const sessionData = JSON.parse(adminSession);
+            sessionData.expiresAt = data.data.newExpiresAt;
+            localStorage.setItem("admin-session", JSON.stringify(sessionData));
+          }
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to extend admin session:", error);
+      return false;
+    }
+  };
+
+  const validateAdminSession = async (): Promise<boolean> => {
+    try {
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("auth-token="))
+        ?.split("=")[1];
+
+      if (!token || !user || user.role !== "ADMIN") {
+        return false;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/validate`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error("Failed to validate admin session:", error);
+      return false;
+    }
+  };
+
+  const handleAdminError = (error: any) => {
+    // Handle admin-specific errors
+    if (error?.errorType) {
+      switch (error.errorType) {
+        case AdminErrorType.ADMIN_SESSION_EXPIRED:
+          adminLogout();
+          break;
+        case AdminErrorType.INSUFFICIENT_PERMISSIONS:
+          // Show error message but don't logout
+          console.error('Insufficient permissions:', error.error);
+          break;
+        case AdminErrorType.INVALID_ADMIN_ACTION:
+          console.error('Invalid admin action:', error.error);
+          break;
+        case AdminErrorType.SYSTEM_CONFIG_ERROR:
+          console.error('System configuration error:', error.error);
+          break;
+        case AdminErrorType.AUDIT_LOG_FAILURE:
+          console.error('Audit log failure:', error.error);
+          break;
+        default:
+          console.error('Unknown admin error:', error);
+      }
+    } else if (error?.status === 401 && user?.role === 'ADMIN') {
+      // Unauthorized admin access - force logout
+      adminLogout();
+    }
+  };
+
   const logout = () => {
-    document.cookie =
-      "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    localStorage.removeItem("user");
-    setUser(null);
-    router.push("/login"); // Fixed: correct route without /auth prefix
+    if (user && user.role === "ADMIN") {
+      adminLogout();
+    } else {
+      document.cookie =
+        "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      localStorage.removeItem("user");
+      localStorage.removeItem("admin-session");
+      setUser(null);
+      router.push("/login");
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, clientLogin, register, logout, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      clientLogin, 
+      adminLogin,
+      register, 
+      logout, 
+      adminLogout,
+      extendAdminSession,
+      validateAdminSession,
+      handleAdminError,
+      loading 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -16,24 +16,35 @@ import {
 	getPhotoStatus,
 	getLikedPhotos,
 	getFavoritedPhotos,
-	getPosts
+	getPosts,
+	downloadLikedPhotos,
+	downloadFavoritedPhotos,
+	downloadAllPhotos,
+	downloadFolderPhotos,
+	getDownloadProgress
 } from '../controllers/photoController'
-import { authenticateToken, requireRole } from '../middleware/auth'
+import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
+import { auditMiddleware } from '../middleware/auditMiddleware'
 
 const router = Router()
 
-// Protected routes (photographers only)
+// Protected routes (photographers and admin)
 router.post(
 	'/upload/:folderId',
 	authenticateToken,
-	requireRole('PHOTOGRAPHER'),
+	requireAnyRole(['PHOTOGRAPHER', 'ADMIN']),
+	auditMiddleware('UPLOAD_PHOTOS', 'photo', {
+		extractTargetId: (req) => req.params.folderId
+	}),
 	uploadMiddleware,
 	uploadPhotos
 )
-router.delete('/:id', authenticateToken, requireRole('PHOTOGRAPHER'), deletePhoto)
+router.delete('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('DELETE_PHOTO', 'photo', {
+	extractTargetId: (req) => req.params.id
+}), deletePhoto)
 
-// Bulk operations
-router.post('/bulk-delete', authenticateToken, requireRole('PHOTOGRAPHER'), bulkDeletePhotos)
+// Bulk operations - Admin can delete any photos
+router.post('/bulk-delete', authenticateToken, requireAdminOrOwner, auditMiddleware('BULK_DELETE_PHOTOS', 'photo'), bulkDeletePhotos)
 
 // Like/Favorite routes
 router.post('/:id/like', authenticateToken, likePhoto)
@@ -41,18 +52,31 @@ router.delete('/:id/like', authenticateToken, unlikePhoto)
 router.post('/:id/favorite', authenticateToken, favoritePhoto)
 router.delete('/:id/favorite', authenticateToken, unfavoritePhoto)
 
-// Post routes (photographer only)
-router.post('/:id/post', authenticateToken, requireRole('PHOTOGRAPHER'), postPhoto)
-router.delete('/:id/post', authenticateToken, requireRole('PHOTOGRAPHER'), unpostPhoto)
+// Post routes (photographer and admin)
+router.post('/:id/post', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('POST_PHOTO', 'photo', {
+	extractTargetId: (req) => req.params.id
+}), postPhoto)
+router.delete('/:id/post', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('UNPOST_PHOTO', 'photo', {
+	extractTargetId: (req) => req.params.id
+}), unpostPhoto)
 
 // Status and lists
 router.get('/:id/status', authenticateToken, getPhotoStatus)
 router.get('/liked', authenticateToken, getLikedPhotos)
 router.get('/favorited', authenticateToken, getFavoritedPhotos)
-router.get('/posts', authenticateToken, requireRole('PHOTOGRAPHER'), getPosts)
+router.get('/posts', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getPosts)
 
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)
 router.get('/:id/download', downloadPhoto)
+
+// Filtered download routes
+router.get('/gallery/:galleryId/download/liked', authenticateToken, downloadLikedPhotos)
+router.get('/gallery/:galleryId/download/favorited', authenticateToken, downloadFavoritedPhotos)
+router.get('/gallery/:galleryId/download/all', authenticateToken, downloadAllPhotos)
+router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, downloadFolderPhotos)
+
+// Download progress tracking
+router.get('/download/:downloadId/progress', authenticateToken, getDownloadProgress)
 
 export default router

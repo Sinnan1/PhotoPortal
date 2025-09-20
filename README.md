@@ -14,7 +14,11 @@ A full-stack web application for photographers to create, manage, and share priv
 ### For Clients
 - **Private Access**: Secure, password-protected gallery access
 - **High-Quality Viewing**: Responsive gallery interface optimized for all devices
-- **Download Options**: Download photos in original quality
+- **Download Options**: Server-side processed downloads with real-time progress tracking
+  - Download all photos in a gallery
+  - Download photos from specific folders
+  - Download liked or favorited photos
+  - Unified progress tracking across all download types
 - **Social Features**: Like and favorite photos and galleries
 - **Mobile Optimized**: Seamless experience across all devices
 
@@ -35,6 +39,7 @@ A full-stack web application for photographers to create, manage, and share priv
 - **Authentication**: JWT with bcrypt password hashing
 - **File Storage**: AWS S3 and Backblaze B2 integration
 - **Image Processing**: Sharp for thumbnail generation and optimization
+- **Download System**: Server-side zip creation with Archiver and S3 streaming
 - **Security**: Helmet.js, CORS, rate limiting
 
 ### Database Schema
@@ -180,6 +185,13 @@ Run `npx prisma studio` to view and manage your database through a web interface
 - `POST /api/photos` - Upload photos
 - `GET /api/photos/:id` - Get photo details
 - `DELETE /api/photos/:id` - Delete photo
+
+### Downloads (Server-side Processing)
+- `GET /api/photos/gallery/:id/download/all` - Download all photos in gallery
+- `GET /api/photos/gallery/:id/download/folder/:folderId` - Download folder photos
+- `GET /api/photos/gallery/:id/download/liked` - Download liked photos
+- `GET /api/photos/gallery/:id/download/favorited` - Download favorited photos
+- `GET /api/download-progress/:downloadId` - Get download progress
 
 ### Uploads
 - `POST /api/uploads/photos` - Batch photo upload

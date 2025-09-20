@@ -20,28 +20,31 @@ import { Badge } from "@/components/ui/badge";
 import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import JSZip from "jszip";
+
 import { PhotoGrid } from "@/components/photo-grid";
 import { FolderGrid } from "@/components/folder-grid";
 import { FolderTiles } from "@/components/folder-tiles";
 import { BreadcrumbNavigation } from "@/components/breadcrumb-navigation";
 import { CompactFolderTree } from "@/components/compact-folder-tree";
 import { useAuth } from "@/lib/auth-context";
+import { DownloadFilteredPhotos } from "@/components/ui/download-filtered-photos";
+import { DownloadProgress } from "@/components/ui/download-progress";
+import { useDownloadProgress } from "@/hooks/use-download-progress";
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 function getAuthToken() {
   if (typeof document === "undefined") return null
-  
+
   // First try to get token from cookie
   const cookieToken = document.cookie
     .split("; ")
     .find((row) => row.startsWith("auth-token="))
     ?.split("=")[1]
-  
+
   if (cookieToken) return cookieToken
-  
+
   // Fallback: try to get token from localStorage
   try {
     const user = localStorage.getItem("user")
@@ -54,7 +57,7 @@ function getAuthToken() {
   } catch (error) {
     console.error("Error reading from localStorage:", error)
   }
-  
+
   return null
 }
 
@@ -117,16 +120,17 @@ function GalleryPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
 
-  // Debug log
-  console.log('Current viewMode:', viewMode);
+  // Download progress hooks
+  const downloadAllProgress = useDownloadProgress();
+  const downloadCurrentProgress = useDownloadProgress();
 
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
-  const [breadcrumbItems, setBreadcrumbItems] = useState<Array<{id: string, name: string, type: 'gallery' | 'folder'}>>([]);
+  const [breadcrumbItems, setBreadcrumbItems] = useState<Array<{ id: string, name: string, type: 'gallery' | 'folder' }>>([]);
 
   // Type alias for breadcrumb items
   type BreadcrumbItemType = 'gallery' | 'folder';
-  
+
   // Infinite scroll state
   const [displayedPhotos, setDisplayedPhotos] = useState<Photo[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -154,20 +158,20 @@ function GalleryPage() {
               status.liked === undefined
                 ? p.likedBy
                 : status.liked
-                ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
-                : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+                  ? [...(p.likedBy ?? []), { userId: user!.id }]
+                  : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
             favoritedBy:
               status.favorited === undefined
                 ? p.favoritedBy
                 : status.favorited
-                ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
-                : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+                  ? [...(p.favoritedBy ?? []), { userId: user!.id }]
+                  : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
             postBy:
               status.posted === undefined
                 ? p.postBy
                 : status.posted
-                ? [ ...(p.postBy ?? []), { userId: user!.id } ]
-                : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
+                  ? [...(p.postBy ?? []), { userId: user!.id }]
+                  : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
           } as Photo;
         })
       };
@@ -189,20 +193,20 @@ function GalleryPage() {
               status.liked === undefined
                 ? p.likedBy
                 : status.liked
-                ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
-                : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+                  ? [...(p.likedBy ?? []), { userId: user!.id }]
+                  : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
             favoritedBy:
               status.favorited === undefined
                 ? p.favoritedBy
                 : status.favorited
-                ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
-                : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+                  ? [...(p.favoritedBy ?? []), { userId: user!.id }]
+                  : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
             postBy:
               status.posted === undefined
                 ? p.postBy
                 : status.posted
-                ? [ ...(p.postBy ?? []), { userId: user!.id } ]
-                : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
+                  ? [...(p.postBy ?? []), { userId: user!.id }]
+                  : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
           } as Photo;
         })
       }));
@@ -250,9 +254,7 @@ function GalleryPage() {
       const response = await api.getGallery(galleryId, shouldRefresh ? { refresh: shouldRefresh } : {});
       const galleryData = response.data;
 
-      // Debug: Check if postBy data is included
-      console.log('Gallery data received:', galleryData);
-      console.log('First folder photos:', galleryData.folders?.[0]?.photos?.slice(0, 2));
+
 
       setGallery(galleryData);
 
@@ -315,45 +317,36 @@ function GalleryPage() {
     }
 
     setIsDownloadingCurrent(true);
-    showToast("Preparing download...", "info");
+    showToast("Preparing folder download...", "info");
 
     try {
-      const zip = new JSZip();
-      const photoPromises = currentPhotos.map(async (photo) => {
-        try {
-          // Use backend download endpoint to enforce limits and count
-          const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
-            headers: {
-              ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
-            },
-          });
+      // Use the unified backend API for server-side processing
+      const result = await api.downloadFolderPhotosUnified(
+        galleryId,
+        currentFolder.id,
+        passwordRequired ? password : undefined
+      );
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
-          }
+      // Track download progress if we have a download ID
+      if (result.downloadId) {
+        downloadCurrentProgress.startProgress(currentPhotos.length, result.downloadId);
+      }
 
-          const blob = await response.blob();
-          zip.file(photo.filename, blob);
-        } catch (error) {
-          console.error(`Failed to download ${photo.filename}:`, error);
-        }
-      });
-
-      await Promise.all(photoPromises);
-
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = `${currentFolder.name.replace(/\s+/g, '_')}_photos.zip`;
+      // Trigger the download
+      const url = window.URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      showToast("Download started!", "success");
-    } catch (error) {
-      console.error("Failed to create zip file", error);
-      showToast("Failed to create zip file", "error");
+      showToast("Folder download started!", "success");
+    } catch (error: any) {
+      console.error("Failed to download folder photos:", error);
+      downloadCurrentProgress.errorProgress(error.message || "Failed to download folder photos");
+      showToast(error.message || "Failed to download folder photos", "error");
     } finally {
       setIsDownloadingCurrent(false);
     }
@@ -367,45 +360,34 @@ function GalleryPage() {
     }
 
     setIsDownloadingAll(true);
-    showToast("Preparing download...", "info");
+    showToast("Preparing all photos download...", "info");
 
     try {
-      const zip = new JSZip();
-      const photoPromises = allPhotos.map(async (photo) => {
-        try {
-          // Use backend download endpoint to enforce limits and count
-          const response = await fetch(`${API_BASE_URL}/photos/${photo.id}/download`, {
-            headers: {
-              ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
-            },
-          });
+      // Use the new unified backend API
+      const result = await api.downloadAllPhotosUnified(
+        galleryId,
+        passwordRequired ? password : undefined
+      );
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to fetch ${photo.filename}`);
-          }
+      // Track download progress if we have a download ID
+      if (result.downloadId) {
+        downloadAllProgress.startProgress(allPhotos.length, result.downloadId);
+      }
 
-          const blob = await response.blob();
-          zip.file(photo.filename, blob);
-        } catch (error) {
-          console.error(`Failed to download ${photo.filename}:`, error);
-        }
-      });
-
-      await Promise.all(photoPromises);
-
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = `${gallery.title.replace(/\s+/g, '_')}_photos.zip`;
+      // Trigger the download
+      const url = window.URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      showToast("Download started!", "success");
-    } catch (error) {
-      console.error("Failed to create zip file", error);
-      showToast("Failed to create zip file", "error");
+      showToast("All photos download started!", "success");
+    } catch (error: any) {
+      console.error("Failed to download all photos:", error);
+      showToast(error.message || "Failed to download all photos", "error");
     } finally {
       setIsDownloadingAll(false);
     }
@@ -450,7 +432,7 @@ function GalleryPage() {
       setCurrentFolder(folder);
 
       // Build complete breadcrumb path by traversing folder hierarchy
-      const buildBreadcrumbPath = (targetFolder: any): Array<{id: string, name: string, type: BreadcrumbItemType}> => {
+      const buildBreadcrumbPath = (targetFolder: any): Array<{ id: string, name: string, type: BreadcrumbItemType }> => {
         const path = [{ id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }];
 
         // Find the folder in the gallery structure to build the path
@@ -473,7 +455,7 @@ function GalleryPage() {
         if (folderPath) {
           // Build path from gallery root to current folder
           let currentFolders = gallery!.folders;
-          const breadcrumbItems: Array<{id: string, name: string, type: BreadcrumbItemType}> = [{ id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType }];
+          const breadcrumbItems: Array<{ id: string, name: string, type: BreadcrumbItemType }> = [{ id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType }];
 
           for (let i = 0; i < folderPath.length; i++) {
             const folderId = folderPath[i];
@@ -538,15 +520,26 @@ function GalleryPage() {
     return currentFolder.photos;
   }, [currentFolder, filter, user]);
 
+  // Calculate liked and favorited photo counts for the entire gallery
+  const galleryPhotoCounts = useMemo(() => {
+    if (!gallery || !user) return { liked: 0, favorited: 0 };
+
+    const allPhotos = gallery.folders?.flatMap(f => f?.photos || []) || [];
+    const likedCount = allPhotos.filter(p => p.likedBy?.some(like => like.userId === user.id)).length;
+    const favoritedCount = allPhotos.filter(p => p.favoritedBy?.some(fav => fav.userId === user.id)).length;
+
+    return { liked: likedCount, favorited: favoritedCount };
+  }, [gallery, user]);
+
   // Load more photos function
   const loadMorePhotos = useCallback(() => {
     if (!currentFolder || loadingMore || !hasMore) return;
-    
+
     setLoadingMore(true);
     const startIndex = displayedPhotos.length;
     const endIndex = startIndex + PHOTOS_PER_PAGE;
     const newPhotos = filteredPhotos.slice(startIndex, endIndex);
-    
+
     // Simulate network delay for smooth UX
     setTimeout(() => {
       setDisplayedPhotos(prev => [...prev, ...newPhotos]);
@@ -651,23 +644,20 @@ function GalleryPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Slideout Sidebar */}
       <div
-        className={`fixed inset-0 z-50 ${
-          sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'
-        }`}
+        className={`fixed inset-0 z-50 ${sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'
+          }`}
       >
         {/* Backdrop */}
         <div
-          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
-            sidebarCollapsed ? 'opacity-0' : 'opacity-100'
-          }`}
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+            }`}
           onClick={() => setSidebarCollapsed(true)}
         />
 
         {/* Sidebar */}
         <div
-          className={`absolute left-0 top-0 h-full w-80 bg-background border-r border-border shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col ${
-            sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'
-          }`}
+          className={`absolute left-0 top-0 h-full w-80 bg-background border-r border-border shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'
+            }`}
         >
           {/* Main Content Area */}
           <div className="flex-1 p-4 overflow-hidden">
@@ -733,59 +723,107 @@ function GalleryPage() {
       <div className="mb-8">
         <div className="flex-1 min-w-0">
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-          <div className="flex items-center gap-3 mb-2 sm:mb-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-muted"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-            >
-              {sidebarCollapsed ? (
-                <Menu className="h-4 w-4" />
-              ) : (
-                <X className="h-4 w-4" />
-              )}
-            </Button>
-            <h1 className="text-3xl font-bold">{gallery.title}</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            {/* Download Current Folder Button */}
-            {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div className="flex items-center gap-3 mb-2 sm:mb-0">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={handleDownloadCurrentFolder}
-                disabled={isDownloadingCurrent}
-                className="mr-2"
+                className="h-8 w-8 p-0 hover:bg-muted"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
               >
-                {isDownloadingCurrent ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {sidebarCollapsed ? (
+                  <Menu className="h-4 w-4" />
                 ) : (
-                  <Download className="mr-2 h-4 w-4" />
+                  <X className="h-4 w-4" />
                 )}
-                Current Folder
               </Button>
+              <h1 className="text-3xl font-bold">{gallery.title}</h1>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              {/* Standard Download Buttons */}
+              <div className="flex items-center space-x-2">
+                {/* Download Current Folder Button */}
+                {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownloadCurrentFolder}
+                    disabled={isDownloadingCurrent}
+                    className="mr-2"
+                  >
+                    {isDownloadingCurrent ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Current Folder
+                  </Button>
+                )}
+
+                {/* Download All Button */}
+                {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
+                  <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                    {isDownloadingAll ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Download All
+                  </Button>
+                )}
+              </div>
+
+              {/* Filtered Download Components */}
+              {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
+                <DownloadFilteredPhotos
+                  galleryId={galleryId}
+                  galleryTitle={gallery.title}
+                  galleryPassword={passwordRequired ? password : undefined}
+                  likedCount={galleryPhotoCounts.liked}
+                  favoritedCount={galleryPhotoCounts.favorited}
+                  className="flex-shrink-0"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Download Progress Indicators - Now using backend progress tracking */}
+          <div className="space-y-3 mt-4">
+            {/* Download All Progress */}
+            {downloadAllProgress.progressState.isActive && downloadAllProgress.progressState.downloadId && (
+              <DownloadProgress
+                downloadId={downloadAllProgress.progressState.downloadId}
+                onComplete={(filename) => {
+                  showToast(`All photos download completed: ${filename}`, "success");
+                  downloadAllProgress.resetProgress();
+                }}
+                onError={(error) => {
+                  showToast(`Download failed: ${error}`, "error");
+                  downloadAllProgress.resetProgress();
+                }}
+              />
             )}
 
-            {/* Download All Button */}
-            {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
-              <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                {isDownloadingAll ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Download All
-              </Button>
+            {/* Download Current Folder Progress */}
+            {downloadCurrentProgress.progressState.isActive && downloadCurrentProgress.progressState.downloadId && (
+              <DownloadProgress
+                downloadId={downloadCurrentProgress.progressState.downloadId}
+                onComplete={(filename) => {
+                  showToast(`Folder download completed: ${filename}`, "success");
+                  downloadCurrentProgress.resetProgress();
+                }}
+                onError={(error) => {
+                  showToast(`Download failed: ${error}`, "error");
+                  downloadCurrentProgress.resetProgress();
+                }}
+              />
             )}
           </div>
-        </div>
 
-        {gallery.description && (
-          <p className="text-muted-foreground mb-4">{gallery.description}</p>
-        )}
+          {gallery.description && (
+            <p className="text-muted-foreground mb-4">{gallery.description}</p>
+          )}
 
           {/* Breadcrumb Navigation */}
           <BreadcrumbNavigation
@@ -794,16 +832,16 @@ function GalleryPage() {
             className="mb-4"
           />
 
-        <div className="flex items-center space-x-6 text-sm text-muted-foreground">
-          <div className="flex items-center">
-            <User className="mr-1 h-4 w-4" />
-            {gallery.photographer.name}
-          </div>
-          <div className="flex items-center">
-            <Images className="mr-1 h-4 w-4" />
-              {currentFolder?._count?.photos ?? 0} photos
-          </div>
+          <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+            <div className="flex items-center">
+              <User className="mr-1 h-4 w-4" />
+              {gallery.photographer.name}
             </div>
+            <div className="flex items-center">
+              <Images className="mr-1 h-4 w-4" />
+              {currentFolder?._count?.photos ?? 0} photos
+            </div>
+          </div>
         </div>
       </div>
 
@@ -818,12 +856,10 @@ function GalleryPage() {
               onChange={(e) => setDataSaverMode(e.target.checked)}
               className="sr-only"
             />
-            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'
-            }`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                dataSaverMode ? 'translate-x-6' : 'translate-x-1'
-              }`} />
+            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'
+              }`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${dataSaverMode ? 'translate-x-6' : 'translate-x-1'
+                }`} />
             </div>
             <span className="ml-2 text-sm text-foreground">
               Data Saver {dataSaverMode && <span className="text-primary font-medium">ON</span>}
@@ -920,7 +956,10 @@ function GalleryPage() {
           <>
             {currentFolder && (
               <FolderGrid
-                folder={currentFolder}
+                folder={{
+                  ...currentFolder,
+                  photos: displayedPhotos
+                }}
                 isPhotographer={user?.role === "PHOTOGRAPHER"}
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}

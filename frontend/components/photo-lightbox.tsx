@@ -136,18 +136,11 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
 
   // Function to toggle full size original (keyboard shortcut: F) - COMPLETELY REWRITTEN
   const toggleFullSize = async () => {
-    console.log(`🎯 toggleFullSize called for photo: ${photo.id}`)
+
     
     // Use functional update to get the most current state
     setImageStates(currentState => {
-      console.log(`📊 Current state inside setter:`, {
-        viewMode: currentState.viewMode,
-        currentPhotoId: photo.id,
-        statePhotoId: currentState.photoId,
-        fullResPhotoId: currentState.fullResPhotoId,
-        hasFullRes: !!currentState.fullRes,
-        currentSrc: currentState.currentSrc?.substring(0, 50) + '...'
-      })
+
 
       // Ensure we're working with the correct photo
       if (currentState.photoId !== photo.id) {

@@ -71,22 +71,37 @@ const createGallery = async (req, res) => {
 exports.createGallery = createGallery;
 const getGalleries = async (req, res) => {
     try {
-        const photographerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        // Admin can see all galleries, photographers only see their own
+        const whereClause = userRole === 'ADMIN' ? {} : { photographerId: userId };
         const galleries = await prisma.gallery.findMany({
-            where: { photographerId },
+            where: whereClause,
             include: {
+                photographer: userRole === 'ADMIN' ? {
+                    select: { id: true, name: true, email: true }
+                } : undefined,
                 folders: {
                     include: {
                         photos: {
+                            include: {
+                                likedBy: true,
+                                favoritedBy: true,
+                                postBy: true
+                            }
+                        },
+                        children: true,
+                        coverPhoto: {
                             select: {
                                 id: true,
                                 filename: true,
                                 thumbnailUrl: true,
+                                mediumUrl: true,
+                                largeUrl: true,
+                                originalUrl: true,
                                 createdAt: true
                             }
                         },
-                        children: true,
-                        coverPhoto: true,
                         _count: {
                             select: { photos: true, children: true }
                         }
@@ -121,16 +136,57 @@ const getGallery = async (req, res) => {
             where: { id },
             include: {
                 folders: {
+                    where: { parentId: null }, // Only get root folders
                     include: {
                         photos: {
                             include: {
                                 likedBy: true,
-                                favoritedBy: true
+                                favoritedBy: true,
+                                postBy: true
                             },
                             orderBy: { createdAt: 'desc' }
                         },
-                        children: true,
-                        coverPhoto: true
+                        children: {
+                            include: {
+                                photos: {
+                                    include: {
+                                        likedBy: true,
+                                        favoritedBy: true,
+                                        postBy: true
+                                    },
+                                    orderBy: { createdAt: 'desc' }
+                                },
+                                children: true, // For deeper nesting
+                                coverPhoto: {
+                                    select: {
+                                        id: true,
+                                        filename: true,
+                                        thumbnailUrl: true,
+                                        mediumUrl: true,
+                                        largeUrl: true,
+                                        originalUrl: true,
+                                        createdAt: true
+                                    }
+                                },
+                                _count: {
+                                    select: { photos: true, children: true }
+                                }
+                            }
+                        },
+                        coverPhoto: {
+                            select: {
+                                id: true,
+                                filename: true,
+                                thumbnailUrl: true,
+                                mediumUrl: true,
+                                largeUrl: true,
+                                originalUrl: true,
+                                createdAt: true
+                            }
+                        },
+                        _count: {
+                            select: { photos: true, children: true }
+                        }
                     }
                 },
                 photographer: {
@@ -256,10 +312,17 @@ const updateGallery = async (req, res) => {
     try {
         const { id } = req.params;
         const { title, description, password, expiresAt, downloadLimit } = req.body;
-        const photographerId = req.user.id;
-        // Check if gallery exists and belongs to photographer
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        // Check if gallery exists and user has permission to update it
+        const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId };
         const existingGallery = await prisma.gallery.findFirst({
-            where: { id, photographerId }
+            where: whereClause,
+            include: {
+                photographer: {
+                    select: { id: true, name: true, email: true }
+                }
+            }
         });
         if (!existingGallery) {
             return res.status(404).json({
@@ -322,11 +385,16 @@ exports.updateGallery = updateGallery;
 const deleteGallery = async (req, res) => {
     try {
         const { id } = req.params;
-        const photographerId = req.user.id;
-        // Check if gallery exists and belongs to photographer
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        // Check if gallery exists and user has permission to delete it
+        const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId };
         const existingGallery = await prisma.gallery.findFirst({
-            where: { id, photographerId },
+            where: whereClause,
             include: {
+                photographer: {
+                    select: { id: true, name: true, email: true }
+                },
                 folders: {
                     include: {
                         photos: true
@@ -461,10 +529,17 @@ const updateGalleryAccess = async (req, res) => {
     try {
         const { id } = req.params;
         const { clientIds, access } = req.body; // access is a boolean
-        const photographerId = req.user.id;
-        // Verify gallery belongs to photographer
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        // Verify gallery exists and user has permission to modify access
+        const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId };
         const gallery = await prisma.gallery.findFirst({
-            where: { id, photographerId }
+            where: whereClause,
+            include: {
+                photographer: {
+                    select: { id: true, name: true, email: true }
+                }
+            }
         });
         if (!gallery) {
             return res.status(404).json({
@@ -500,10 +575,17 @@ exports.updateGalleryAccess = updateGalleryAccess;
 const getAllowedClients = async (req, res) => {
     try {
         const { id } = req.params;
-        const photographerId = req.user.id;
-        // Verify gallery belongs to photographer
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        // Verify gallery exists and user has permission to view access
+        const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId };
         const gallery = await prisma.gallery.findFirst({
-            where: { id, photographerId }
+            where: whereClause,
+            include: {
+                photographer: {
+                    select: { id: true, name: true, email: true }
+                }
+            }
         });
         if (!gallery) {
             return res.status(404).json({
@@ -546,15 +628,24 @@ const getClientGalleries = async (req, res) => {
                         folders: {
                             include: {
                                 photos: {
+                                    include: {
+                                        likedBy: true,
+                                        favoritedBy: true,
+                                        postBy: true
+                                    }
+                                },
+                                children: true,
+                                coverPhoto: {
                                     select: {
                                         id: true,
                                         filename: true,
                                         thumbnailUrl: true,
+                                        mediumUrl: true,
+                                        largeUrl: true,
+                                        originalUrl: true,
                                         createdAt: true
                                     }
                                 },
-                                children: true,
-                                coverPhoto: true,
                                 _count: {
                                     select: { photos: true, children: true }
                                 }
