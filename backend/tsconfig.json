@@ -14,8 +14,7 @@
     "resolveJsonModule": true,
     "importHelpers": true,
     "types": [
-      "node",
-      "jest"
+      "node"
     ]
   },
   "include": [
