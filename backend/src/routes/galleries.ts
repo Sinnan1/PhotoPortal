@@ -12,16 +12,21 @@ import {
 	unfavoriteGallery,
 	getClientGalleries
 } from '../controllers/galleryController'
-import { authenticateToken, requireRole } from '../middleware/auth'
+import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { updateGalleryAccess, getAllowedClients } from '../controllers/galleryController'
+import { auditMiddleware } from '../middleware/auditMiddleware'
 
 const router = Router()
 
-// Protected routes (require authentication)
-router.post('/', authenticateToken, requireRole('PHOTOGRAPHER'), createGallery)
-router.get('/', authenticateToken, requireRole('PHOTOGRAPHER'), getGalleries)
-router.put('/:id', authenticateToken, requireRole('PHOTOGRAPHER'), updateGallery)
-router.delete('/:id', authenticateToken, requireRole('PHOTOGRAPHER'), deleteGallery)
+// Protected routes (require authentication) - Admin can access all
+router.post('/', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('CREATE_GALLERY', 'gallery'), createGallery)
+router.get('/', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleries)
+router.put('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY', 'gallery', {
+	extractTargetId: (req) => req.params.id
+}), updateGallery)
+router.delete('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('DELETE_GALLERY', 'gallery', {
+	extractTargetId: (req) => req.params.id
+}), deleteGallery)
 
 // Client routes
 router.get('/client/accessible', authenticateToken, requireRole('CLIENT'), getClientGalleries)
@@ -36,8 +41,10 @@ router.delete('/:id/like', authenticateToken, unlikeGallery)
 router.post('/:id/favorite', authenticateToken, favoriteGallery)
 router.delete('/:id/favorite', authenticateToken, unfavoriteGallery)
 
-// Routes for managing client access to galleries
-router.put('/:id/access', authenticateToken, requireRole('PHOTOGRAPHER'), updateGalleryAccess)
-router.get('/:id/allowed-clients', authenticateToken, requireRole('PHOTOGRAPHER'), getAllowedClients)
+// Routes for managing client access to galleries - Admin can manage any gallery
+router.put('/:id/access', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY_ACCESS', 'gallery', {
+	extractTargetId: (req) => req.params.id
+}), updateGalleryAccess)
+router.get('/:id/allowed-clients', authenticateToken, requireAdminOrOwner, getAllowedClients)
 
 export default router

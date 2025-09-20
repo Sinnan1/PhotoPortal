@@ -3,3 +3,16 @@ node_modules
 .env
 
 /src/generated/prisma
+
+# Test and utility scripts (moved to docs folder)
+# test-*.js
+# setup-*.js
+# check-*.js
+# create-*.js
+# cleanup-demo-data.js
+# find-hardcoded-data.js
+# inspect-data.js
+
+# Temp uploads directory
+temp-uploads/*
+!temp-uploads/.gitkeep

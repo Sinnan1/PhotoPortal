@@ -25,6 +25,27 @@ export const register = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Validate role
+		const validRoles = ['CLIENT', 'PHOTOGRAPHER']
+		if (!validRoles.includes(role.toUpperCase())) {
+			return res.status(400).json({
+				success: false,
+				error: 'Invalid role specified'
+			})
+		}
+
+		// Check if registration is enabled
+		const registrationConfig = await prisma.systemConfig.findUnique({
+			where: { configKey: 'registration.enabled' }
+		})
+
+		if (registrationConfig && !registrationConfig.configValue) {
+			return res.status(403).json({
+				success: false,
+				error: 'Registration is currently disabled'
+			})
+		}
+
 		// Check if user already exists
 		const existingUser = await prisma.user.findUnique({
 			where: { email }
@@ -37,27 +58,54 @@ export const register = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Check if approval is required for this role
+		const requireApprovalConfig = await prisma.systemConfig.findUnique({
+			where: { configKey: 'registration.requireApproval' }
+		})
+
+		const requiresApproval = requireApprovalConfig?.configValue === true && role.toUpperCase() === 'PHOTOGRAPHER'
+
 		// Hash password
 		const hashedPassword = await bcrypt.hash(password, 12)
 
-		// Create user
+		// Create user with pending status if approval required
+		const userData = {
+			email,
+			password: hashedPassword,
+			name,
+			role: role.toUpperCase(),
+			...(requiresApproval && {
+				suspendedAt: new Date(),
+				suspensionReason: 'Pending admin approval for photographer account'
+			})
+		}
+
 		const user = await prisma.user.create({
-			data: {
-				email,
-				password: hashedPassword,
-				name,
-				role: role.toUpperCase()
-			},
+			data: userData,
 			select: {
 				id: true,
 				email: true,
 				name: true,
 				role: true,
-				createdAt: true
+				createdAt: true,
+				suspendedAt: true,
+				suspensionReason: true
 			}
 		})
 
-		// Generate JWT token
+		// If approval is required, don't generate token
+		if (requiresApproval) {
+			return res.status(201).json({
+				success: true,
+				data: {
+					user,
+					message: 'Account created successfully. Your photographer account is pending admin approval.',
+					requiresApproval: true
+				}
+			})
+		}
+
+		// Generate JWT token for approved accounts
 		const token = jwt.sign(
 			{ userId: user.id, role: user.role },
 			process.env.JWT_SECRET!,
@@ -101,6 +149,15 @@ export const login = async (req: Request, res: Response) => {
 			return res.status(401).json({
 				success: false,
 				error: 'Invalid credentials'
+			})
+		}
+
+		// Check if account is suspended
+		if (user.suspendedAt) {
+			return res.status(403).json({
+				success: false,
+				error: user.suspensionReason || 'Account suspended. Please contact support.',
+				suspended: true
 			})
 		}
 
@@ -156,6 +213,15 @@ export const clientLogin = async (req: Request, res: Response) => {
 
 		if (!user) {
 			return res.status(401).json({ success: false, error: 'Invalid credentials' })
+		}
+
+		// Check if account is suspended
+		if (user.suspendedAt) {
+			return res.status(403).json({
+				success: false,
+				error: user.suspensionReason || 'Account suspended. Please contact support.',
+				suspended: true
+			})
 		}
 
 		const isValidPassword = await bcrypt.compare(password, user.password)

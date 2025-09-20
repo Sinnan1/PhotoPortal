@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,24 +8,30 @@ datasource db {
 }
 
 model User {
-  id                 String             @id @default(cuid())
-  email              String             @unique
-  password           String
-  name               String
-  role               Role               @default(CLIENT)
-  galleries          Gallery[]
-  likedPhotos        LikedPhoto[]
-  favoritedPhotos    FavoritedPhoto[]
-  postPhotos         PostPhoto[]
-  likedGalleries     LikedGallery[]
-  favoritedGalleries FavoritedGallery[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  photographer   User?   @relation("PhotographerClients", fields: [photographerId], references: [id])
-  photographerId String?
-  clients        User[]  @relation("PhotographerClients")
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  password            String
+  name                String
+  role                Role               @default(CLIENT)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  photographerId      String?
+  suspendedAt         DateTime?
+  suspendedBy         String?
+  suspensionReason    String?
+  adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
+  adminSessions       AdminSession[]     @relation("AdminSessions")
+  favoritedGalleries  FavoritedGallery[]
+  favoritedPhotos     FavoritedPhoto[]
+  galleries           Gallery[]
   accessibleGalleries GalleryAccess[]
+  likedGalleries      LikedGallery[]
+  likedPhotos         LikedPhoto[]
+  postPhotos          PostPhoto[]
+  systemConfigUpdates SystemConfig[]     @relation("SystemConfigUpdates")
+  adminInvitations    AdminInvitation[]  @relation("AdminInvitations")
+  photographer        User?              @relation("PhotographerClients", fields: [photographerId], references: [id])
+  clients             User[]             @relation("PhotographerClients")
 
   @@map("users")
 }
@@ -41,31 +44,31 @@ model Gallery {
   expiresAt      DateTime?
   downloadLimit  Int?               @default(0)
   downloadCount  Int                @default(0)
-  photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
   photographerId String
-  folders        Folder[]
-  likedBy        LikedGallery[]
-  favoritedBy    FavoritedGallery[]
-  accessibleBy   GalleryAccess[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  favoritedBy    FavoritedGallery[]
+  folders        Folder[]
+  photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  accessibleBy   GalleryAccess[]
+  likedBy        LikedGallery[]
 
   @@map("galleries")
 }
 
 model Folder {
-  id          String   @id @default(cuid())
-  name        String   @default("New Folder")
-  galleryId   String
-  gallery     Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  parentId    String?  // For unlimited nesting
-  parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
-  children    Folder[] @relation("FolderHierarchy") // Unlimited nesting
-  photos      Photo[]
-  coverPhotoId String? // Manual cover selection
-  coverPhoto   Photo?  @relation("FolderCover", fields: [coverPhotoId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String   @default("New Folder")
+  galleryId    String
+  parentId     String?
+  coverPhotoId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  coverPhoto   Photo?   @relation("FolderCover", fields: [coverPhotoId], references: [id])
+  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  parent       Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children     Folder[] @relation("FolderHierarchy")
+  photos       Photo[]
 
   @@map("folders")
 }
@@ -74,90 +77,153 @@ model Photo {
   id            String           @id @default(cuid())
   filename      String
   originalUrl   String
-  thumbnailUrl  String           // 400x400px - for grid view
-  mediumUrl     String?          // 800x800px - for lightbox view
-  largeUrl      String?          // 1200x1200px - for high-quality viewing
+  thumbnailUrl  String
   fileSize      Int
   downloadCount Int              @default(0)
-  folder        Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  folderId      String
-  likedBy       LikedPhoto[]
-  favoritedBy   FavoritedPhoto[]
-  postBy        PostPhoto[]
   createdAt     DateTime         @default(now())
-  // Relations for folder cover functionality
+  largeUrl      String?
+  mediumUrl     String?
+  folderId      String
+  favoritedBy   FavoritedPhoto[]
   coverFolders  Folder[]         @relation("FolderCover")
+  likedBy       LikedPhoto[]
+  folder        Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  postBy        PostPhoto[]
 
   @@map("photos")
 }
 
 model LikedPhoto {
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
-  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
-  photoId String
+  userId    String
+  photoId   String
   createdAt DateTime @default(now())
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, photoId])
   @@map("liked_photos")
 }
 
 model FavoritedPhoto {
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
-  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
-  photoId String
+  userId    String
+  photoId   String
   createdAt DateTime @default(now())
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, photoId])
   @@map("favorited_photos")
 }
 
 model PostPhoto {
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
-  photo   Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
-  photoId String
+  userId    String
+  photoId   String
   createdAt DateTime @default(now())
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, photoId])
   @@map("post_photos")
 }
 
 model LikedGallery {
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   galleryId String
   createdAt DateTime @default(now())
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, galleryId])
   @@map("liked_galleries")
 }
 
 model FavoritedGallery {
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   galleryId String
   createdAt DateTime @default(now())
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, galleryId])
   @@map("favorited_galleries")
 }
 
 model GalleryAccess {
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId    String
-    gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-    galleryId String
-    createdAt DateTime @default(now())
+  userId    String
+  galleryId String
+  createdAt DateTime @default(now())
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@id([userId, galleryId])
-    @@map("gallery_access")
+  @@id([userId, galleryId])
+  @@map("gallery_access")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  admin      User     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_audit_logs")
+}
+
+model SystemConfig {
+  id            String   @id @default(cuid())
+  configKey     String   @unique
+  configValue   Json
+  updatedBy     String
+  updatedAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedByUser User     @relation("SystemConfigUpdates", fields: [updatedBy], references: [id])
+
+  @@map("system_config")
+}
+
+model AdminSession {
+  id           String   @id @default(cuid())
+  adminId      String
+  sessionToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  admin        User     @relation("AdminSessions", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_sessions")
+}
+
+model AdminInvitation {
+  id          String                @id @default(cuid())
+  email       String                @unique
+  name        String
+  invitedBy   String
+  token       String                @unique
+  status      AdminInvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  invitedByUser User                @relation("AdminInvitations", fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@map("admin_invitations")
 }
 
 enum Role {
   PHOTOGRAPHER
   CLIENT
+  ADMIN
+}
+
+enum AdminInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }

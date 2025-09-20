@@ -1,9 +1,37 @@
+/**
+ * Photo Controller - Unified Download API Endpoints
+ * 
+ * This controller provides unified server-side download endpoints for all photo download types.
+ * All downloads now use server-side processing with Archiver instead of client-side JSZip.
+ * 
+ * Download Endpoints:
+ * - GET /photos/gallery/:galleryId/download/all - Download all photos in gallery
+ * - GET /photos/gallery/:galleryId/download/folder/:folderId - Download photos in folder
+ * - GET /photos/gallery/:galleryId/download/liked - Download user's liked photos
+ * - GET /photos/gallery/:galleryId/download/favorited - Download user's favorited photos
+ * 
+ * All endpoints support:
+ * - Real-time progress tracking via download IDs
+ * - Direct S3 streaming for memory efficiency
+ * - Consistent error handling and recovery
+ * - Authentication and authorization
+ * 
+ * Migration Notes:
+ * - Replaced client-side JSZip with server-side Archiver
+ * - Unified progress tracking across all download types
+ * - Improved memory usage and scalability
+ * 
+ * @since Server-side download migration completed
+ */
+
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
-import { uploadToS3, deleteFromS3 } from '../utils/s3Storage'
+import archiver from 'archiver'
+import { uploadToS3, deleteFromS3, getObjectStreamFromS3 } from '../utils/s3Storage'
+import { DownloadService } from '../services/downloadService'
 
 const prisma = new PrismaClient()
 
@@ -1129,5 +1157,222 @@ export const getPosts = async (req: AuthRequest, res: Response) => {
     } catch (error) {
         console.error('Get posts error:', error)
         return res.status(500).json({ success: false, error: 'Internal server error' })
+    }
+}
+
+// Download liked photos as zip
+export const downloadLikedPhotos = async (req: AuthRequest, res: Response) => {
+    try {
+        const { galleryId } = req.params
+        const userId = req.user!.id
+        const providedPassword = 
+            (req.headers['x-gallery-password'] as string | undefined) ||
+            (req.query.password as string | undefined)
+
+        // Verify gallery access
+        const hasAccess = await DownloadService.verifyGalleryAccess(
+            galleryId,
+            userId,
+            req.user!.role,
+            providedPassword
+        )
+
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            })
+        }
+
+        // Use download service to create and stream the zip
+        await DownloadService.createFilteredPhotoZip(galleryId, userId, 'liked', res)
+
+    } catch (error) {
+        console.error('Download liked photos error:', error)
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Internal server error'
+            })
+        }
+    }
+}
+
+// Download favorited photos as zip
+export const downloadFavoritedPhotos = async (req: AuthRequest, res: Response) => {
+    try {
+        const { galleryId } = req.params
+        const userId = req.user!.id
+        const providedPassword = 
+            (req.headers['x-gallery-password'] as string | undefined) ||
+            (req.query.password as string | undefined)
+
+        // Verify gallery access
+        const hasAccess = await DownloadService.verifyGalleryAccess(
+            galleryId,
+            userId,
+            req.user!.role,
+            providedPassword
+        )
+
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            })
+        }
+
+        // Use download service to create and stream the zip
+        await DownloadService.createFilteredPhotoZip(galleryId, userId, 'favorited', res)
+
+    } catch (error) {
+        console.error('Download favorited photos error:', error)
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Internal server error'
+            })
+        }
+    }
+}
+
+// Get download progress
+export const getDownloadProgress = async (req: AuthRequest, res: Response) => {
+    try {
+        const { downloadId } = req.params
+        
+        const progress = DownloadService.getProgress(downloadId)
+        
+        if (!progress) {
+            return res.status(404).json({
+                success: false,
+                error: 'Download not found or expired'
+            })
+        }
+
+        res.json({
+            success: true,
+            data: progress
+        })
+    } catch (error) {
+        console.error('Get download progress error:', error)
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        })
+    }
+}
+
+// Download all photos from gallery as zip
+export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
+    try {
+        const { galleryId } = req.params
+        const userId = req.user?.id
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated'
+            })
+        }
+
+        console.log(`📦 Starting all photos download for gallery ${galleryId} by user ${userId}`)
+
+        // Set timeout to 30 minutes for large downloads
+        req.setTimeout(30 * 60 * 1000) // 30 minutes
+        res.setTimeout(30 * 60 * 1000) // 30 minutes
+
+        // Verify gallery access
+        const hasAccess = await DownloadService.verifyGalleryAccess(
+            galleryId,
+            userId,
+            req.user?.role || 'CLIENT',
+            req.headers['x-gallery-password'] as string
+        )
+
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            })
+        }
+
+        // Set headers for streaming download before starting
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('Transfer-Encoding', 'chunked')
+
+        // Use download service to create and stream the zip
+        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res)
+
+    } catch (error) {
+        console.error('Download all photos error:', error)
+        
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to download all photos'
+            })
+        } else {
+            // If headers are already sent, we can't send JSON, so just end the response
+            res.end()
+        }
+    }
+}
+
+// Download folder photos as zip
+export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
+    try {
+        const { galleryId, folderId } = req.params
+        const userId = req.user?.id
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated'
+            })
+        }
+
+        console.log(`📦 Starting folder photos download for gallery ${galleryId}, folder ${folderId} by user ${userId}`)
+
+        // Set timeout to 30 minutes for large downloads
+        req.setTimeout(30 * 60 * 1000) // 30 minutes
+        res.setTimeout(30 * 60 * 1000) // 30 minutes
+
+        // Verify gallery access
+        const hasAccess = await DownloadService.verifyGalleryAccess(
+            galleryId,
+            userId,
+            req.user?.role || 'CLIENT',
+            req.headers['x-gallery-password'] as string
+        )
+
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            })
+        }
+
+        // Set headers for streaming download before starting
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('Transfer-Encoding', 'chunked')
+
+        // Use download service to create and stream the zip
+        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'folder', folderId, res)
+
+    } catch (error) {
+        console.error('Download folder photos error:', error)
+        
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to download folder photos'
+            })
+        } else {
+            // If headers are already sent, we can't send JSON, so just end the response
+            res.end()
+        }
     }
 }

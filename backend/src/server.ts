@@ -7,11 +7,21 @@ import { PrismaClient } from '@prisma/client'
 
 // Import routes
 import authRoutes from './routes/auth'
+import adminAuthRoutes from './routes/adminAuth'
+import adminUsersRoutes from './routes/adminUsers'
+import adminGalleriesRoutes from './routes/adminGalleries'
+import adminAnalyticsRoutes from './routes/adminAnalytics'
+import adminSystemConfigRoutes from './routes/adminSystemConfig'
+import adminInvitationsRoutes from './routes/adminInvitations'
+import auditRoutes from './routes/audit'
 import galleryRoutes from './routes/galleries'
 import photoRoutes from './routes/photos'
 import photographersRoutes from './routes/photographers'
 import uploadsRoutes from './routes/uploads'
 import folderRoutes from './routes/folders'
+
+// Import admin session manager
+import { adminSessionManager } from './utils/adminSessionManager'
 
 // Load environment variables
 dotenv.config()
@@ -29,14 +39,21 @@ app.use(morgan('combined'))
 app.use(express.json({ limit: '100mb' }))
 app.use(express.urlencoded({ extended: true, limit: '100mb' }))
 
-// Enhanced timeout middleware for upload operations
+// Enhanced timeout middleware for upload and download operations
 app.use((req, res, next) => {
   // Set longer timeouts for upload routes
   if (req.path.includes('/upload') || req.method === 'POST' && req.path.includes('/photos')) {
     req.setTimeout(10 * 60 * 1000) // 10 minutes for uploads
     res.setTimeout(10 * 60 * 1000)
     console.log(`Extended timeout set for upload request: ${req.path}`)
-  } else {
+  } 
+  // Set longer timeouts for download routes
+  else if (req.path.includes('/download') || req.path.includes('/photos/gallery/')) {
+    req.setTimeout(30 * 60 * 1000) // 30 minutes for downloads
+    res.setTimeout(30 * 60 * 1000)
+    console.log(`Extended timeout set for download request: ${req.path}`)
+  } 
+  else {
     req.setTimeout(30 * 1000) // 30 seconds for other requests
     res.setTimeout(30 * 1000)
   }
@@ -65,6 +82,13 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes)
+app.use('/api/admin/auth', adminAuthRoutes)
+app.use('/api/admin/users', adminUsersRoutes)
+app.use('/api/admin/galleries', adminGalleriesRoutes)
+app.use('/api/admin/analytics', adminAnalyticsRoutes)
+app.use('/api/admin/system-config', adminSystemConfigRoutes)
+app.use('/api/admin/invitations', adminInvitationsRoutes)
+app.use('/api/admin/audit', auditRoutes)
 app.use('/api/galleries', galleryRoutes)
 app.use('/api/photos', photoRoutes)
 app.use('/api/photographers', photographersRoutes)
@@ -207,11 +231,19 @@ process.on('SIGINT', async () => {
   process.exit(0)
 })
 
+// Export app for testing
+export default app
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`)
-  console.log(`📋 Features: Batch uploads, RAW support, Extended timeouts`)
+  console.log(`� Env ironment: ${process.env.NODE_ENV || 'development'}`)
+  console.log(`� Feataures: Batch uploads, RAW support, Extended timeouts, Admin system`)
   console.log(`⏰ Upload timeout: 10 minutes`)
   console.log(`💾 Max file size: 50MB, Max batch: 50 files`)
   console.log(`🔗 Upload config: http://localhost:${PORT}/api/upload-config`)
+  console.log(`🔐 Admin auth: http://localhost:${PORT}/api/admin/auth`)
+  
+  // Start admin session cleanup
+  adminSessionManager.startAutomaticCleanup()
+  console.log(`🧹 Admin session cleanup started`)
 })

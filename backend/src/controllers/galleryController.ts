@@ -82,11 +82,18 @@ export const createGallery = async (req: AuthRequest, res: Response) => {
 
 export const getGalleries = async (req: AuthRequest, res: Response) => {
 	try {
-		const photographerId = req.user!.id
+		const userId = req.user!.id
+		const userRole = req.user!.role
+
+		// Admin can see all galleries, photographers only see their own
+		const whereClause = userRole === 'ADMIN' ? {} : { photographerId: userId }
 
 		const galleries = await prisma.gallery.findMany({
-			where: { photographerId },
+			where: whereClause,
 			include: {
+				photographer: userRole === 'ADMIN' ? {
+					select: { id: true, name: true, email: true }
+				} : undefined,
 				folders: {
 					include: {
 						photos: {
@@ -331,11 +338,18 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
 		const { title, description, password, expiresAt, downloadLimit } = req.body
-		const photographerId = req.user!.id
+		const userId = req.user!.id
+		const userRole = req.user!.role
 
-		// Check if gallery exists and belongs to photographer
+		// Check if gallery exists and user has permission to update it
+		const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId }
 		const existingGallery = await prisma.gallery.findFirst({
-			where: { id, photographerId }
+			where: whereClause,
+			include: {
+				photographer: {
+					select: { id: true, name: true, email: true }
+				}
+			}
 		})
 
 		if (!existingGallery) {
@@ -399,12 +413,17 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 export const deleteGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const photographerId = req.user!.id
+		const userId = req.user!.id
+		const userRole = req.user!.role
 
-		// Check if gallery exists and belongs to photographer
+		// Check if gallery exists and user has permission to delete it
+		const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId }
 		const existingGallery = await prisma.gallery.findFirst({
-			where: { id, photographerId },
+			where: whereClause,
 			include: {
+				photographer: {
+					select: { id: true, name: true, email: true }
+				},
 				folders: {
 					include: {
 						photos: true
@@ -553,11 +572,18 @@ export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
 		const { clientIds, access } = req.body // access is a boolean
-		const photographerId = req.user!.id
+		const userId = req.user!.id
+		const userRole = req.user!.role
 
-		// Verify gallery belongs to photographer
+		// Verify gallery exists and user has permission to modify access
+		const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId }
 		const gallery = await prisma.gallery.findFirst({
-			where: { id, photographerId }
+			where: whereClause,
+			include: {
+				photographer: {
+					select: { id: true, name: true, email: true }
+				}
+			}
 		})
 
 		if (!gallery) {
@@ -594,11 +620,18 @@ export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 export const getAllowedClients = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const photographerId = req.user!.id
+		const userId = req.user!.id
+		const userRole = req.user!.role
 
-		// Verify gallery belongs to photographer
+		// Verify gallery exists and user has permission to view access
+		const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId }
 		const gallery = await prisma.gallery.findFirst({
-			where: { id, photographerId }
+			where: whereClause,
+			include: {
+				photographer: {
+					select: { id: true, name: true, email: true }
+				}
+			}
 		})
 
 		if (!gallery) {

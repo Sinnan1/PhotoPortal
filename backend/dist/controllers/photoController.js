@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.downloadPhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
+exports.downloadFolderPhotos = exports.downloadAllPhotos = exports.getDownloadProgress = exports.downloadFavoritedPhotos = exports.downloadLikedPhotos = exports.getPosts = exports.unpostPhoto = exports.postPhoto = exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.downloadPhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
 const tslib_1 = require("tslib");
 const client_1 = require("@prisma/client");
 const multer_1 = tslib_1.__importDefault(require("multer"));
 const path_1 = tslib_1.__importDefault(require("path"));
 const promises_1 = tslib_1.__importDefault(require("fs/promises"));
 const s3Storage_1 = require("../utils/s3Storage");
+const downloadService_1 = require("../services/downloadService");
 const prisma = new client_1.PrismaClient();
 // Balanced configuration - disk storage for reliability, reasonable limits for testing
 const upload = (0, multer_1.default)({
@@ -348,7 +349,12 @@ const getPhotos = async (req, res) => {
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
-                take: limit
+                take: limit,
+                include: {
+                    likedBy: true,
+                    favoritedBy: true,
+                    postBy: true
+                }
             }),
             prisma.photo.count({
                 where: {
@@ -844,11 +850,12 @@ const getPhotoStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
-        const [liked, favorited] = await Promise.all([
+        const [liked, favorited, posted] = await Promise.all([
             prisma.likedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } }),
-            prisma.favoritedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } })
+            prisma.favoritedPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } }),
+            prisma.postPhoto.findUnique({ where: { userId_photoId: { userId, photoId: id } } })
         ]);
-        return res.json({ success: true, data: { liked: !!liked, favorited: !!favorited } });
+        return res.json({ success: true, data: { liked: !!liked, favorited: !!favorited, posted: !!posted } });
     }
     catch (error) {
         console.error('Get photo status error:', error);
@@ -916,3 +923,265 @@ const getFavoritedPhotos = async (req, res) => {
     }
 };
 exports.getFavoritedPhotos = getFavoritedPhotos;
+// Mark a photo for posting (photographer only)
+const postPhoto = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        // Ensure photo exists and belongs to the photographer
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' });
+        }
+        // Ensure the user is the photographer of this gallery
+        if (photo.folder.gallery.photographerId !== userId) {
+            return res.status(403).json({ success: false, error: 'Only the photographer can mark photos for posting' });
+        }
+        // Check if already marked for posting
+        const existingPost = await prisma.postPhoto.findUnique({
+            where: { userId_photoId: { userId, photoId: id } }
+        });
+        if (existingPost) {
+            return res.json({ success: true, message: 'Photo already marked for posting' });
+        }
+        // Create the post record
+        await prisma.postPhoto.create({
+            data: { userId, photoId: id }
+        });
+        return res.json({ success: true, message: 'Photo marked for posting' });
+    }
+    catch (error) {
+        console.error('Post photo error:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.postPhoto = postPhoto;
+// Unmark a photo for posting (photographer only)
+const unpostPhoto = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        // Ensure photo exists and belongs to the photographer
+        const photo = await prisma.photo.findUnique({
+            where: { id },
+            include: {
+                folder: {
+                    include: {
+                        gallery: {
+                            select: { id: true, photographerId: true }
+                        }
+                    }
+                }
+            }
+        });
+        if (!photo) {
+            return res.status(404).json({ success: false, error: 'Photo not found' });
+        }
+        // Ensure the user is the photographer of this gallery
+        if (photo.folder.gallery.photographerId !== userId) {
+            return res.status(403).json({ success: false, error: 'Only the photographer can unmark photos for posting' });
+        }
+        // Delete the post record
+        await prisma.postPhoto.deleteMany({
+            where: { userId, photoId: id }
+        });
+        return res.json({ success: true, message: 'Photo unmarked for posting' });
+    }
+    catch (error) {
+        console.error('Unpost photo error:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.unpostPhoto = unpostPhoto;
+// Get all photos marked for posting for the current photographer
+const getPosts = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const posts = await prisma.postPhoto.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                photo: {
+                    include: {
+                        folder: {
+                            include: {
+                                gallery: {
+                                    include: { photographer: { select: { name: true } } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        const photos = posts.map((pp) => pp.photo);
+        return res.json({ success: true, data: photos });
+    }
+    catch (error) {
+        console.error('Get posts error:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};
+exports.getPosts = getPosts;
+// Download liked photos as zip
+const downloadLikedPhotos = async (req, res) => {
+    try {
+        const { galleryId } = req.params;
+        const userId = req.user.id;
+        const providedPassword = req.headers['x-gallery-password'] ||
+            req.query.password;
+        // Verify gallery access
+        const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user.role, providedPassword);
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            });
+        }
+        // Use download service to create and stream the zip
+        await downloadService_1.DownloadService.createFilteredPhotoZip(galleryId, userId, 'liked', res);
+    }
+    catch (error) {
+        console.error('Download liked photos error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Internal server error'
+            });
+        }
+    }
+};
+exports.downloadLikedPhotos = downloadLikedPhotos;
+// Download favorited photos as zip
+const downloadFavoritedPhotos = async (req, res) => {
+    try {
+        const { galleryId } = req.params;
+        const userId = req.user.id;
+        const providedPassword = req.headers['x-gallery-password'] ||
+            req.query.password;
+        // Verify gallery access
+        const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user.role, providedPassword);
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            });
+        }
+        // Use download service to create and stream the zip
+        await downloadService_1.DownloadService.createFilteredPhotoZip(galleryId, userId, 'favorited', res);
+    }
+    catch (error) {
+        console.error('Download favorited photos error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Internal server error'
+            });
+        }
+    }
+};
+exports.downloadFavoritedPhotos = downloadFavoritedPhotos;
+// Get download progress
+const getDownloadProgress = async (req, res) => {
+    try {
+        const { downloadId } = req.params;
+        const progress = downloadService_1.DownloadService.getProgress(downloadId);
+        if (!progress) {
+            return res.status(404).json({
+                success: false,
+                error: 'Download not found or expired'
+            });
+        }
+        res.json({
+            success: true,
+            data: progress
+        });
+    }
+    catch (error) {
+        console.error('Get download progress error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+};
+exports.getDownloadProgress = getDownloadProgress;
+// Download all photos from gallery as zip
+const downloadAllPhotos = async (req, res) => {
+    try {
+        const { galleryId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated'
+            });
+        }
+        console.log(`📦 Starting all photos download for gallery ${galleryId} by user ${userId}`);
+        // Verify gallery access
+        const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user?.role || 'CLIENT', req.headers['x-gallery-password']);
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            });
+        }
+        // Use download service to create and stream the zip
+        await downloadService_1.DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res);
+    }
+    catch (error) {
+        console.error('Download all photos error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to download all photos'
+            });
+        }
+    }
+};
+exports.downloadAllPhotos = downloadAllPhotos;
+// Download folder photos as zip
+const downloadFolderPhotos = async (req, res) => {
+    try {
+        const { galleryId, folderId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated'
+            });
+        }
+        console.log(`📦 Starting folder photos download for gallery ${galleryId}, folder ${folderId} by user ${userId}`);
+        // Verify gallery access
+        const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user?.role || 'CLIENT', req.headers['x-gallery-password']);
+        if (!hasAccess) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access denied or password required'
+            });
+        }
+        // Use download service to create and stream the zip
+        await downloadService_1.DownloadService.createGalleryPhotoZip(galleryId, userId, 'folder', folderId, res);
+    }
+    catch (error) {
+        console.error('Download folder photos error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to download folder photos'
+            });
+        }
+    }
+};
+exports.downloadFolderPhotos = downloadFolderPhotos;

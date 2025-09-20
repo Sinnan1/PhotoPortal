@@ -35,3 +35,6 @@ Thumbs.db
 
 # Cursor IDE
 .cursor/
+
+# Documentation and development files (excluded from production)
+docs/
