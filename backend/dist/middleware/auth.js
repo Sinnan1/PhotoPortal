@@ -118,10 +118,10 @@ const requireAdminOrOwner = (req, res, next) => {
     }
     // For non-admin users, check if they own the resource
     // This will be used in gallery and photo routes
-    const resourceUserId = req.params.userId || req.body.userId;
-    if (resourceUserId && req.user?.id === resourceUserId) {
-        return next();
-    }
+    // const resourceUserId = req.params.userId || req.body.userId
+    // if (resourceUserId && req.user?.id === resourceUserId) {
+    // return next()
+    //	}
     // Check if it's a photographer accessing their own galleries/photos
     if (req.user?.role === 'PHOTOGRAPHER') {
         return next(); // Let the specific controller handle ownership validation

@@ -230,6 +230,7 @@ export function FolderGrid({
                 : 'opacity-0 scale-105'
             } group-hover:scale-105`}
             onClick={() => onPhotoView(photo)}
+            unoptimized
             onLoad={() => {
               setLoadedImages(prev => new Set([...prev, photo.id]))
             }}

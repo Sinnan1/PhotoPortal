@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SelectionCounter } from "@/components/ui/selection-counter"
 
 interface Photo {
   id: string
@@ -40,6 +41,7 @@ interface FolderTilesProps {
   onFolderRename?: (folderId: string, newName: string) => void
   onFolderDelete?: (folderId: string) => void
   onSetCoverPhoto?: (folderId: string, photoId: string) => void
+  showSelectionCounters?: boolean
 }
 
 export function FolderTiles({
@@ -49,6 +51,7 @@ export function FolderTiles({
   onFolderRename,
   onFolderDelete,
   onSetCoverPhoto,
+  showSelectionCounters = false,
 }: FolderTilesProps) {
   const [foldersVisible, setFoldersVisible] = useState(true)
 
@@ -102,13 +105,14 @@ export function FolderTiles({
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
         foldersVisible ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'
       }`}>
-        <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
-          {folders.map((folder) => (
-            <div
-              key={`folder-${folder.id}`}
-              className="group relative flex-shrink-0 w-28 h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-sm hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
-              onClick={() => handleFolderClick(folder.id)}
-            >
+        <div className="space-y-3">
+          <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
+            {folders.map((folder) => (
+              <div
+                key={`folder-${folder.id}`}
+                className="group relative flex-shrink-0 w-28 h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-sm hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
+                onClick={() => handleFolderClick(folder.id)}
+              >
               {/* Cover Photo Background (if available) */}
               {folder.coverPhoto && (
                 <div className="absolute inset-0 opacity-15">
@@ -172,8 +176,26 @@ export function FolderTiles({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+              </div>
+            ))}
+          </div>
+
+          {/* Selection Counters Row */}
+          {showSelectionCounters && (
+            <div className="flex gap-3 overflow-x-auto">
+              {folders.map((folder) => (
+                <div key={`counter-${folder.id}`} className="flex-shrink-0 w-28">
+                  <SelectionCounter
+                    folderId={folder.id}
+                    totalPhotos={folder._count?.photos || 0}
+                    compact={true}
+                    showBreakdown={false}
+                    className="text-xs"
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

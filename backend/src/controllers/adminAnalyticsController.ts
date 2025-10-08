@@ -818,7 +818,7 @@ export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
         severity,
         description: event.action,
         userId: event.adminId,
-        userName: event.admin.name,
+        userName: event.admin?.name || 'Unknown',
         ipAddress: event.ipAddress || undefined,
         userAgent: event.userAgent || undefined,
         timestamp: event.createdAt,

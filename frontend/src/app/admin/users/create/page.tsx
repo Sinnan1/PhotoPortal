@@ -29,7 +29,7 @@ interface CreateUserForm {
   email: string;
   password: string;
   confirmPassword: string;
-  role: 'PHOTOGRAPHER' | 'CLIENT' | 'ADMIN' | '';
+  role: string;
   notes: string;
 }
 

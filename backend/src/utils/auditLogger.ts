@@ -37,6 +37,23 @@ export class AuditLogger {
    */
   static async logAction(entry: AuditLogEntry): Promise<void> {
     try {
+      // Validate adminId exists in database before logging
+      if (entry.adminId === 'unknown' || !entry.adminId) {
+        console.warn('Skipping audit log entry with invalid adminId:', entry.adminId);
+        return;
+      }
+
+      // Check if admin user exists in database
+      const adminExists = await prisma.user.findUnique({
+        where: { id: entry.adminId },
+        select: { id: true }
+      });
+
+      if (!adminExists) {
+        console.warn('Skipping audit log entry for non-existent admin:', entry.adminId);
+        return;
+      }
+
       await prisma.adminAuditLog.create({
         data: {
           adminId: entry.adminId,

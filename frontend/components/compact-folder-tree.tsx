@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, Folder } from "lucide-react";
+import { SelectionCounter } from "@/components/ui/selection-counter";
 
 interface Folder {
   id: string;
@@ -18,15 +19,17 @@ interface CompactFolderTreeProps {
   currentFolderId?: string;
   onFolderSelect: (folderId: string) => void;
   isFirst: boolean;
+  showSelectionCounters?: boolean;
 }
 
 interface FolderTreeProps {
   folders: Folder[];
   currentFolderId?: string;
   onFolderSelect: (folderId: string) => void;
+  showSelectionCounters?: boolean;
 }
 
-export function FolderTree({ folders, currentFolderId, onFolderSelect }: FolderTreeProps) {
+export function FolderTree({ folders, currentFolderId, onFolderSelect, showSelectionCounters = false }: FolderTreeProps) {
   // Get all child folder IDs to filter out duplicates at root level
   const allChildIds = useMemo(() => {
     const childIds = new Set<string>();
@@ -57,6 +60,7 @@ export function FolderTree({ folders, currentFolderId, onFolderSelect }: FolderT
           currentFolderId={currentFolderId}
           onFolderSelect={onFolderSelect}
           isFirst={index === 0}
+          showSelectionCounters={showSelectionCounters}
         />
       ))}
     </div>
@@ -68,7 +72,8 @@ export function CompactFolderTree({
   level,
   currentFolderId,
   onFolderSelect,
-  isFirst
+  isFirst,
+  showSelectionCounters = false
 }: CompactFolderTreeProps) {
   const hasChildren = folder.children && folder.children.length > 0;
   const isActive = folder.id === currentFolderId;
@@ -129,6 +134,19 @@ export function CompactFolderTree({
         </div>
       </button>
 
+      {/* Selection Counter */}
+      {showSelectionCounters && (
+        <div className="ml-6 mt-1 mb-2">
+          <SelectionCounter
+            folderId={folder.id}
+            totalPhotos={folder._count?.photos || 0}
+            compact={true}
+            showBreakdown={false}
+            className="text-xs"
+          />
+        </div>
+      )}
+
       {hasChildren && isExpanded && (
         <div className="ml-2">
           {folder.children?.map((child) => (
@@ -139,6 +157,7 @@ export function CompactFolderTree({
               currentFolderId={currentFolderId}
               onFolderSelect={onFolderSelect}
               isFirst={false}
+              showSelectionCounters={showSelectionCounters}
             />
           ))}
         </div>

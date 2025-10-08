@@ -25,6 +25,12 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+    // Increase cache TTL to reduce repeated requests
+    minimumCacheTTL: 300, // 5 minutes
+    // Disable image optimization for external images to avoid timeout issues
+    unoptimized: false,
+    // Add loader configuration
+    loader: 'default',
   },
   async headers() {
     return [

@@ -1,4 +1,29 @@
 "use strict";
+/**
+ * Photo Controller - Unified Download API Endpoints
+ *
+ * This controller provides unified server-side download endpoints for all photo download types.
+ * All downloads now use server-side processing with Archiver instead of client-side JSZip.
+ *
+ * Download Endpoints:
+ * - GET /photos/gallery/:galleryId/download/all - Download all photos in gallery
+ * - GET /photos/gallery/:galleryId/download/folder/:folderId - Download photos in folder
+ * - GET /photos/gallery/:galleryId/download/liked - Download user's liked photos
+ * - GET /photos/gallery/:galleryId/download/favorited - Download user's favorited photos
+ *
+ * All endpoints support:
+ * - Real-time progress tracking via download IDs
+ * - Direct S3 streaming for memory efficiency
+ * - Consistent error handling and recovery
+ * - Authentication and authorization
+ *
+ * Migration Notes:
+ * - Replaced client-side JSZip with server-side Archiver
+ * - Unified progress tracking across all download types
+ * - Improved memory usage and scalability
+ *
+ * @since Server-side download migration completed
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadFolderPhotos = exports.downloadAllPhotos = exports.getDownloadProgress = exports.downloadFavoritedPhotos = exports.downloadLikedPhotos = exports.getPosts = exports.unpostPhoto = exports.postPhoto = exports.getFavoritedPhotos = exports.getLikedPhotos = exports.getPhotoStatus = exports.unfavoritePhoto = exports.favoritePhoto = exports.unlikePhoto = exports.likePhoto = exports.bulkDeletePhotos = exports.deletePhoto = exports.downloadPhoto = exports.getCompressedPhoto = exports.getPhotos = exports.batchUploadPhotos = exports.uploadPhotos = exports.handleUploadErrors = exports.cleanupTempFiles = exports.uploadMiddleware = void 0;
 const tslib_1 = require("tslib");
@@ -1129,6 +1154,9 @@ const downloadAllPhotos = async (req, res) => {
             });
         }
         console.log(`📦 Starting all photos download for gallery ${galleryId} by user ${userId}`);
+        // Set timeout to 30 minutes for large downloads
+        req.setTimeout(30 * 60 * 1000); // 30 minutes
+        res.setTimeout(30 * 60 * 1000); // 30 minutes
         // Verify gallery access
         const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user?.role || 'CLIENT', req.headers['x-gallery-password']);
         if (!hasAccess) {
@@ -1137,6 +1165,10 @@ const downloadAllPhotos = async (req, res) => {
                 error: 'Access denied or password required'
             });
         }
+        // Set headers for streaming download before starting
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Transfer-Encoding', 'chunked');
         // Use download service to create and stream the zip
         await downloadService_1.DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res);
     }
@@ -1147,6 +1179,10 @@ const downloadAllPhotos = async (req, res) => {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to download all photos'
             });
+        }
+        else {
+            // If headers are already sent, we can't send JSON, so just end the response
+            res.end();
         }
     }
 };
@@ -1163,6 +1199,9 @@ const downloadFolderPhotos = async (req, res) => {
             });
         }
         console.log(`📦 Starting folder photos download for gallery ${galleryId}, folder ${folderId} by user ${userId}`);
+        // Set timeout to 30 minutes for large downloads
+        req.setTimeout(30 * 60 * 1000); // 30 minutes
+        res.setTimeout(30 * 60 * 1000); // 30 minutes
         // Verify gallery access
         const hasAccess = await downloadService_1.DownloadService.verifyGalleryAccess(galleryId, userId, req.user?.role || 'CLIENT', req.headers['x-gallery-password']);
         if (!hasAccess) {
@@ -1171,6 +1210,10 @@ const downloadFolderPhotos = async (req, res) => {
                 error: 'Access denied or password required'
             });
         }
+        // Set headers for streaming download before starting
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Transfer-Encoding', 'chunked');
         // Use download service to create and stream the zip
         await downloadService_1.DownloadService.createGalleryPhotoZip(galleryId, userId, 'folder', folderId, res);
     }
@@ -1181,6 +1224,10 @@ const downloadFolderPhotos = async (req, res) => {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to download folder photos'
             });
+        }
+        else {
+            // If headers are already sent, we can't send JSON, so just end the response
+            res.end();
         }
     }
 };

@@ -21,6 +21,7 @@ const photos_1 = tslib_1.__importDefault(require("./routes/photos"));
 const photographers_1 = tslib_1.__importDefault(require("./routes/photographers"));
 const uploads_1 = tslib_1.__importDefault(require("./routes/uploads"));
 const folders_1 = tslib_1.__importDefault(require("./routes/folders"));
+const selectionAnalytics_1 = tslib_1.__importDefault(require("./routes/selectionAnalytics"));
 // Import admin session manager
 const adminSessionManager_1 = require("./utils/adminSessionManager");
 // Load environment variables
@@ -35,13 +36,19 @@ app.use((0, morgan_1.default)('combined'));
 // Increased limits for batch photo uploads
 app.use(express_1.default.json({ limit: '100mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '100mb' }));
-// Enhanced timeout middleware for upload operations
+// Enhanced timeout middleware for upload and download operations
 app.use((req, res, next) => {
     // Set longer timeouts for upload routes
     if (req.path.includes('/upload') || req.method === 'POST' && req.path.includes('/photos')) {
         req.setTimeout(10 * 60 * 1000); // 10 minutes for uploads
         res.setTimeout(10 * 60 * 1000);
         console.log(`Extended timeout set for upload request: ${req.path}`);
+    }
+    // Set longer timeouts for download routes
+    else if (req.path.includes('/download') || req.path.includes('/photos/gallery/')) {
+        req.setTimeout(30 * 60 * 1000); // 30 minutes for downloads
+        res.setTimeout(30 * 60 * 1000);
+        console.log(`Extended timeout set for download request: ${req.path}`);
     }
     else {
         req.setTimeout(30 * 1000); // 30 seconds for other requests
@@ -80,6 +87,7 @@ app.use('/api/photos', photos_1.default);
 app.use('/api/photographers', photographers_1.default);
 app.use('/api/uploads', uploads_1.default);
 app.use('/api/folders', folders_1.default);
+app.use('/api/analytics', selectionAnalytics_1.default);
 // Upload configuration endpoint for frontend
 app.get('/api/upload-config', (req, res) => {
     res.json({

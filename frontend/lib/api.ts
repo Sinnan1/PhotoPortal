@@ -443,4 +443,31 @@ export const api = {
       filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'folder_photos.zip'
     };
   },
+
+  // Selection Analytics APIs
+  getFolderSelections: (folderId: string) =>
+    apiRequest(`/analytics/folder/${folderId}/selections`),
+
+  getGallerySelections: (galleryId: string) =>
+    apiRequest(`/analytics/gallery/${galleryId}/selections`),
+
+  getPhotographerSelections: (filters?: {
+    dateFrom?: string
+    dateTo?: string
+    clientName?: string
+    galleryId?: string
+    hasSelections?: boolean
+    photographerId?: string
+  }) => {
+    const queryParams = new URLSearchParams()
+    if (filters?.dateFrom) queryParams.append('dateFrom', filters.dateFrom)
+    if (filters?.dateTo) queryParams.append('dateTo', filters.dateTo)
+    if (filters?.clientName) queryParams.append('clientName', filters.clientName)
+    if (filters?.galleryId) queryParams.append('galleryId', filters.galleryId)
+    if (filters?.hasSelections !== undefined) queryParams.append('hasSelections', filters.hasSelections.toString())
+    if (filters?.photographerId) queryParams.append('photographerId', filters.photographerId)
+    
+    const queryString = queryParams.toString()
+    return apiRequest(`/analytics/photographer/selections${queryString ? `?${queryString}` : ''}`)
+  },
 }

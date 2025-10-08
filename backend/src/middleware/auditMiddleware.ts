@@ -28,13 +28,15 @@ export const auditMiddleware = (
   } = {}
 ) => {
   return async (req: AdminAuthRequest, res: Response, next: NextFunction) => {
-    // Set up audit context
-    req.auditContext = {
-      adminId: req.admin?.id || 'unknown',
-      action,
-      targetType,
-      targetId: options.extractTargetId ? options.extractTargetId(req) : undefined,
-    };
+    // Only set up audit context if we have a valid admin ID
+    if (req.admin?.id) {
+      req.auditContext = {
+        adminId: req.admin.id,
+        action,
+        targetType,
+        targetId: options.extractTargetId ? options.extractTargetId(req) : undefined,
+      };
+    }
 
     // Store original res.json to intercept response
     const originalJson = res.json;
@@ -45,6 +47,11 @@ export const auditMiddleware = (
         // Don't block the response for logging
         setImmediate(async () => {
           try {
+            // Only log if we have audit context (valid admin)
+            if (!req.auditContext) {
+              return;
+            }
+
             if (options.skipLogging && options.skipLogging(req, res)) {
               return;
             }
@@ -60,10 +67,10 @@ export const auditMiddleware = (
                 };
 
             await AuditLogger.logAction({
-              adminId: req.auditContext!.adminId,
-              action: req.auditContext!.action!,
-              targetType: req.auditContext!.targetType!,
-              targetId: req.auditContext!.targetId,
+              adminId: req.auditContext.adminId,
+              action: req.auditContext.action!,
+              targetType: req.auditContext.targetType!,
+              targetId: req.auditContext.targetId,
               details,
               ipAddress: req.ip || req.connection.remoteAddress,
               userAgent: req.get('User-Agent'),

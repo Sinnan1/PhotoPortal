@@ -281,6 +281,7 @@ export function PhotoGrid({
             onClick={() => onView?.(photo)}
             priority={index < columns.lg}
             sizes={getSizes()}
+            unoptimized
             onLoad={() => {
               setLoadedImages(prev => new Set([...prev, photo.id]));
               console.log(`Image loaded: ${photo.filename}`);

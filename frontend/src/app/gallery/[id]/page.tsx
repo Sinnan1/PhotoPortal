@@ -30,6 +30,8 @@ import { useAuth } from "@/lib/auth-context";
 import { DownloadFilteredPhotos } from "@/components/ui/download-filtered-photos";
 import { DownloadProgress } from "@/components/ui/download-progress";
 import { useDownloadProgress } from "@/hooks/use-download-progress";
+import { SelectionCounter } from "@/components/ui/selection-counter";
+import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summary";
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -124,6 +126,14 @@ function GalleryPage() {
   const downloadAllProgress = useDownloadProgress();
   const downloadCurrentProgress = useDownloadProgress();
 
+  // Selection tracking state
+  const [selectionCounts, setSelectionCounts] = useState<{[folderId: string]: {
+    selectedCount: number;
+    likedCount: number;
+    favoritedCount: number;
+    postedCount: number;
+  }}>({});
+
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [breadcrumbItems, setBreadcrumbItems] = useState<Array<{ id: string, name: string, type: 'gallery' | 'folder' }>>([]);
@@ -137,6 +147,10 @@ function GalleryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const PHOTOS_PER_PAGE = 30;
+
+  // Refs for components to trigger refreshes
+  const gallerySelectionSummaryRef = useRef<{ refreshData: () => void } | null>(null);
+  const currentFolderSelectionCounterRef = useRef<{ refreshCounts: () => void } | null>(null);
 
   // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
   const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean; posted?: boolean }) => {
@@ -177,6 +191,34 @@ function GalleryPage() {
       };
     });
 
+    // Update selection counts for the current folder
+    if (currentFolder) {
+      setSelectionCounts(prev => {
+        const currentCounts = prev[currentFolder.id] || { selectedCount: 0, likedCount: 0, favoritedCount: 0, postedCount: 0 };
+        const newCounts = { ...currentCounts };
+
+        // Update individual counts based on status changes
+        if (status.liked !== undefined) {
+          newCounts.likedCount += status.liked ? 1 : -1;
+        }
+        if (status.favorited !== undefined) {
+          newCounts.favoritedCount += status.favorited ? 1 : -1;
+        }
+        if (status.posted !== undefined) {
+          newCounts.postedCount += status.posted ? 1 : -1;
+        }
+
+        // Recalculate selected count (photos with any selection)
+        // This is an approximation - for exact counts, the SelectionCounter will refresh from API
+        newCounts.selectedCount = Math.max(0, Math.max(newCounts.likedCount, newCounts.favoritedCount, newCounts.postedCount));
+
+        return {
+          ...prev,
+          [currentFolder.id]: newCounts
+        };
+      });
+    }
+
     // Update gallery state to keep everything in sync
     setGallery((prev) => {
       if (!prev) return prev;
@@ -212,6 +254,15 @@ function GalleryPage() {
       }));
       return { ...prev, folders: updatedFolders };
     });
+
+    // Trigger refreshes of selection counter components
+    // This ensures the counters update immediately with accurate data from the API
+    if (gallerySelectionSummaryRef.current) {
+      gallerySelectionSummaryRef.current.refreshData();
+    }
+    if (currentFolderSelectionCounterRef.current) {
+      currentFolderSelectionCounterRef.current.refreshCounts();
+    }
   };
 
   useEffect(() => {
@@ -673,6 +724,19 @@ function GalleryPage() {
               </Button>
             </div>
 
+            {/* Gallery Selection Summary */}
+            {gallery && user && (
+              <div className="mb-6">
+                <GallerySelectionSummary
+                  ref={gallerySelectionSummaryRef}
+                  galleryId={galleryId}
+                  compact={true}
+                  showFolderBreakdown={false}
+                  className="mb-4"
+                />
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-muted-foreground">Toggle Folders</span>
               <Button
@@ -695,6 +759,7 @@ function GalleryPage() {
                     currentFolderId={currentFolder?.id}
                     onFolderSelect={handleFolderSelect}
                     isFirst={index === 0}
+showSelectionCounters={!!user}
                   />
                 ))}
               </div>
@@ -875,6 +940,7 @@ function GalleryPage() {
           folders={currentFolder.children}
           isPhotographer={user?.role === "PHOTOGRAPHER"}
           onFolderSelect={handleFolderSelect}
+          showSelectionCounters={!!user}
         />
       )}
 
@@ -936,7 +1002,26 @@ function GalleryPage() {
       {/* Photo Grid Section */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-foreground">Photos</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold text-foreground">Photos</h2>
+            {/* Current Folder Selection Counter */}
+            {currentFolder && user && (
+              <SelectionCounter
+                ref={currentFolderSelectionCounterRef}
+                folderId={currentFolder.id}
+                totalPhotos={currentFolder.photos.length}
+                compact={true}
+                showBreakdown={true}
+                className="text-sm"
+                onCountsUpdate={(counts) => {
+                  setSelectionCounts(prev => ({
+                    ...prev,
+                    [currentFolder.id]: counts
+                  }));
+                }}
+              />
+            )}
+          </div>
           <span className="text-sm text-muted-foreground">
             {currentFolder ? currentFolder.photos.length : 0} photo{(currentFolder?.photos.length ?? 0) !== 1 ? 's' : ''}
           </span>

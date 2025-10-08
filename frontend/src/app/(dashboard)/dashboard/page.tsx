@@ -348,6 +348,7 @@ export default function DashboardPage() {
                           className="object-cover"
                           priority={index === 0}
                           sizes="(max-width: 1024px) 50vw, 25vw"
+                          unoptimized
                         />
                       ) : gallery.folders[0]._count?.photos > 0 ? (
                         // If no cover photo but folder has photos, show a placeholder with photo count
