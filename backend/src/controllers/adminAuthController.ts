@@ -4,6 +4,12 @@ import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { AuditLogger } from '../utils/auditLogger'
+import { 
+  validateEmail, 
+  validatePassword, 
+  validateName,
+  sanitizeString
+} from '../utils/validation'
 
 const prisma = new PrismaClient()
 
@@ -36,6 +42,27 @@ export const adminLogin = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Validate email format
+		const emailValidation = validateEmail(email)
+		if (!emailValidation.isValid) {
+			await AuditLogger.logAction({
+				adminId: 'SYSTEM',
+				action: 'LOGIN_INVALID_EMAIL_FORMAT',
+				targetType: 'system',
+				details: { email, errors: emailValidation.errors },
+				ipAddress,
+				userAgent
+			})
+			return res.status(400).json({
+				success: false,
+				error: 'Invalid email format',
+				details: emailValidation.errors
+			})
+		}
+
+		// Sanitize email input
+		const sanitizedEmail = email.toLowerCase().trim()
+
 		// Check for rate limiting based on IP
 		const attemptKey = `${email}:${ipAddress}`
 		const attempts = failedAttempts.get(attemptKey)
@@ -62,10 +89,10 @@ export const adminLogin = async (req: Request, res: Response) => {
 			}
 		}
 
-		// Find admin user
+		// Find admin user with sanitized email
 		const admin = await prisma.user.findUnique({
 			where: { 
-				email,
+				email: sanitizedEmail,
 				role: 'ADMIN'
 			}
 		})
@@ -490,6 +517,26 @@ export const setupFirstAdmin = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Validate email format
+		const emailValidation = validateEmail(email)
+		if (!emailValidation.isValid) {
+			return res.status(400).json({
+				success: false,
+				error: 'Invalid email format',
+				details: emailValidation.errors
+			})
+		}
+
+		// Validate name
+		const nameValidation = validateName(name)
+		if (!nameValidation.isValid) {
+			return res.status(400).json({
+				success: false,
+				error: 'Invalid name format',
+				details: nameValidation.errors
+			})
+		}
+
 		// Check if any admin already exists
 		const existingAdmin = await prisma.user.findFirst({
 			where: { role: 'ADMIN' }
@@ -513,17 +560,35 @@ export const setupFirstAdmin = async (req: Request, res: Response) => {
 			})
 		}
 
-		// Validate password strength (minimum 16 characters for admin)
-		if (password.length < 16) {
+		// Validate password strength for admin
+		const passwordValidation = validatePassword(password, {
+			minLength: 16,
+			requireUppercase: true,
+			requireLowercase: true,
+			requireNumbers: true,
+			requireSpecialChars: true
+		})
+		
+		if (!passwordValidation.isValid) {
 			return res.status(400).json({
 				success: false,
-				error: 'Admin password must be at least 16 characters long'
+				error: 'Admin password does not meet security requirements',
+				details: passwordValidation.errors
+			})
+		}
+
+		if (passwordValidation.strength === 'weak') {
+			return res.status(400).json({
+				success: false,
+				error: 'Admin password is too weak',
+				details: passwordValidation.errors
 			})
 		}
 
 		// Check if user with this email already exists
+		const sanitizedEmail = email.toLowerCase().trim()
 		const existingUser = await prisma.user.findUnique({
-			where: { email }
+			where: { email: sanitizedEmail }
 		})
 
 		if (existingUser) {
@@ -533,15 +598,15 @@ export const setupFirstAdmin = async (req: Request, res: Response) => {
 			})
 		}
 
-		// Hash password
-		const hashedPassword = await bcrypt.hash(password, 12)
+		// Hash password with high salt rounds for admin
+		const hashedPassword = await bcrypt.hash(password, 14)
 
-		// Create first admin
+		// Create first admin with sanitized data
 		const admin = await prisma.user.create({
 			data: {
-				email,
+				email: sanitizedEmail,
 				password: hashedPassword,
-				name,
+				name: sanitizeString(name).trim(),
 				role: 'ADMIN'
 			},
 			select: {

@@ -13,6 +13,8 @@ import {
   getPendingApprovals
 } from '../controllers/adminUserController'
 import { authenticateAdmin, requireAdmin } from '../middleware/adminAuth'
+import { validateCSRFToken, addCSRFTokenToResponse } from '../middleware/csrf'
+import { userManagementLimiter, adminGeneralLimiter } from '../middleware/rateLimiter'
 
 const router = Router()
 
@@ -20,17 +22,17 @@ const router = Router()
 router.use(authenticateAdmin)
 router.use(requireAdmin)
 
-// User management routes
-router.get('/', getAllUsers)                    // GET /api/admin/users - Get all users with filtering
-router.get('/search', searchUsers)              // GET /api/admin/users/search - Search users
-router.get('/statistics', getUserStatistics)   // GET /api/admin/users/statistics - Get user statistics
-router.get('/pending-approvals', getPendingApprovals) // GET /api/admin/users/pending-approvals - Get pending approvals
-router.get('/:userId', getUserDetails)         // GET /api/admin/users/:userId - Get user details
-router.post('/', createUser)                   // POST /api/admin/users - Create new user
-router.put('/:userId/role', updateUserRole)    // PUT /api/admin/users/:userId/role - Update user role
-router.put('/:userId/suspend', suspendUser)    // PUT /api/admin/users/:userId/suspend - Suspend user
-router.put('/:userId/activate', activateUser)  // PUT /api/admin/users/:userId/activate - Activate user
-router.put('/:userId/approve', approvePendingUser) // PUT /api/admin/users/:userId/approve - Approve pending user
-router.delete('/:userId', deleteUser)          // DELETE /api/admin/users/:userId - Delete user
+// User management routes with CSRF protection and rate limiting for write operations
+router.get('/', adminGeneralLimiter, addCSRFTokenToResponse, getAllUsers)                    // GET /api/admin/users - Get all users with filtering
+router.get('/search', adminGeneralLimiter, addCSRFTokenToResponse, searchUsers)              // GET /api/admin/users/search - Search users
+router.get('/statistics', adminGeneralLimiter, addCSRFTokenToResponse, getUserStatistics)   // GET /api/admin/users/statistics - Get user statistics
+router.get('/pending-approvals', adminGeneralLimiter, addCSRFTokenToResponse, getPendingApprovals) // GET /api/admin/users/pending-approvals - Get pending approvals
+router.get('/:userId', adminGeneralLimiter, addCSRFTokenToResponse, getUserDetails)         // GET /api/admin/users/:userId - Get user details
+router.post('/', userManagementLimiter, validateCSRFToken, createUser)                   // POST /api/admin/users - Create new user
+router.put('/:userId/role', userManagementLimiter, validateCSRFToken, updateUserRole)    // PUT /api/admin/users/:userId/role - Update user role
+router.put('/:userId/suspend', userManagementLimiter, validateCSRFToken, suspendUser)    // PUT /api/admin/users/:userId/suspend - Suspend user
+router.put('/:userId/activate', userManagementLimiter, validateCSRFToken, activateUser)  // PUT /api/admin/users/:userId/activate - Activate user
+router.put('/:userId/approve', userManagementLimiter, validateCSRFToken, approvePendingUser) // PUT /api/admin/users/:userId/approve - Approve pending user
+router.delete('/:userId', userManagementLimiter, validateCSRFToken, deleteUser)          // DELETE /api/admin/users/:userId - Delete user
 
 export default router

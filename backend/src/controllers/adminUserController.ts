@@ -3,6 +3,16 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { logAdminAction } from '../middleware/auditMiddleware'
+import { 
+  validateUserCreation, 
+  validateEmail, 
+  validatePassword, 
+  validateName, 
+  validateRole,
+  validateSearchInput,
+  validatePaginationParams,
+  sanitizeString
+} from '../utils/validation'
 
 // Allow dependency injection for testing
 let prisma: PrismaClient
@@ -79,13 +89,48 @@ export const getAllUsers = async (req: AdminAuthRequest, res: Response) => {
             limit = 20
         } = req.query as UserSearchFilters
 
-        // Build where clause for filtering
+        // Validate pagination parameters
+        const paginationValidation = validatePaginationParams(page, limit)
+        if (!paginationValidation.isValid) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid pagination parameters',
+                details: paginationValidation.errors
+            })
+        }
+
+        // Validate search input
+        if (search) {
+            const searchValidation = validateSearchInput(search as string)
+            if (!searchValidation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid search term',
+                    details: searchValidation.errors
+                })
+            }
+        }
+
+        // Validate role if provided
+        if (role) {
+            const roleValidation = validateRole(role as string)
+            if (!roleValidation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid role',
+                    details: roleValidation.errors
+                })
+            }
+        }
+
+        // Build where clause for filtering with sanitized input
         const where: any = {}
 
         if (search) {
+            const sanitizedSearch = sanitizeString(search as string)
             where.OR = [
-                { name: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } }
+                { name: { contains: sanitizedSearch, mode: 'insensitive' } },
+                { email: { contains: sanitizedSearch, mode: 'insensitive' } }
             ]
         }
 
@@ -1129,26 +1174,36 @@ export const createUser = async (req: AdminAuthRequest, res: Response) => {
         const { email, name, password, role = 'CLIENT' } = req.body
         const adminId = req.admin!.id
 
-        // Validate input
-        if (!email || !name || !password) {
+        // Comprehensive validation
+        const validation = validateUserCreation({ email, name, password, role })
+        if (!validation.isValid) {
             return res.status(400).json({
                 success: false,
-                error: 'Email, name, and password are required'
+                error: 'Validation failed',
+                details: validation.errors
             })
         }
 
-        // Validate role
-        const validRoles = ['PHOTOGRAPHER', 'CLIENT', 'ADMIN']
-        if (!validRoles.includes(role)) {
+        // Additional password strength check for admin-created users
+        const passwordValidation = validatePassword(password, {
+            minLength: 12,
+            requireUppercase: true,
+            requireLowercase: true,
+            requireNumbers: true,
+            requireSpecialChars: true
+        })
+        
+        if (passwordValidation.strength === 'weak') {
             return res.status(400).json({
                 success: false,
-                error: 'Invalid role specified'
+                error: 'Password is too weak for admin-created accounts',
+                details: passwordValidation.errors
             })
         }
 
         // Check if user already exists
         const existingUser = await prisma.user.findUnique({
-            where: { email }
+            where: { email: email.toLowerCase().trim() }
         })
 
         if (existingUser) {
@@ -1158,14 +1213,14 @@ export const createUser = async (req: AdminAuthRequest, res: Response) => {
             })
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 12)
+        // Hash password with high salt rounds for admin-created users
+        const hashedPassword = await bcrypt.hash(password, 14)
 
-        // Create user
+        // Create user with sanitized data
         const newUser = await prisma.user.create({
             data: {
-                email,
-                name,
+                email: email.toLowerCase().trim(),
+                name: sanitizeString(name).trim(),
                 password: hashedPassword,
                 role
             },

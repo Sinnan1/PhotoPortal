@@ -16,6 +16,19 @@ import {
 } from '../controllers/adminAuthController'
 import { authenticateAdmin, requireAdmin } from '../middleware/adminAuth'
 import { getAdminSetupStatus } from '../utils/createFirstAdmin'
+import { 
+	generateCSRFToken, 
+	validateCSRFToken, 
+	revokeCSRFToken,
+	addCSRFTokenToResponse,
+	getCSRFTokenStatus
+} from '../middleware/csrf'
+import { 
+	adminLoginLimiter, 
+	adminGeneralLimiter, 
+	passwordChangeLimiter,
+	getRateLimitStatus
+} from '../middleware/rateLimiter'
 
 const router = Router()
 
@@ -43,8 +56,8 @@ router.get('/', (req, res) => {
 	})
 })
 
-// Public admin auth routes
-router.post('/login', adminLogin)
+// Public admin auth routes with rate limiting
+router.post('/login', adminLoginLimiter, adminLogin)
 router.get('/setup-status', async (req, res) => {
 	try {
 		const status = await getAdminSetupStatus()
@@ -67,17 +80,24 @@ router.post('/setup-first-admin', setupFirstAdmin)
 router.post('/verify-invitation/:token', verifyAdminInvitation)
 router.post('/activate-account', activateAdminAccount)
 
-// Protected admin routes (require admin authentication)
-router.post('/logout', authenticateAdmin, requireAdmin, adminLogout)
-router.get('/profile', authenticateAdmin, requireAdmin, getAdminProfile)
-router.get('/validate', authenticateAdmin, requireAdmin, validateAdminSession)
-router.post('/extend-session', authenticateAdmin, requireAdmin, extendAdminSession)
-router.get('/sessions', authenticateAdmin, requireAdmin, getAdminSessions)
-router.delete('/sessions/:sessionId', authenticateAdmin, requireAdmin, revokeAdminSession)
+// CSRF token management with rate limiting
+router.get('/csrf-token', authenticateAdmin, requireAdmin, adminGeneralLimiter, generateCSRFToken)
+router.get('/csrf-status', authenticateAdmin, requireAdmin, adminGeneralLimiter, getCSRFTokenStatus)
 
-// Admin account management (protected routes)
-router.post('/invite-admin', authenticateAdmin, requireAdmin, inviteAdmin)
-router.put('/profile', authenticateAdmin, requireAdmin, updateAdminProfile)
-router.put('/change-password', authenticateAdmin, requireAdmin, changeAdminPassword)
+// Rate limit status endpoint
+router.get('/rate-limit-status', authenticateAdmin, requireAdmin, getRateLimitStatus)
+
+// Protected admin routes (require admin authentication + CSRF protection + rate limiting)
+router.post('/logout', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, revokeCSRFToken, adminLogout)
+router.get('/profile', authenticateAdmin, requireAdmin, adminGeneralLimiter, addCSRFTokenToResponse, getAdminProfile)
+router.get('/validate', authenticateAdmin, requireAdmin, adminGeneralLimiter, addCSRFTokenToResponse, validateAdminSession)
+router.post('/extend-session', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, extendAdminSession)
+router.get('/sessions', authenticateAdmin, requireAdmin, adminGeneralLimiter, addCSRFTokenToResponse, getAdminSessions)
+router.delete('/sessions/:sessionId', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, revokeAdminSession)
+
+// Admin account management (protected routes with CSRF protection + rate limiting)
+router.post('/invite-admin', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, inviteAdmin)
+router.put('/profile', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, updateAdminProfile)
+router.put('/change-password', authenticateAdmin, requireAdmin, passwordChangeLimiter, validateCSRFToken, changeAdminPassword)
 
 export default router
