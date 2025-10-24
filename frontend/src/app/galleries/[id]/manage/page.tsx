@@ -71,6 +71,17 @@ export default function ManageGalleryPage() {
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'queued' | 'uploading' | 'processing' | 'success' | 'failed' }>({})
   const [uploadAttempts, setUploadAttempts] = useState<{ [key: string]: number }>({})
   const [activeUploads, setActiveUploads] = useState<{ [key: string]: XMLHttpRequest }>({})
+  
+  // Batch upload tracking
+  const [batchStats, setBatchStats] = useState({
+    totalFiles: 0,
+    completedFiles: 0,
+    failedFiles: 0,
+    totalBytes: 0,
+    uploadedBytes: 0,
+    startTime: 0,
+    averageSpeed: 0
+  })
 
   // Folder management state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
@@ -84,6 +95,26 @@ export default function ManageGalleryPage() {
     expiresAt: "",
     downloadLimit: "",
   })
+
+  // Utility functions for batch progress
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  }
+
+  const calculateETA = (stats: typeof batchStats): string => {
+    if (stats.averageSpeed === 0 || stats.uploadedBytes >= stats.totalBytes) return 'Done'
+    
+    const remainingBytes = stats.totalBytes - stats.uploadedBytes
+    const remainingSeconds = remainingBytes / stats.averageSpeed
+    
+    if (remainingSeconds < 60) return `${Math.round(remainingSeconds)}s`
+    if (remainingSeconds < 3600) return `${Math.round(remainingSeconds / 60)}m`
+    return `${Math.round(remainingSeconds / 3600)}h`
+  }
 
   useEffect(() => {
     if (user?.role === "PHOTOGRAPHER") {
@@ -197,7 +228,7 @@ export default function ManageGalleryPage() {
     return out
   }
 
-  const uploadWithConcurrency = async (files: File[], concurrency = 5) => {
+  const uploadWithConcurrency = async (files: File[], concurrency = 15) => {
     let index = 0
     let successCount = 0
     let failureCount = 0
@@ -219,11 +250,6 @@ export default function ManageGalleryPage() {
   }
 
   const cancelUpload = () => {
-    // Abort all active uploads
-    Object.values(activeUploads).forEach(xhr => {
-      xhr.abort()
-    })
-    
     // Reset upload state
     setActiveUploads({})
     setUploading(false)
@@ -246,6 +272,20 @@ export default function ManageGalleryPage() {
 
     setUploading(true)
 
+    // Calculate total bytes for batch tracking
+    const totalBytes = fileArray.reduce((sum, file) => sum + file.size, 0)
+    
+    // Initialize batch stats
+    setBatchStats({
+      totalFiles: fileArray.length,
+      completedFiles: 0,
+      failedFiles: 0,
+      totalBytes,
+      uploadedBytes: 0,
+      startTime: Date.now(),
+      averageSpeed: 0
+    })
+
     // Initialize progress, status and attempts
     const initProgress: { [key: string]: number } = {}
     const initStatus: { [key: string]: 'queued' } = {} as any
@@ -260,8 +300,8 @@ export default function ManageGalleryPage() {
     setUploadAttempts((prev) => ({ ...prev, ...initAttempts }))
 
     try {
-      // Limited parallel uploads for better throughput without overwhelming the server
-      const { successCount, failureCount } = await uploadWithConcurrency(fileArray, 5)
+      // Optimized parallel uploads for high-throughput uploads
+      const { successCount, failureCount } = await uploadWithConcurrency(fileArray, 20)
 
       if (successCount > 0) {
         showToast(`Successfully uploaded ${successCount} ${successCount === 1 ? 'photo' : 'photos'}`, 'success')
@@ -284,86 +324,88 @@ export default function ManageGalleryPage() {
     }
   }
 
-  const uploadSingleFileWithProgress = (file: File): Promise<boolean> => {
+  const uploadSingleFileWithProgress = async (file: File): Promise<boolean> => {
     const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
     const token = typeof document !== 'undefined'
       ? document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
       : undefined
 
-    const attemptUpload = (attempt: number): Promise<boolean> => {
-      return new Promise((resolve) => {
-        const xhr = new XMLHttpRequest()
-        const formData = new FormData()
-        formData.append('photos', file)
+    if (!token) {
+      console.error('No auth token found')
+      return false
+    }
 
-        // Track this upload request
-        setActiveUploads(prev => ({ ...prev, [file.name]: xhr }))
-
+    const attemptUpload = async (attempt: number): Promise<boolean> => {
+      try {
         setUploadStatus((prev) => ({ ...prev, [file.name]: 'uploading' }))
         setUploadAttempts((prev) => ({ ...prev, [file.name]: attempt }))
 
-        xhr.upload.onprogress = (e: ProgressEvent<EventTarget>) => {
-          if (e.lengthComputable) {
-            const percent = Math.round((e.loaded / e.total) * 100)
+        // Use the new multipart upload system
+        const { uploadFileToB2 } = await import('./uploadUtils')
+        
+        await uploadFileToB2(
+          file,
+          galleryId,
+          selectedFolderId!,
+          (percent: number) => {
             setUploadProgress((prev) => ({ ...prev, [file.name]: percent }))
+            
+            // Update batch stats
+            setBatchStats(prev => {
+              const uploadedBytes = (percent / 100) * file.size
+              const elapsedTime = (Date.now() - prev.startTime) / 1000
+              const averageSpeed = elapsedTime > 0 ? uploadedBytes / elapsedTime : 0
+              
+              return {
+                ...prev,
+                uploadedBytes: prev.uploadedBytes + (uploadedBytes - (prev.uploadedBytes % file.size)),
+                averageSpeed
+              }
+            })
+            
             if (percent === 100) {
-              // Body sent; server may still be processing
               setUploadStatus((prev) => ({ ...prev, [file.name]: 'processing' }))
             }
-          }
-        }
+          },
+          token,
+          BASE_URL
+        )
 
-        xhr.onabort = () => {
+        // Upload successful
+        setUploadStatus((prev) => ({ ...prev, [file.name]: 'success' }))
+        setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }))
+        
+        // Update batch stats for successful upload
+        setBatchStats(prev => ({
+          ...prev,
+          completedFiles: prev.completedFiles + 1
+        }))
+        
+        return true
+
+      } catch (error) {
+        console.error(`Upload attempt ${attempt} failed for ${file.name}:`, error)
+        
+        // Retry with exponential backoff up to 5 attempts
+        if (attempt < 5) {
+          const baseDelay = 1000
+          const jitter = Math.random() * 1000 // Add jitter to prevent thundering herd
+          const delay = baseDelay * Math.pow(2, attempt - 1) + jitter
+          
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return attemptUpload(attempt + 1)
+        } else {
           setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
-          setActiveUploads(prev => {
-            const newUploads = { ...prev }
-            delete newUploads[file.name]
-            return newUploads
-          })
-          resolve(false)
+          
+          // Update batch stats for final failed upload
+          setBatchStats(prev => ({
+            ...prev,
+            failedFiles: prev.failedFiles + 1
+          }))
+          
+          return false
         }
-
-        xhr.onreadystatechange = () => {
-          if (xhr.readyState === XMLHttpRequest.DONE) {
-            // Remove from active uploads
-            setActiveUploads(prev => {
-              const newUploads = { ...prev }
-              delete newUploads[file.name]
-              return newUploads
-            })
-
-            const status = xhr.status
-            if (status >= 200 && status < 300) {
-              setUploadStatus((prev) => ({ ...prev, [file.name]: 'success' }))
-              setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }))
-              resolve(true)
-              return
-            }
-
-            // Do not retry on client errors like 400/413; allow retry for 429
-            if (status >= 400 && status < 500 && status !== 429) {
-              setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
-              resolve(false)
-              return
-            }
-
-            // Retry with exponential backoff up to 3 attempts
-            if (attempt < 3) {
-              const delay = 500 * Math.pow(2, attempt - 1)
-              setTimeout(() => {
-                resolve(attemptUpload(attempt + 1))
-              }, delay)
-            } else {
-              setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
-              resolve(false)
-            }
-          }
-        }
-
-        xhr.open('POST', `${BASE_URL}/photos/upload/${selectedFolderId}`)
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-        xhr.send(formData)
-      })
+      }
     }
 
     return attemptUpload(1)
@@ -597,103 +639,151 @@ export default function ManageGalleryPage() {
 
             {/* Main Content Area */}
             <div className="lg:col-span-3 space-y-6">
-          {/* Upload Section */}
+              {/* Upload Section */}
               {selectedFolder && (
-          <Card>
-            <CardHeader>
+                <Card>
+                  <CardHeader>
                     <CardTitle>Upload to "{selectedFolder.name}"</CardTitle>
                     <CardDescription>Add new photos to this folder. Supported formats: JPG, PNG, WEBP</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div
+                  </CardHeader>
+                  <CardContent>
+                    <div
                       className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#425146] transition-colors cursor-pointer"
-                role="button"
-                tabIndex={0}
-                aria-label="Upload photos by clicking or dragging files here"
-                onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    fileInputRef.current?.click()
-                  }
-                }}
-                onDrop={async (e) => {
-                  e.preventDefault()
-                  const dt = e.dataTransfer
-                  let files: File[] = []
-                  try {
-                    files = await getFilesFromDataTransfer(dt)
-                  } catch {
-                    files = Array.from(dt.files || [])
-                  }
-                  if (files.length > 0) {
-                    await handleFileUpload(files)
-                  }
-                }}
-                onDragOver={(e) => e.preventDefault()}
-              >
-                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">Drop photos here or click to browse</p>
-                <p className="text-sm text-gray-500">You can upload multiple photos at once</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      handleFileUpload(e.target.files)
-                    }
-                  }}
-                />
-              </div>
-
-              {uploading && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Uploading photos...</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={cancelUpload}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      aria-label="Cancel all photo uploads"
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Upload photos by clicking or dragging files here"
+                      onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          fileInputRef.current?.click()
+                        }
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault()
+                        const dt = e.dataTransfer
+                        let files: File[] = []
+                        try {
+                          files = await getFilesFromDataTransfer(dt)
+                        } catch {
+                          files = Array.from(dt.files || [])
+                        }
+                        if (files.length > 0) {
+                          await handleFileUpload(files)
+                        }
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
                     >
-                      <X className="mr-1 h-4 w-4" />
-                      Cancel Upload
-                    </Button>
-                  </div>
-                  {Object.entries(uploadProgress).map(([filename, progress]) => {
-                    const status = uploadStatus[filename]
-                    const attempts = uploadAttempts[filename] || 0
-                    return (
-                      <div key={filename} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700 truncate flex-1 pr-2">{filename}</span>
-                          <span className="text-xs text-gray-500">
-                            {status === 'uploading' && `${progress}%`}
-                            {status === 'processing' && 'Processing...'}
-                            {status === 'success' && 'Done'}
-                            {status === 'failed' && 'Failed'}
-                          </span>
+                      <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-lg font-medium text-gray-900 mb-2">Drop photos here or click to browse</p>
+                      <p className="text-sm text-gray-500">You can upload multiple photos at once</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleFileUpload(e.target.files)
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {uploading && (
+                      <div className="mt-4 space-y-4">
+                        {/* Batch Progress Dashboard */}
+                        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium text-gray-900">Upload Progress</h4>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={cancelUpload}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              aria-label="Cancel all photo uploads"
+                            >
+                              <X className="mr-1 h-4 w-4" />
+                              Cancel Upload
+                            </Button>
+                          </div>
+                          
+                          {/* Overall Progress Bar */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-gray-600">
+                              <span>
+                                {batchStats.completedFiles + batchStats.failedFiles}/{batchStats.totalFiles} files
+                              </span>
+                              <span>
+                                {formatBytes(batchStats.uploadedBytes)} / {formatBytes(batchStats.totalBytes)}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                              <div
+                                className="bg-[#425146] h-3 rounded-full transition-all duration-300"
+                                style={{ 
+                                  width: `${batchStats.totalBytes > 0 ? (batchStats.uploadedBytes / batchStats.totalBytes) * 100 : 0}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Stats Row */}
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <div className="text-gray-500">Speed</div>
+                              <div className="font-medium">{formatBytes(batchStats.averageSpeed)}/s</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">ETA</div>
+                              <div className="font-medium">{calculateETA(batchStats)}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Success Rate</div>
+                              <div className="font-medium">
+                                {batchStats.totalFiles > 0 
+                                  ? Math.round((batchStats.completedFiles / batchStats.totalFiles) * 100)
+                                  : 0}%
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                                  className={`${status === 'failed' ? 'bg-red-500' : 'bg-[#425146]'} h-2 rounded-full transition-all`}
-                            style={{ width: `${progress}%` }}
-                          />
+
+                        {/* Individual File Progress */}
+                        <div className="space-y-3">
+                          <p className="text-sm font-medium text-gray-700">Individual Files:</p>
+                          {Object.entries(uploadProgress).map(([filename, progress]) => {
+                            const status = uploadStatus[filename]
+                            const attempts = uploadAttempts[filename] || 0
+                            return (
+                              <div key={filename} className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-700 truncate flex-1 pr-2">{filename}</span>
+                                  <span className="text-xs text-gray-500">
+                                    {status === 'uploading' && `${progress}%`}
+                                    {status === 'processing' && 'Processing...'}
+                                    {status === 'success' && 'Done'}
+                                    {status === 'failed' && 'Failed'}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`${status === 'failed' ? 'bg-red-500' : 'bg-[#425146]'} h-2 rounded-full transition-all`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                                {attempts > 1 && status !== 'success' && (
+                                  <div className="text-xs text-gray-500">Attempt {attempts} of 5</div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
-                        {attempts > 1 && status !== 'success' && (
-                          <div className="text-xs text-gray-500">Attempt {attempts} of 3</div>
-                        )}
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    )}
+                  </CardContent>
+                </Card>
               )}
 
               {/* Folder Content */}
