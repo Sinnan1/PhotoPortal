@@ -18,10 +18,10 @@ const s3Client = new S3Client({
 sharp.concurrency(Math.min(3, Math.max(1, os.cpus().length)))
 
 // RAW file extensions that Sharp can handle
-const SHARP_SUPPORTED_RAW = ['.dng', '.tiff', '.tif']
+export const SHARP_SUPPORTED_RAW = ['.dng', '.tiff', '.tif']
 
 // Function to check if file is a RAW format
-const isRawFile = (filename: string): boolean => {
+export const isRawFile = (filename: string): boolean => {
 	const ext = path.extname(filename).toLowerCase()
 	const rawExtensions = [
 		'.cr2', '.cr3', '.crw', '.nef', '.nrw', '.arw', '.srf', '.sr2',
@@ -138,7 +138,7 @@ export const uploadToS3 = async (
 }
 
 // Create placeholder thumbnail for unsupported RAW files
-async function createPlaceholderThumbnail(filename: string): Promise<Buffer> {
+export async function createPlaceholderThumbnail(filename: string): Promise<Buffer> {
 	const extension = path.extname(filename).toUpperCase().replace('.', '')
 	
 	// Create a simple SVG placeholder
@@ -164,7 +164,7 @@ async function createPlaceholderThumbnail(filename: string): Promise<Buffer> {
 }
 
 // Get appropriate content type for different file extensions
-function getContentType(extension: string): string {
+export function getContentType(extension: string): string {
 	const contentTypes: { [key: string]: string } = {
 		'.jpg': 'image/jpeg',
 		'.jpeg': 'image/jpeg',

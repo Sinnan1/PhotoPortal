@@ -33,19 +33,26 @@ const prisma = new PrismaClient()
 
 // Enhanced middleware for photo uploads
 app.use(helmet())
-app.use(cors())
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}))
 app.use(morgan('combined'))
 
 // Increased limits for batch photo uploads
 app.use(express.json({ limit: '100mb' }))
 app.use(express.urlencoded({ extended: true, limit: '100mb' }))
+// Raw body limit for proxy uploads
+app.use(express.raw({ type: '*/*', limit: '1gb' }))
 
 // Enhanced timeout middleware for upload and download operations
 app.use((req, res, next) => {
   // Set longer timeouts for upload routes
   if (req.path.includes('/upload') || req.method === 'POST' && req.path.includes('/photos')) {
-    req.setTimeout(10 * 60 * 1000) // 10 minutes for uploads
-    res.setTimeout(10 * 60 * 1000)
+    req.setTimeout(60 * 60 * 1000) // 60 minutes for large batch uploads
+    res.setTimeout(60 * 60 * 1000)
     console.log(`Extended timeout set for upload request: ${req.path}`)
   } 
   // Set longer timeouts for download routes
