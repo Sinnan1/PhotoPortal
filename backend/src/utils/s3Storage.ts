@@ -5,8 +5,8 @@ import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 
 const s3Client = new S3Client({
-	region: 'us-east-005',
-	endpoint: 'https://s3.us-east-005.backblazeb2.com',
+	region: process.env.AWS_REGION || 'us-east-005',
+	endpoint: `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`,
 	forcePathStyle: true,
 	credentials: {
 		accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -118,7 +118,7 @@ export const uploadToS3 = async (
 
 		// Generate URLs
 		const bucketName = process.env.S3_BUCKET_NAME!
-		const endpoint = 'https://s3.us-east-005.backblazeb2.com'
+		const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
 		const originalUrl = `${endpoint}/${bucketName}/${filename}`
 		const thumbnailUrl = `${endpoint}/${bucketName}/${thumbnailFilename}`
 
@@ -347,7 +347,7 @@ export const generateMultipleThumbnails = async (
 			await s3Client.send(uploadCommand)
 			
 			const bucketName = process.env.S3_BUCKET_NAME!
-			const endpoint = 'https://s3.us-east-005.backblazeb2.com'
+			const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
 			results[sizeName] = `${endpoint}/${bucketName}/${thumbnailFilename}`
 			
 		} catch (error) {

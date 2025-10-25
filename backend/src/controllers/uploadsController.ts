@@ -7,8 +7,8 @@ import path from 'path'
 const prisma = new PrismaClient()
 
 const s3Client = new S3Client({
-	region: 'us-east-005',
-	endpoint: 'https://s3.us-east-005.backblazeb2.com',
+	region: process.env.AWS_REGION || 'us-east-005',
+	endpoint: `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`,
 	forcePathStyle: true,
 	credentials: {
 		accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -151,7 +151,7 @@ export const registerPhoto = async (req: Request, res: Response) => {
 
 		// Generate URLs
 		const bucketName = process.env.S3_BUCKET_NAME!
-		const endpoint = 'https://s3.us-east-005.backblazeb2.com'
+		const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
 		const originalUrl = `${endpoint}/${bucketName}/${key}`
 
 		// Extract thumbnail key from the S3 key (not the original filename)
