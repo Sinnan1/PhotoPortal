@@ -1,0 +1,10 @@
+# Docker Compose Override for Local Development
+# This file is automatically used by docker-compose for local testing
+# It disables SSL requirements and uses HTTP
+
+version: '3.8'
+
+services:
+  nginx:
+    volumes:
+      - ./nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
