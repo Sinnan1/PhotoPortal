@@ -162,8 +162,12 @@ app.get('/', (req, res) => {
   })
 })
 
-// Legacy health check (keep for compatibility)
+// Health check endpoints (both paths for compatibility)
 app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
