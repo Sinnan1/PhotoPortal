@@ -5,11 +5,10 @@ const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload
 export async function uploadFileToB2(
     file: File, 
     galleryId: string,
-    folderId: string,
     onProgress: (percent: number) => void,
     token: string,
     BASE_URL: string
-): Promise<{ key: string; photo: any }> {
+): Promise<{ key: string }> {
     const uniqueId = uuidv4()
     const key = `${galleryId}/${uniqueId}_${file.name}`
 
@@ -36,15 +35,21 @@ export async function uploadFileToB2(
 
         const { uploadId } = await initResponse.json()
 
-        // Step 2: Upload chunks one at a time (streaming approach)
+        // Step 2: Split file into chunks and get signed URLs
+        const chunks: Blob[] = []
+        let start = 0
+        while (start < file.size) {
+            chunks.push(file.slice(start, start + CHUNK_SIZE))
+            start += CHUNK_SIZE
+        }
+
         const parts: { ETag: string, PartNumber: number }[] = []
         let uploadedSize = 0
-        let start = 0
-        let partNumber = 1
 
-        // Step 3: Upload each chunk immediately (no memory storage)
-        while (start < file.size) {
-            const chunk = file.slice(start, start + CHUNK_SIZE)
+        // Step 3: Upload each chunk
+        for (let i = 0; i < chunks.length; i++) {
+            const partNumber = i + 1
+            const chunk = chunks[i]
 
             // Get signed URL for this part
             const signResponse = await fetch(
@@ -64,28 +69,22 @@ export async function uploadFileToB2(
 
             const { signedUrl } = await signResponse.json()
 
-            // Upload chunk through backend proxy to avoid CORS issues
-            console.log('Uploading part', partNumber, 'through backend proxy')
-            console.log('Chunk size:', chunk.size, 'bytes')
-            const uploadResponse = await fetch(`${BASE_URL}/uploads/multipart/upload?url=${encodeURIComponent(signedUrl)}`, {
+            // Upload chunk directly to B2 (no credentials, set content-type)
+            console.debug('Uploading part', partNumber, 'to signedUrl:', signedUrl)
+            const uploadResponse = await fetch(signedUrl, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/octet-stream'
                 },
                 body: chunk
             })
-            
-            console.log('Upload response status:', uploadResponse.status, uploadResponse.statusText)
 
             if (!uploadResponse.ok) {
                 const text = await uploadResponse.text().catch(() => '<no body>')
                 throw new Error(`Failed to upload part ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText} - ${text}`)
             }
 
-            const responseData = await uploadResponse.json()
-            const etag = responseData.etag
-            
+            const etag = uploadResponse.headers.get('ETag') || uploadResponse.headers.get('etag')
             if (!etag) {
                 throw new Error('Missing ETag from upload response')
             }
@@ -97,13 +96,7 @@ export async function uploadFileToB2(
 
             // Update progress
             uploadedSize += chunk.size
-            const progressPercent = Math.round((uploadedSize / file.size) * 100)
-            console.log(`Progress: ${progressPercent}% (${uploadedSize}/${file.size} bytes)`)
-            onProgress(progressPercent)
-            
-            // Move to next chunk
-            start += CHUNK_SIZE
-            partNumber++
+            onProgress(Math.round((uploadedSize / file.size) * 100))
         }
 
         // Step 4: Complete multipart upload
@@ -143,29 +136,7 @@ export async function uploadFileToB2(
             console.warn('Thumbnail generation may have failed, but file upload succeeded:', thumbnailResponse.status, thumbnailResponse.statusText, text)
         }
 
-        // Step 6: Register photo in database
-        const registerResponse = await fetch(`${BASE_URL}/uploads/register`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                key,
-                filename: file.name,
-                folderId,
-                fileSize: file.size
-            })
-        })
-
-        if (!registerResponse.ok) {
-            const text = await registerResponse.text().catch(() => '<no body>')
-            throw new Error(`Failed to register photo: ${registerResponse.status} ${registerResponse.statusText} - ${text}`)
-        }
-
-        const { photo } = await registerResponse.json()
-
-        return { key, photo }
+        return { key }
     } catch (error) {
         console.error('Upload failed:', error)
         throw error
