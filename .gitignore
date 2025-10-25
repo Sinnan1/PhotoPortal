@@ -13,6 +13,9 @@
 .env.local
 backend/.env
 frontend/.env.local
+.env.production
+.env.staging
+
 
 # Logs
 npm-debug.log*
