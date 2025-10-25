@@ -3,8 +3,9 @@ import { v4 as uuidv4 } from 'uuid'
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload
 
 export async function uploadFileToB2(
-    file: File, 
+    file: File,
     galleryId: string,
+    folderId: string,
     onProgress: (percent: number) => void,
     token: string,
     BASE_URL: string
@@ -134,6 +135,26 @@ export async function uploadFileToB2(
         if (!thumbnailResponse.ok) {
             const text = await thumbnailResponse.text().catch(() => '<no body>')
             console.warn('Thumbnail generation may have failed, but file upload succeeded:', thumbnailResponse.status, thumbnailResponse.statusText, text)
+        }
+
+        // Step 6: Register photo in database
+        const registerResponse = await fetch(`${BASE_URL}/uploads/register`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                key,
+                filename: file.name,
+                folderId,
+                fileSize: file.size
+            })
+        })
+
+        if (!registerResponse.ok) {
+            const text = await registerResponse.text().catch(() => '<no body>')
+            throw new Error(`Failed to register photo: ${registerResponse.status} ${registerResponse.statusText} - ${text}`)
         }
 
         return { key }
