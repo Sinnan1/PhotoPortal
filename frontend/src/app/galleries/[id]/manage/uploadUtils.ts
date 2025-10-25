@@ -70,22 +70,29 @@ export async function uploadFileToB2(
 
             const { signedUrl } = await signResponse.json()
 
-            // Upload chunk directly to B2 (no credentials, set content-type)
-            console.debug('Uploading part', partNumber, 'to signedUrl:', signedUrl)
-            const uploadResponse = await fetch(signedUrl, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/octet-stream'
-                },
-                body: chunk
-            })
+            // Upload chunk through backend proxy to avoid CORS issues
+            console.debug('Uploading part', partNumber, 'via proxy')
+            const uploadResponse = await fetch(
+                `${BASE_URL}/uploads/multipart/upload?url=${encodeURIComponent(signedUrl)}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/octet-stream'
+                    },
+                    credentials: 'include',
+                    body: chunk
+                }
+            )
 
             if (!uploadResponse.ok) {
                 const text = await uploadResponse.text().catch(() => '<no body>')
                 throw new Error(`Failed to upload part ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText} - ${text}`)
             }
 
-            const etag = uploadResponse.headers.get('ETag') || uploadResponse.headers.get('etag')
+            // Get ETag from proxy response JSON
+            const uploadResult = await uploadResponse.json()
+            const etag = uploadResult.etag
             if (!etag) {
                 throw new Error('Missing ETag from upload response')
             }
