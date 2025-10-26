@@ -102,9 +102,8 @@ export function FolderTiles({
         </Button>
       </div>
 
-      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-        foldersVisible ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'
-      }`}>
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${foldersVisible ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        }`}>
         <div className="space-y-3">
           <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
             {folders.map((folder) => (
@@ -113,69 +112,69 @@ export function FolderTiles({
                 className="group relative flex-shrink-0 w-28 h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-sm hover:shadow-[#425146]/10 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
                 onClick={() => handleFolderClick(folder.id)}
               >
-              {/* Cover Photo Background (if available) */}
-              {folder.coverPhoto && (
-                <div className="absolute inset-0 opacity-15">
-                  <Image
-                    src={folder.coverPhoto.thumbnailUrl}
-                    alt={folder.coverPhoto.filename}
-                    fill
-                    className="object-cover"
-                  />
+                {/* Cover Photo Background (if available) */}
+                {folder.coverPhoto && (
+                  <div className="absolute inset-0 opacity-15">
+                    <Image
+                      src={folder.coverPhoto.thumbnailUrl}
+                      alt={folder.coverPhoto.filename}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Folder Content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                  <Folder className="w-5 h-5 text-[#425146] mb-1" />
+                  <p className="text-xs font-medium text-gray-900 dark:text-white text-center truncate w-full leading-tight">
+                    {folder.name || 'Unnamed'}
+                  </p>
+                  <p className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">
+                    {folder._count?.photos ?? 0}
+                  </p>
                 </div>
-              )}
 
-              {/* Folder Content */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
-                <Folder className="w-5 h-5 text-[#425146] mb-1" />
-                <p className="text-xs font-medium text-gray-900 dark:text-white text-center truncate w-full leading-tight">
-                  {folder.name || 'Unnamed'}
-                </p>
-                <p className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">
-                  {folder._count?.photos ?? 0}
-                </p>
-              </div>
-
-              {/* Actions Menu for Photographers */}
-              {isPhotographer && showActionsMenu && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-black/40 hover:bg-black/60 text-white h-4 w-4 p-0 z-20"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-2.5 h-2.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem
-                      onClick={() => handleFolderRename(folder.id, folder.name || 'Unnamed Folder')}
-                      className="text-xs"
-                    >
-                      <Edit className="w-3 h-3 mr-2" />
-                      Rename
-                    </DropdownMenuItem>
-                    {folder.coverPhoto && onSetCoverPhoto && (
+                {/* Actions Menu for Photographers */}
+                {isPhotographer && showActionsMenu && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-black/40 hover:bg-black/60 text-white h-4 w-4 p-0 z-20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-2.5 h-2.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
                       <DropdownMenuItem
-                        onClick={() => onSetCoverPhoto(folder.id, '')}
+                        onClick={() => handleFolderRename(folder.id, folder.name || 'Unnamed Folder')}
                         className="text-xs"
                       >
-                        <ImageIcon className="w-3 h-3 mr-2" />
-                        Remove Cover
+                        <Edit className="w-3 h-3 mr-2" />
+                        Rename
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onClick={() => handleFolderDelete(folder.id, folder.name || 'Unnamed Folder')}
-                      className="text-red-600 focus:text-red-600 text-xs"
-                    >
-                      <Trash2 className="w-3 h-3 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                      {folder.coverPhoto && onSetCoverPhoto && (
+                        <DropdownMenuItem
+                          onClick={() => onSetCoverPhoto(folder.id, '')}
+                          className="text-xs"
+                        >
+                          <ImageIcon className="w-3 h-3 mr-2" />
+                          Remove Cover
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => handleFolderDelete(folder.id, folder.name || 'Unnamed Folder')}
+                        className="text-red-600 focus:text-red-600 text-xs"
+                      >
+                        <Trash2 className="w-3 h-3 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             ))}
           </div>
