@@ -633,12 +633,12 @@ function GalleryPage() {
     const endIndex = startIndex + PHOTOS_PER_PAGE;
     const newPhotos = filteredPhotos.slice(startIndex, endIndex);
 
-    // Simulate network delay for smooth UX
-    setTimeout(() => {
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
       setDisplayedPhotos(prev => [...prev, ...newPhotos]);
       setHasMore(endIndex < filteredPhotos.length);
       setLoadingMore(false);
-    }, 200);
+    });
   }, [currentFolder, filteredPhotos, displayedPhotos.length, loadingMore, hasMore, PHOTOS_PER_PAGE]);
 
   // Intersection observer for infinite scroll
@@ -657,12 +657,18 @@ function GalleryPage() {
   // Reset pagination when filter changes or folder loads
   useEffect(() => {
     if (currentFolder && filteredPhotos.length > 0) {
-      const initialPhotos = filteredPhotos.slice(0, PHOTOS_PER_PAGE);
-      setDisplayedPhotos(initialPhotos);
-      setCurrentPage(2);
-      setHasMore(filteredPhotos.length > PHOTOS_PER_PAGE);
+      // Use requestAnimationFrame for smoother initial render
+      requestAnimationFrame(() => {
+        const initialPhotos = filteredPhotos.slice(0, PHOTOS_PER_PAGE);
+        setDisplayedPhotos(initialPhotos);
+        setCurrentPage(2);
+        setHasMore(filteredPhotos.length > PHOTOS_PER_PAGE);
+      });
+    } else if (currentFolder && filteredPhotos.length === 0) {
+      setDisplayedPhotos([]);
+      setHasMore(false);
     }
-  }, [filteredPhotos, currentFolder]);
+  }, [filteredPhotos, currentFolder, PHOTOS_PER_PAGE]);
 
   if (loading) {
     return (
@@ -734,7 +740,7 @@ function GalleryPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ willChange: 'scroll-position' }}>
       {/* Slideout Sidebar */}
       <div
         className={`fixed inset-0 z-50 ${sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'

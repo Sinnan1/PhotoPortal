@@ -65,12 +65,16 @@ export function FolderGrid({
   const { user } = useAuth()
   const { showToast } = useToast()
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
-  const [renderKey, setRenderKey] = useState(0)
 
-  // Force re-render when viewMode changes
-  useEffect(() => {
-    setRenderKey(prev => prev + 1)
-  }, [viewMode])
+  // Batch image load updates to reduce re-renders
+  const handleImageLoad = (photoId: string) => {
+    setLoadedImages(prev => {
+      if (prev.has(photoId)) return prev
+      const newSet = new Set(prev)
+      newSet.add(photoId)
+      return newSet
+    })
+  }
 
   const handleDownload = async (photoId: string) => {
     try {
@@ -216,32 +220,30 @@ export function FolderGrid({
           key={`photo-${photo.id}`}
           className={`group relative ${
             viewMode === "tile"
-              ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-all duration-200 hover:scale-[1.01]"
-              : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-all duration-200 hover:scale-[1.01]"
+              ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
+              : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
           }`}
+          style={{ contain: 'layout style paint' }}
         >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
             fill
-            className={`object-cover cursor-pointer transition-all duration-500 ease-out ${
+            className={`object-cover cursor-pointer transition-opacity duration-300 ${
               loadedImages.has(photo.id)
-                ? 'opacity-100 scale-100'
-                : 'opacity-0 scale-105'
-            } group-hover:scale-105`}
+                ? 'opacity-100'
+                : 'opacity-0'
+            }`}
             onClick={() => onPhotoView(photo)}
             unoptimized
-            onLoad={() => {
-              setLoadedImages(prev => new Set([...prev, photo.id]))
-            }}
-            onError={() => {
-              setLoadedImages(prev => new Set([...prev, photo.id]))
-            }}
+            loading="lazy"
+            onLoad={() => handleImageLoad(photo.id)}
+            onError={() => handleImageLoad(photo.id)}
           />
 
           {/* Action overlay */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all flex items-end justify-center pb-2">
-            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200 flex items-end justify-center pb-2">
+            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <Button
                 size="sm"
                 variant="secondary"
