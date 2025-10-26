@@ -127,12 +127,14 @@ function GalleryPage() {
   const downloadCurrentProgress = useDownloadProgress();
 
   // Selection tracking state
-  const [selectionCounts, setSelectionCounts] = useState<{[folderId: string]: {
-    selectedCount: number;
-    likedCount: number;
-    favoritedCount: number;
-    postedCount: number;
-  }}>({});
+  const [selectionCounts, setSelectionCounts] = useState<{
+    [folderId: string]: {
+      selectedCount: number;
+      likedCount: number;
+      favoritedCount: number;
+      postedCount: number;
+    }
+  }>({});
 
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
@@ -371,23 +373,42 @@ function GalleryPage() {
     showToast("Preparing folder download...", "info");
 
     try {
-      // Use the unified backend API for server-side processing
-      const result = await api.downloadFolderPhotosUnified(
-        galleryId,
-        currentFolder.id,
-        passwordRequired ? password : undefined
-      );
-
-      // Track download progress if we have a download ID
-      if (result.downloadId) {
-        downloadCurrentProgress.startProgress(currentPhotos.length, result.downloadId);
+      // Start the download and get the download ID immediately
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required");
       }
 
+      const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/folder/${currentFolder.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to download folder photos");
+      }
+
+      // Extract download ID and filename from headers immediately
+      const downloadId = response.headers.get('X-Download-ID');
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'folder_photos.zip';
+
+      // Start progress tracking immediately
+      if (downloadId) {
+        downloadCurrentProgress.startProgress(currentPhotos.length, downloadId);
+      }
+
+      // Now download the blob (this will take time)
+      const blob = await response.blob();
+
       // Trigger the download
-      const url = window.URL.createObjectURL(result.blob);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = result.filename;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -414,22 +435,42 @@ function GalleryPage() {
     showToast("Preparing all photos download...", "info");
 
     try {
-      // Use the new unified backend API
-      const result = await api.downloadAllPhotosUnified(
-        galleryId,
-        passwordRequired ? password : undefined
-      );
-
-      // Track download progress if we have a download ID
-      if (result.downloadId) {
-        downloadAllProgress.startProgress(allPhotos.length, result.downloadId);
+      // Start the download and get the download ID immediately
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required");
       }
 
+      const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/all`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to download all photos");
+      }
+
+      // Extract download ID and filename from headers immediately
+      const downloadId = response.headers.get('X-Download-ID');
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip';
+
+      // Start progress tracking immediately
+      if (downloadId) {
+        downloadAllProgress.startProgress(allPhotos.length, downloadId);
+      }
+
+      // Now download the blob (this will take time)
+      const blob = await response.blob();
+
       // Trigger the download
-      const url = window.URL.createObjectURL(result.blob);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = result.filename;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -438,6 +479,7 @@ function GalleryPage() {
       showToast("All photos download started!", "success");
     } catch (error: any) {
       console.error("Failed to download all photos:", error);
+      downloadAllProgress.errorProgress(error.message || "Failed to download all photos");
       showToast(error.message || "Failed to download all photos", "error");
     } finally {
       setIsDownloadingAll(false);
@@ -759,7 +801,7 @@ function GalleryPage() {
                     currentFolderId={currentFolder?.id}
                     onFolderSelect={handleFolderSelect}
                     isFirst={index === 0}
-showSelectionCounters={!!user}
+                    showSelectionCounters={!!user}
                   />
                 ))}
               </div>
