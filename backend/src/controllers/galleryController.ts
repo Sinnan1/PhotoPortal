@@ -96,14 +96,6 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				} : undefined,
 				folders: {
 					include: {
-						photos: {
-							include: {
-								likedBy: true,
-								favoritedBy: true,
-								postBy: true
-							}
-						},
-						children: true,
 						coverPhoto: {
 							select: {
 								id: true,
@@ -120,8 +112,6 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						}
 					}
 				},
-				likedBy: true,
-				favoritedBy: true,
 				_count: {
 					select: { folders: true }
 				}
@@ -146,63 +136,63 @@ export const getGallery = async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params
 
-        const gallery = await prisma.gallery.findUnique({
+		const gallery = await prisma.gallery.findUnique({
 			where: { id },
+			include: {
+				folders: {
+					where: { parentId: null }, // Only get root folders
 					include: {
-			folders: {
-				where: { parentId: null }, // Only get root folders
-				include: {
-					photos: {
-						include: {
-							likedBy: true,
-							favoritedBy: true,
-							postBy: true
+						photos: {
+							include: {
+								likedBy: true,
+								favoritedBy: true,
+								postBy: true
+							},
+							orderBy: { createdAt: 'desc' }
 						},
-						orderBy: { createdAt: 'desc' }
-					},
-					children: {
-						include: {
-							photos: {
-								include: {
-									likedBy: true,
-									favoritedBy: true,
-									postBy: true
+						children: {
+							include: {
+								photos: {
+									include: {
+										likedBy: true,
+										favoritedBy: true,
+										postBy: true
+									},
+									orderBy: { createdAt: 'desc' }
 								},
-								orderBy: { createdAt: 'desc' }
-							},
-							children: true, // For deeper nesting
-							coverPhoto: {
-								select: {
-									id: true,
-									filename: true,
-									thumbnailUrl: true,
-									mediumUrl: true,
-									largeUrl: true,
-									originalUrl: true,
-									createdAt: true
+								children: true, // For deeper nesting
+								coverPhoto: {
+									select: {
+										id: true,
+										filename: true,
+										thumbnailUrl: true,
+										mediumUrl: true,
+										largeUrl: true,
+										originalUrl: true,
+										createdAt: true
+									}
+								},
+								_count: {
+									select: { photos: true, children: true }
 								}
-							},
-							_count: {
-								select: { photos: true, children: true }
 							}
+						},
+						coverPhoto: {
+							select: {
+								id: true,
+								filename: true,
+								thumbnailUrl: true,
+								mediumUrl: true,
+								largeUrl: true,
+								originalUrl: true,
+								createdAt: true
+							}
+						},
+						_count: {
+							select: { photos: true, children: true }
 						}
-					},
-					coverPhoto: {
-						select: {
-							id: true,
-							filename: true,
-							thumbnailUrl: true,
-							mediumUrl: true,
-							largeUrl: true,
-							originalUrl: true,
-							createdAt: true
-						}
-					},
-					_count: {
-						select: { photos: true, children: true }
 					}
-				}
-			},
+				},
 				photographer: {
 					select: { name: true }
 				}
@@ -224,49 +214,49 @@ export const getGallery = async (req: Request, res: Response) => {
 			})
 		}
 
-        // If gallery is password-protected, enforce access rules
-        if (gallery.password) {
-            let isAuthorized = false
+		// If gallery is password-protected, enforce access rules
+		if (gallery.password) {
+			let isAuthorized = false
 
-            // 1) If user is authenticated, allow if photographer owner or client with access
-            const authHeader = req.headers['authorization']
-            const token = authHeader && (authHeader as string).split(' ')[1]
-            if (token) {
-                try {
-                    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-                    const userId = decoded.userId as string
+			// 1) If user is authenticated, allow if photographer owner or client with access
+			const authHeader = req.headers['authorization']
+			const token = authHeader && (authHeader as string).split(' ')[1]
+			if (token) {
+				try {
+					const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+					const userId = decoded.userId as string
 
-                    // Photographer who owns the gallery
-                    if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
-                        isAuthorized = true
-                    } else {
-                        // Client with explicit access
-                        const hasAccess = await prisma.galleryAccess.findUnique({
-                            where: { userId_galleryId: { userId, galleryId: id } }
-                        })
-                        if (hasAccess) isAuthorized = true
-                    }
-                } catch {
-                    // ignore token errors; will fall back to password header
-                }
-            }
+					// Photographer who owns the gallery
+					if (decoded.role === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+						isAuthorized = true
+					} else {
+						// Client with explicit access
+						const hasAccess = await prisma.galleryAccess.findUnique({
+							where: { userId_galleryId: { userId, galleryId: id } }
+						})
+						if (hasAccess) isAuthorized = true
+					}
+				} catch {
+					// ignore token errors; will fall back to password header
+				}
+			}
 
-            // 2) If not authorized yet, validate provided password (via header or query)
-            if (!isAuthorized) {
-                const providedPassword =
-                    (req.headers['x-gallery-password'] as string | undefined) ||
-                    (req.query.password as string | undefined)
+			// 2) If not authorized yet, validate provided password (via header or query)
+			if (!isAuthorized) {
+				const providedPassword =
+					(req.headers['x-gallery-password'] as string | undefined) ||
+					(req.query.password as string | undefined)
 
-                if (!providedPassword) {
-                    return res.status(401).json({ success: false, error: 'Password required' })
-                }
+				if (!providedPassword) {
+					return res.status(401).json({ success: false, error: 'Password required' })
+				}
 
-                const isValidPassword = await bcrypt.compare(providedPassword, gallery.password)
-                if (!isValidPassword) {
-                    return res.status(401).json({ success: false, error: 'Invalid password' })
-                }
-            }
-        }
+				const isValidPassword = await bcrypt.compare(providedPassword, gallery.password)
+				if (!isValidPassword) {
+					return res.status(401).json({ success: false, error: 'Invalid password' })
+				}
+			}
+		}
 
 		res.json({
 			success: true,
@@ -446,15 +436,15 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 				const deletePromises = allPhotos.map(async (photo) => {
 					// Extract the S3 keys from the URLs
 					const originalUrl = new URL(photo.originalUrl);
-					
+
 					// Split pathname and remove bucket name to get just the filename
 					const originalPathParts = originalUrl.pathname.split('/');
-					
+
 					// Remove empty string and bucket name, keep the rest as the key
 					const originalKey = originalPathParts.slice(2).join('/');
-					
+
 					const promises = [deleteFromS3(originalKey)]
-					
+
 					// Only delete thumbnail if it exists (may be null for pending thumbnails)
 					if (photo.thumbnailUrl) {
 						const thumbnailUrl = new URL(photo.thumbnailUrl);
@@ -462,10 +452,10 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 						const thumbnailKey = thumbnailPathParts.slice(2).join('/');
 						promises.push(deleteFromS3(thumbnailKey))
 					}
-					
+
 					return Promise.all(promises)
 				});
-				
+
 				await Promise.all(deletePromises);
 				console.log(`Deleted ${allPhotos.length} photos from S3 for gallery ${id}`);
 			} catch (storageError) {
@@ -493,83 +483,83 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 }
 
 export const likeGallery = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user!.id;
+	try {
+		const { id } = req.params;
+		const userId = req.user!.id;
 
-        const existingLike = await prisma.likedGallery.findUnique({
-            where: { userId_galleryId: { userId, galleryId: id } },
-        });
+		const existingLike = await prisma.likedGallery.findUnique({
+			where: { userId_galleryId: { userId, galleryId: id } },
+		});
 
-        if (existingLike) {
-            return res.status(400).json({ success: false, error: 'Gallery already liked' });
-        }
+		if (existingLike) {
+			return res.status(400).json({ success: false, error: 'Gallery already liked' });
+		}
 
-        await prisma.likedGallery.create({
-            data: { userId, galleryId: id },
-        });
+		await prisma.likedGallery.create({
+			data: { userId, galleryId: id },
+		});
 
-        res.json({ success: true, message: 'Gallery liked' });
-    } catch (error) {
-        console.error('Like gallery error:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
+		res.json({ success: true, message: 'Gallery liked' });
+	} catch (error) {
+		console.error('Like gallery error:', error);
+		res.status(500).json({ success: false, error: 'Internal server error' });
+	}
 };
 
 export const unlikeGallery = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user!.id;
+	try {
+		const { id } = req.params;
+		const userId = req.user!.id;
 
-        await prisma.likedGallery.delete({
-            where: { userId_galleryId: { userId, galleryId: id } },
-        });
+		await prisma.likedGallery.delete({
+			where: { userId_galleryId: { userId, galleryId: id } },
+		});
 
-        res.json({ success: true, message: 'Gallery unliked' });
-    } catch (error) {
-        console.error('Unlike gallery error:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
+		res.json({ success: true, message: 'Gallery unliked' });
+	} catch (error) {
+		console.error('Unlike gallery error:', error);
+		res.status(500).json({ success: false, error: 'Internal server error' });
+	}
 };
 
 export const favoriteGallery = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user!.id;
+	try {
+		const { id } = req.params;
+		const userId = req.user!.id;
 
-        const existingFavorite = await prisma.favoritedGallery.findUnique({
-            where: { userId_galleryId: { userId, galleryId: id } },
-        });
+		const existingFavorite = await prisma.favoritedGallery.findUnique({
+			where: { userId_galleryId: { userId, galleryId: id } },
+		});
 
-        if (existingFavorite) {
-            return res.status(400).json({ success: false, error: 'Gallery already favorited' });
-        }
+		if (existingFavorite) {
+			return res.status(400).json({ success: false, error: 'Gallery already favorited' });
+		}
 
-        await prisma.favoritedGallery.create({
-            data: { userId, galleryId: id },
-        });
+		await prisma.favoritedGallery.create({
+			data: { userId, galleryId: id },
+		});
 
-        res.json({ success: true, message: 'Gallery favorited' });
-    } catch (error) {
-        console.error('Favorite gallery error:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
+		res.json({ success: true, message: 'Gallery favorited' });
+	} catch (error) {
+		console.error('Favorite gallery error:', error);
+		res.status(500).json({ success: false, error: 'Internal server error' });
+	}
 };
 
 export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user!.id;
+	try {
+		const { id } = req.params;
+		const userId = req.user!.id;
 
-        await prisma.favoritedGallery.delete({
-            where: { userId_galleryId: { userId, galleryId: id } },
-        });
+		await prisma.favoritedGallery.delete({
+			where: { userId_galleryId: { userId, galleryId: id } },
+		});
 
-        res.json({ success: true, message: 'Gallery unfavorited' });
-    } catch (error) {
-        console.error('Unfavorite gallery error:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
+		res.json({ success: true, message: 'Gallery unfavorited' });
+	} catch (error) {
+		console.error('Unfavorite gallery error:', error);
+		res.status(500).json({ success: false, error: 'Internal server error' });
+	}
 };
 
 export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
