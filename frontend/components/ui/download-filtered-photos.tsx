@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Loader2, Heart, Star, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { DownloadProgress } from "@/components/ui/download-progress";
-import { generateFilteredDownloadFilename, validateDownloadRequest } from "@/lib/download-utils";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import { generateFilteredDownloadFilename, validateDownloadRequest, getDownloadBaseUrl } from "@/lib/download-utils";
 
 function getAuthToken() {
   if (typeof document === "undefined") return null;
@@ -75,10 +73,13 @@ export function DownloadFilteredPhotos({
     const setDownloadId = filterType === 'liked' ? setLikedDownloadId : setFavoritedDownloadId;
 
     setDownloading(true);
+    
+    // Use direct domain to bypass Cloudflare timeouts
+    const baseUrl = getDownloadBaseUrl();
     showToast(`Preparing ${filterType} photos download...`, "info");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/${filterType}`, {
+      const response = await fetch(`${baseUrl}/api/photos/gallery/${galleryId}/download/${filterType}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

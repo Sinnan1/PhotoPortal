@@ -35,6 +35,7 @@ import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summa
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL || API_BASE_URL;
 
 function getAuthToken() {
   if (typeof document === "undefined") return null
@@ -379,7 +380,7 @@ function GalleryPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/folder/${currentFolder.id}`, {
+      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/folder/${currentFolder.id}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -441,7 +442,7 @@ function GalleryPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`${API_BASE_URL}/photos/gallery/${galleryId}/download/all`, {
+      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/all`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

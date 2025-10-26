@@ -2,6 +2,18 @@
  * Utility functions for download functionality
  */
 
+const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+/**
+ * Gets the download base URL
+ * All zip downloads use the direct subdomain to bypass Cloudflare timeouts
+ * @returns The direct download URL if configured, otherwise falls back to API URL
+ */
+export function getDownloadBaseUrl(): string {
+  return DIRECT_DOWNLOAD_URL || API_BASE_URL;
+}
+
 /**
  * Generates a descriptive filename for filtered photo downloads
  * @param galleryTitle - The title of the gallery
@@ -98,7 +110,7 @@ export function estimateDownloadTime(totalPhotos: number, processedPhotos: numbe
   // Estimate 2 seconds per photo on average
   const averageTimePerPhoto = 2;
   const remainingPhotos = totalPhotos - processedPhotos;
-  
+
   return remainingPhotos * averageTimePerPhoto;
 }
 
