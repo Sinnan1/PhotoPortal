@@ -349,9 +349,9 @@ export const registerPhoto = async (req: Request, res: Response) => {
 
     console.log(`✅ Photo registered in database: ${photo.id}`);
 
-    // Queue thumbnail generation (non-blocking)
-    const { thumbnailQueue } = await import("../services/thumbnailQueue");
-    await thumbnailQueue.add({
+    // Queue thumbnail generation (non-blocking) - Using parallel processing
+    const { parallelThumbnailQueue } = await import("../services/parallelThumbnailQueue");
+    await parallelThumbnailQueue.add({
       photoId: photo.id,
       s3Key: key,
       galleryId: folder.galleryId,
