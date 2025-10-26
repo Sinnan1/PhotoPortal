@@ -30,7 +30,7 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 // Direct download URL should not include /api suffix as we add it in the fetch calls
-const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL 
+const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL
   ? `${process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL}/api`
   : API_BASE_URL
 
@@ -472,7 +472,7 @@ export const api = {
     if (filters?.galleryId) queryParams.append('galleryId', filters.galleryId)
     if (filters?.hasSelections !== undefined) queryParams.append('hasSelections', filters.hasSelections.toString())
     if (filters?.photographerId) queryParams.append('photographerId', filters.photographerId)
-    
+
     const queryString = queryParams.toString()
     return apiRequest(`/analytics/photographer/selections${queryString ? `?${queryString}` : ''}`)
   },

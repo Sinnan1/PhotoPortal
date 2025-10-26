@@ -3,8 +3,10 @@
  */
 
 const CDN_URL = process.env.CDN_URL;
-const B2_ENDPOINT = `https://s3.${process.env.AWS_REGION || 'us-west-004'}.backblazeb2.com`;
+// Use correct S3-compatible URL format: bucket-name.s3.region.backblazeb2.com
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
+const AWS_REGION = process.env.AWS_REGION || 'us-west-004';
+const B2_ENDPOINT = `https://${BUCKET_NAME}.s3.${AWS_REGION}.backblazeb2.com`;
 
 /**
  * Convert a B2 URL to CDN URL if CDN is configured
@@ -15,10 +17,7 @@ export function toCDNUrl(b2Url: string): string {
     }
 
     // Replace B2 endpoint with CDN URL
-    const cdnUrl = b2Url.replace(
-        `${B2_ENDPOINT}/${BUCKET_NAME}`,
-        CDN_URL
-    );
+    const cdnUrl = b2Url.replace(B2_ENDPOINT, CDN_URL);
 
     return cdnUrl;
 }
@@ -27,10 +26,10 @@ export function toCDNUrl(b2Url: string): string {
  * Generate photo URLs with CDN support
  */
 export function generatePhotoUrls(key: string) {
-    const bucketName = BUCKET_NAME!;
     const endpoint = B2_ENDPOINT;
     
-    const originalUrl = `${endpoint}/${bucketName}/${key}`;
+    // S3-compatible URL format: https://bucket-name.s3.region.backblazeb2.com/path/to/file
+    const originalUrl = `${endpoint}/${key}`;
     
     // Extract base name for thumbnails
     const keyBaseName = key.substring(0, key.lastIndexOf('.')) || key;
@@ -42,8 +41,8 @@ export function generatePhotoUrls(key: string) {
     
     return {
         originalUrl: toCDNUrl(originalUrl),
-        thumbnailUrl: toCDNUrl(`${endpoint}/${bucketName}/${thumbnailKey}`),
-        mediumUrl: toCDNUrl(`${endpoint}/${bucketName}/${mediumKey}`),
-        largeUrl: toCDNUrl(`${endpoint}/${bucketName}/${largeKey}`)
+        thumbnailUrl: toCDNUrl(`${endpoint}/${thumbnailKey}`),
+        mediumUrl: toCDNUrl(`${endpoint}/${mediumKey}`),
+        largeUrl: toCDNUrl(`${endpoint}/${largeKey}`)
     };
 }
