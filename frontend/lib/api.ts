@@ -29,7 +29,10 @@
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL || API_BASE_URL
+// Direct download URL should not include /api suffix as we add it in the fetch calls
+const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL 
+  ? `${process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL}/api`
+  : API_BASE_URL
 
 function getAuthToken() {
   if (typeof document === "undefined") return null
@@ -347,7 +350,7 @@ export const api = {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/liked`, {
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/liked`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -373,7 +376,7 @@ export const api = {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/favorited`, {
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/favorited`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -401,7 +404,7 @@ export const api = {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/all`, {
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/all`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -427,7 +430,7 @@ export const api = {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/api/photos/gallery/${galleryId}/download/folder/${folderId}`, {
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/folder/${folderId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -8,10 +8,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/a
 /**
  * Gets the download base URL
  * All zip downloads use the direct subdomain to bypass Cloudflare timeouts
- * @returns The direct download URL if configured, otherwise falls back to API URL
+ * @returns The direct download URL with /api suffix if configured, otherwise falls back to API URL
  */
 export function getDownloadBaseUrl(): string {
-  return DIRECT_DOWNLOAD_URL || API_BASE_URL;
+  return DIRECT_DOWNLOAD_URL ? `${DIRECT_DOWNLOAD_URL}/api` : API_BASE_URL;
 }
 
 /**

@@ -79,7 +79,7 @@ export function DownloadFilteredPhotos({
     showToast(`Preparing ${filterType} photos download...`, "info");
 
     try {
-      const response = await fetch(`${baseUrl}/api/photos/gallery/${galleryId}/download/${filterType}`, {
+      const response = await fetch(`${baseUrl}/photos/gallery/${galleryId}/download/${filterType}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
