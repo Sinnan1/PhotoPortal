@@ -401,3 +401,132 @@ export const registerPhoto = async (req: Request, res: Response) => {
     res.status(500).json(errorResponse);
   }
 };
+
+// Direct upload endpoint for simple file uploads (non-multipart)
+export const uploadDirect = async (req: Request, res: Response) => {
+  try {
+    const multer = require('multer');
+    const upload = multer({ storage: multer.memoryStorage() }).single('file');
+
+    upload(req, res, async (err: any) => {
+      if (err) {
+        console.error('Multer error:', err);
+        return res.status(400).json({
+          success: false,
+          error: 'File upload failed: ' + err.message
+        });
+      }
+
+      const file = (req as any).file;
+      const { folderId } = req.body;
+      const photographerId = (req as any).user?.id;
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file provided'
+        });
+      }
+
+      if (!folderId) {
+        return res.status(400).json({
+          success: false,
+          error: 'folderId is required'
+        });
+      }
+
+      console.log(`📤 Direct upload: ${file.originalname} (${file.size} bytes)`);
+
+      // Verify folder exists and belongs to photographer
+      const folder = await prisma.folder.findFirst({
+        where: { id: folderId },
+        include: { gallery: true },
+      });
+
+      if (!folder) {
+        return res.status(404).json({
+          success: false,
+          error: 'Folder not found',
+        });
+      }
+
+      if (folder.gallery.photographerId !== photographerId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied',
+        });
+      }
+
+      // Generate unique B2 key
+      const uniqueId = uuidv4();
+      const fileExtension = path.extname(file.originalname);
+      const baseName = path.basename(file.originalname, fileExtension);
+      const b2Key = `${folder.galleryId}/${uniqueId}_${baseName}${fileExtension}`;
+
+      // Upload to B2
+      const { PutObjectCommand } = require('@aws-sdk/client-s3');
+      const command = new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME!,
+        Key: b2Key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        Metadata: {
+          originalFilename: file.originalname,
+          galleryId: folder.galleryId,
+          folderId,
+          photographerId,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+
+      await s3Client.send(command);
+
+      console.log(`✅ File uploaded to B2: ${b2Key}`);
+
+      // Generate B2 URL
+      const bucketName = process.env.S3_BUCKET_NAME!;
+      const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`;
+      const originalUrl = `${endpoint}/${bucketName}/${b2Key}`;
+
+      // Create photo record
+      const photo = await prisma.photo.create({
+        data: {
+          filename: file.originalname,
+          originalUrl,
+          thumbnailUrl: '', // Empty string initially, will be updated by thumbnail queue
+          fileSize: file.size,
+          folderId,
+        },
+      });
+
+      console.log(`✅ Photo registered: ${photo.id}`);
+
+      // Queue thumbnail generation
+      const { parallelThumbnailQueue } = await import('../services/parallelThumbnailQueue');
+      await parallelThumbnailQueue.add({
+        photoId: photo.id,
+        s3Key: b2Key,
+        galleryId: folder.galleryId,
+        originalFilename: file.originalname,
+      });
+
+      console.log(`📸 Thumbnail queued for: ${file.originalname}`);
+
+      res.json({
+        success: true,
+        photo: {
+          id: photo.id,
+          filename: photo.filename,
+          originalUrl: photo.originalUrl,
+          fileSize: photo.fileSize,
+        },
+      });
+    });
+  } catch (error) {
+    console.error('Direct upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Upload failed',
+    });
+  }
+};

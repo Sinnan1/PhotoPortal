@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import express from 'express'
 import { authenticateToken, requireRole } from '../middleware/auth'
-import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto } from '../controllers/uploadsController'
+import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect } from '../controllers/uploadsController'
 import { generateThumbnail } from '../controllers/thumbnailController'
 import { UPLOAD_CONFIG } from '../config/uploadConfig'
 
@@ -96,6 +96,9 @@ router.post('/thumbnail/generate', uploadRateLimit, authenticateToken, requireRo
 
 // Register photo in database after multipart upload
 router.post('/register', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), registerPhoto)
+
+// Direct upload endpoint (simpler, non-multipart)
+router.post('/direct', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), uploadDirect)
 
 // Get upload status (for monitoring)
 router.get('/status', authenticateToken, (req, res) => {
