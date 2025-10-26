@@ -343,6 +343,8 @@ export default function ManageGalleryPage() {
         // Use the new multipart upload system
         const { uploadFileToB2 } = await import('./uploadUtils')
         
+        let lastUploadedBytes = 0
+        
         await uploadFileToB2(
           file,
           galleryId,
@@ -350,15 +352,19 @@ export default function ManageGalleryPage() {
           (percent: number) => {
             setUploadProgress((prev) => ({ ...prev, [file.name]: percent }))
             
-            // Update batch stats
+            // Update batch stats with accurate total progress
             setBatchStats(prev => {
-              const uploadedBytes = (percent / 100) * file.size
+              const currentFileBytes = (percent / 100) * file.size
+              const bytesIncrement = currentFileBytes - lastUploadedBytes
+              lastUploadedBytes = currentFileBytes
+              
+              const newUploadedBytes = prev.uploadedBytes + bytesIncrement
               const elapsedTime = (Date.now() - prev.startTime) / 1000
-              const averageSpeed = elapsedTime > 0 ? uploadedBytes / elapsedTime : 0
+              const averageSpeed = elapsedTime > 0 ? newUploadedBytes / elapsedTime : 0
               
               return {
                 ...prev,
-                uploadedBytes: prev.uploadedBytes + (uploadedBytes - (prev.uploadedBytes % file.size)),
+                uploadedBytes: newUploadedBytes,
                 averageSpeed
               }
             })
