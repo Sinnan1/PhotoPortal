@@ -71,7 +71,7 @@ export default function ManageGalleryPage() {
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'queued' | 'uploading' | 'processing' | 'success' | 'failed' }>({})
   const [uploadAttempts, setUploadAttempts] = useState<{ [key: string]: number }>({})
   const [activeUploads, setActiveUploads] = useState<{ [key: string]: XMLHttpRequest }>({})
-  
+
   // Batch upload tracking
   const [batchStats, setBatchStats] = useState({
     totalFiles: 0,
@@ -107,10 +107,10 @@ export default function ManageGalleryPage() {
 
   const calculateETA = (stats: typeof batchStats): string => {
     if (stats.averageSpeed === 0 || stats.uploadedBytes >= stats.totalBytes) return 'Done'
-    
+
     const remainingBytes = stats.totalBytes - stats.uploadedBytes
     const remainingSeconds = remainingBytes / stats.averageSpeed
-    
+
     if (remainingSeconds < 60) return `${Math.round(remainingSeconds)}s`
     if (remainingSeconds < 3600) return `${Math.round(remainingSeconds / 60)}m`
     return `${Math.round(remainingSeconds / 3600)}h`
@@ -129,7 +129,7 @@ export default function ManageGalleryPage() {
       try {
         input.setAttribute('webkitdirectory', '')
         input.setAttribute('directory', '')
-      } catch {}
+      } catch { }
     }
   }, [])
 
@@ -195,7 +195,7 @@ export default function ManageGalleryPage() {
           entry.file((file: File) => {
             try {
               Object.defineProperty(file, 'webkitRelativePath', { value: prefix + file.name })
-            } catch {}
+            } catch { }
             out.push(file)
             resolve()
           })
@@ -256,7 +256,7 @@ export default function ManageGalleryPage() {
     setUploadProgress({})
     setUploadStatus({})
     setUploadAttempts({})
-    
+
     showToast("Upload canceled", "info")
   }
 
@@ -274,7 +274,7 @@ export default function ManageGalleryPage() {
 
     // Calculate total bytes for batch tracking
     const totalBytes = fileArray.reduce((sum, file) => sum + file.size, 0)
-    
+
     // Initialize batch stats
     setBatchStats({
       totalFiles: fileArray.length,
@@ -301,7 +301,7 @@ export default function ManageGalleryPage() {
 
     try {
       // Optimized parallel uploads for high-throughput uploads
-      const { successCount, failureCount } = await uploadWithConcurrency(fileArray, 20)
+      const { successCount, failureCount } = await uploadWithConcurrency(fileArray, 10)
 
       if (successCount > 0) {
         showToast(`Successfully uploaded ${successCount} ${successCount === 1 ? 'photo' : 'photos'}`, 'success')
@@ -342,33 +342,33 @@ export default function ManageGalleryPage() {
 
         // Use the new multipart upload system
         const { uploadFileToB2 } = await import('./uploadUtils')
-        
+
         let lastUploadedBytes = 0
-        
+
         await uploadFileToB2(
           file,
           galleryId,
           selectedFolderId!,
           (percent: number) => {
             setUploadProgress((prev) => ({ ...prev, [file.name]: percent }))
-            
+
             // Update batch stats with accurate total progress
             setBatchStats(prev => {
               const currentFileBytes = (percent / 100) * file.size
               const bytesIncrement = currentFileBytes - lastUploadedBytes
               lastUploadedBytes = currentFileBytes
-              
+
               const newUploadedBytes = prev.uploadedBytes + bytesIncrement
               const elapsedTime = (Date.now() - prev.startTime) / 1000
               const averageSpeed = elapsedTime > 0 ? newUploadedBytes / elapsedTime : 0
-              
+
               return {
                 ...prev,
                 uploadedBytes: newUploadedBytes,
                 averageSpeed
               }
             })
-            
+
             if (percent === 100) {
               setUploadStatus((prev) => ({ ...prev, [file.name]: 'processing' }))
             }
@@ -380,35 +380,35 @@ export default function ManageGalleryPage() {
         // Upload successful
         setUploadStatus((prev) => ({ ...prev, [file.name]: 'success' }))
         setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }))
-        
+
         // Update batch stats for successful upload
         setBatchStats(prev => ({
           ...prev,
           completedFiles: prev.completedFiles + 1
         }))
-        
+
         return true
 
       } catch (error) {
         console.error(`Upload attempt ${attempt} failed for ${file.name}:`, error)
-        
+
         // Retry with exponential backoff up to 5 attempts
         if (attempt < 5) {
           const baseDelay = 1000
           const jitter = Math.random() * 1000 // Add jitter to prevent thundering herd
           const delay = baseDelay * Math.pow(2, attempt - 1) + jitter
-          
+
           await new Promise(resolve => setTimeout(resolve, delay))
           return attemptUpload(attempt + 1)
         } else {
           setUploadStatus((prev) => ({ ...prev, [file.name]: 'failed' }))
-          
+
           // Update batch stats for final failed upload
           setBatchStats(prev => ({
             ...prev,
             failedFiles: prev.failedFiles + 1
           }))
-          
+
           return false
         }
       }
@@ -490,14 +490,14 @@ export default function ManageGalleryPage() {
             status.liked === undefined
               ? p.likedBy
               : status.liked
-              ? [ ...(p.likedBy ?? []), { userId: user!.id } ]
-              : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
+                ? [...(p.likedBy ?? []), { userId: user!.id }]
+                : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
           favoritedBy:
             status.favorited === undefined
               ? p.favoritedBy
               : status.favorited
-              ? [ ...(p.favoritedBy ?? []), { userId: user!.id } ]
-              : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
+                ? [...(p.favoritedBy ?? []), { userId: user!.id }]
+                : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
         } as Photo
       })
 
@@ -601,8 +601,8 @@ export default function ManageGalleryPage() {
           <Badge variant="outline">{gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</Badge>
           {gallery?.id && (
             <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
-            <Button variant="outline">View Gallery</Button>
-          </Link>
+              <Button variant="outline">View Gallery</Button>
+            </Link>
           )}
         </div>
       </div>
@@ -714,7 +714,7 @@ export default function ManageGalleryPage() {
                               Cancel Upload
                             </Button>
                           </div>
-                          
+
                           {/* Overall Progress Bar */}
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm text-gray-600">
@@ -728,8 +728,8 @@ export default function ManageGalleryPage() {
                             <div className="w-full bg-gray-200 rounded-full h-3">
                               <div
                                 className="bg-[#425146] h-3 rounded-full transition-all duration-300"
-                                style={{ 
-                                  width: `${batchStats.totalBytes > 0 ? (batchStats.uploadedBytes / batchStats.totalBytes) * 100 : 0}%` 
+                                style={{
+                                  width: `${batchStats.totalBytes > 0 ? (batchStats.uploadedBytes / batchStats.totalBytes) * 100 : 0}%`
                                 }}
                               />
                             </div>
@@ -748,7 +748,7 @@ export default function ManageGalleryPage() {
                             <div>
                               <div className="text-gray-500">Success Rate</div>
                               <div className="font-medium">
-                                {batchStats.totalFiles > 0 
+                                {batchStats.totalFiles > 0
                                   ? Math.round((batchStats.completedFiles / batchStats.totalFiles) * 100)
                                   : 0}%
                               </div>
@@ -794,14 +794,14 @@ export default function ManageGalleryPage() {
 
               {/* Folder Content */}
               {selectedFolder ? (
-          <Card>
-            <CardHeader>
+                <Card>
+                  <CardHeader>
                     <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
                     <CardDescription>
                       {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
                     </CardDescription>
-            </CardHeader>
-            <CardContent>
+                  </CardHeader>
+                  <CardContent>
                     <FolderGrid
                       folder={selectedFolder}
                       isPhotographer={user?.role === "PHOTOGRAPHER"}
@@ -824,8 +824,8 @@ export default function ManageGalleryPage() {
                   </CardContent>
                 </Card>
               )}
-                      </div>
-                    </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="settings">
