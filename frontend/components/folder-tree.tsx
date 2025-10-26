@@ -45,11 +45,12 @@ export function FolderTree({
   const [folders, setFolders] = useState<Folder[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
   const { showToast } = useToast()
 
   useEffect(() => {
     fetchFolders()
-  }, [galleryId])
+  }, [galleryId, refreshKey])
 
   const fetchFolders = async () => {
     try {
@@ -79,23 +80,35 @@ export function FolderTree({
     onFolderSelect(folderId)
   }
 
-  const handleCreateSubfolder = (parentId: string, e: React.MouseEvent) => {
+  const handleCreateSubfolder = async (parentId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    onFolderCreate?.(parentId)
-  }
-
-  const handleRename = (folderId: string, currentName: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const newName = prompt("Enter new folder name:", currentName)
-    if (newName && newName.trim() && newName !== currentName) {
-      onFolderRename?.(folderId, newName.trim())
+    if (onFolderCreate) {
+      await onFolderCreate(parentId)
+      // Refresh folder tree after creation
+      setRefreshKey(prev => prev + 1)
     }
   }
 
-  const handleDelete = (folderId: string, folderName: string, e: React.MouseEvent) => {
+  const handleRename = async (folderId: string, currentName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newName = prompt("Enter new folder name:", currentName)
+    if (newName && newName.trim() && newName !== currentName) {
+      if (onFolderRename) {
+        await onFolderRename(folderId, newName.trim())
+        // Refresh folder tree after rename
+        setRefreshKey(prev => prev + 1)
+      }
+    }
+  }
+
+  const handleDelete = async (folderId: string, folderName: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm(`Are you sure you want to delete "${folderName}" and all its contents?`)) {
-      onFolderDelete?.(folderId)
+      if (onFolderDelete) {
+        await onFolderDelete(folderId)
+        // Refresh folder tree after deletion
+        setRefreshKey(prev => prev + 1)
+      }
     }
   }
 
@@ -214,11 +227,17 @@ export function FolderTree({
       {/* Header with Create Root Folder Button */}
       <div className="px-4 pb-3 border-b border-gray-200 dark:border-gray-700 mb-2">
         <Button
-          onClick={() => onFolderCreate?.()}
+          onClick={async () => {
+            if (onFolderCreate) {
+              await onFolderCreate()
+              // Refresh folder tree after creation
+              setRefreshKey(prev => prev + 1)
+            }
+          }}
           size="sm"
           className="w-full bg-[#425146] hover:bg-[#425146]/90"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 w-4 mr-2" />
           New Folder
         </Button>
       </div>
