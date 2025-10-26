@@ -77,7 +77,7 @@ class UploadManager {
         const batches = JSON.parse(data) as UploadBatch[]
         // Only load batches that aren't complete
         batches.forEach(batch => {
-          const hasIncomplete = batch.files.some(f => 
+          const hasIncomplete = batch.files.some(f =>
             f.status === 'queued' || f.status === 'uploading'
           )
           if (hasIncomplete) {
@@ -103,8 +103,8 @@ class UploadManager {
     files: File[],
     compress: boolean = false
   ): Promise<string> {
-    const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
+    const batchId = `batch-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+
     const uploadFiles: UploadFile[] = files.map(file => ({
       file,
       id: `${batchId}-${file.name}`,
@@ -143,12 +143,12 @@ class UploadManager {
     if (!batch) return
 
     const queuedFiles = batch.files.filter(f => f.status === 'queued')
-    
+
     // Process files with concurrency limit
-    const workers = Array.from({ length: Math.min(this.maxConcurrent, queuedFiles.length) }, 
+    const workers = Array.from({ length: Math.min(this.maxConcurrent, queuedFiles.length) },
       () => this.processNextFile(batchId)
     )
-    
+
     await Promise.all(workers)
   }
 
@@ -189,18 +189,17 @@ class UploadManager {
           batch.galleryId,
           batch.folderId,
           (progress) => {
+            // Update file progress
             uploadFile.progress = progress
-            
-            // Update batch stats
-            const currentBytes = (progress / 100) * fileToUpload.size
-            const previousBytes = uploadFile.progress === progress ? 0 : 
-              ((uploadFile.progress || 0) / 100) * fileToUpload.size
-            
-            batch.uploadedBytes += (currentBytes - previousBytes)
-            
+
+            // Recalculate total uploaded bytes from all files
+            batch.uploadedBytes = batch.files.reduce((total, f) => {
+              return total + ((f.progress / 100) * (f.file?.size || 0))
+            }, 0)
+
             const elapsedTime = (Date.now() - batch.startTime) / 1000
             batch.averageSpeed = elapsedTime > 0 ? batch.uploadedBytes / elapsedTime : 0
-            
+
             this.notify()
           }
         )
@@ -209,6 +208,12 @@ class UploadManager {
         uploadFile.progress = 100
         uploadFile.photoId = result.photoId
         batch.completedFiles++
+
+        // Recalculate final uploaded bytes
+        batch.uploadedBytes = batch.files.reduce((total, f) => {
+          return total + ((f.progress / 100) * (f.file?.size || 0))
+        }, 0)
+
         this.notify()
 
         return true
@@ -369,6 +374,7 @@ class UploadManager {
     const batch = this.batches.get(batchId)
     if (!batch) return
 
+    // Reset failed files
     batch.files.forEach(file => {
       if (file.status === 'failed') {
         file.status = 'queued'
@@ -378,7 +384,9 @@ class UploadManager {
       }
     })
 
+    // Reset batch counters (but keep uploadedBytes from successful uploads)
     batch.failedFiles = 0
+
     this.notify()
     this.processBatch(batchId)
   }
@@ -393,7 +401,7 @@ class UploadManager {
 
   clearCompleted() {
     Array.from(this.batches.entries()).forEach(([id, batch]) => {
-      const allComplete = batch.files.every(f => 
+      const allComplete = batch.files.every(f =>
         f.status === 'success' || f.status === 'failed'
       )
       if (allComplete) {
