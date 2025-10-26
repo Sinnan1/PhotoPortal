@@ -69,6 +69,7 @@ router.get('/posts', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)
 router.get('/:id/download', downloadPhoto)
+router.post('/:id/download', downloadPhoto) // Support POST for secure credential passing
 
 // Filtered download routes
 router.get('/gallery/:galleryId/download/liked', authenticateToken, downloadLikedPhotos)
