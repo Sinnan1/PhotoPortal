@@ -36,9 +36,7 @@ export const UPLOAD_CONFIG = {
   // THUMBNAIL SETTINGS
   THUMBNAIL_QUEUE_CONCURRENCY: 5,          // Process 5 thumbnails at once
   THUMBNAIL_SIZES: {
-    small: { width: 400, height: 400 },    // Grid view
-    medium: { width: 1200, height: 1200 }, // Lightbox
-    large: { width: 2000, height: 2000 }   // High quality preview
+    medium: { width: 1200, height: 1200 }  // Universal thumbnail for grid & lightbox
   },
   
   // SUPPORTED FILE TYPES
