@@ -128,7 +128,7 @@ export const uploadPartProxy = async (req: Request, res: Response) => {
 
 export const registerPhoto = async (req: Request, res: Response) => {
 	try {
-		const { key, filename, folderId, fileSize } = req.body
+		const { key, filename, folderId, fileSize, uploadSessionId } = req.body
 		const photographerId = (req as any).user?.id
 
 		if (!key || !filename || !folderId || !photographerId) {
@@ -154,37 +154,49 @@ export const registerPhoto = async (req: Request, res: Response) => {
 		const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
 		const originalUrl = `${endpoint}/${bucketName}/${key}`
 
-		// Extract thumbnail key from the S3 key (not the original filename)
-		// The key format is: galleryId/uuid_originalFilename.ext
-		// The thumbnail formats are:
-		// - small (400x400): galleryId/thumbnails/uuid_originalFilename_small.jpg
-		// - medium (1200x1200): galleryId/thumbnails/uuid_originalFilename_medium.jpg
-		// - large (2000x2000): galleryId/thumbnails/uuid_originalFilename_large.jpg
-		const keyBaseName = path.basename(key, path.extname(key))
-		const thumbnailKey = `${folder.galleryId}/thumbnails/${keyBaseName}_small.jpg`
-		const mediumKey = `${folder.galleryId}/thumbnails/${keyBaseName}_medium.jpg`
-		const largeKey = `${folder.galleryId}/thumbnails/${keyBaseName}_large.jpg`
-		
-		const thumbnailUrl = `${endpoint}/${bucketName}/${thumbnailKey}`
-		const mediumUrl = `${endpoint}/${bucketName}/${mediumKey}`
-		const largeUrl = `${endpoint}/${bucketName}/${largeKey}`
-
-		// Create photo record in database
+		// Create photo record in database WITHOUT thumbnails (will be generated async)
 		const photo = await prisma.photo.create({
 			data: {
 				filename,
 				originalUrl,
-				thumbnailUrl,
-				mediumUrl,
-				largeUrl,
+				thumbnailUrl: undefined, // Will be set by thumbnail queue
+				mediumUrl: undefined,
+				largeUrl: undefined,
+				thumbnailStatus: 'PENDING',
+				uploadStatus: 'COMPLETED',
 				fileSize: fileSize || 0,
-				folderId
+				folderId,
+				uploadSessionId: uploadSessionId || undefined
 			}
 		})
 
+		// Queue thumbnail generation (non-blocking)
+		const { thumbnailQueue } = await import('../services/thumbnailQueue')
+		thumbnailQueue.add({
+			photoId: photo.id,
+			s3Key: key,
+			galleryId: folder.galleryId,
+			originalFilename: filename
+		})
+
+		// Update upload session if provided
+		if (uploadSessionId) {
+			const { uploadSessionService } = await import('../services/uploadSessionService')
+			const session = await uploadSessionService.getSession(uploadSessionId)
+			if (session) {
+				await uploadSessionService.updateProgress(
+					uploadSessionId,
+					session.uploadedFiles + 1,
+					session.failedFiles,
+					Number(session.uploadedBytes) + (fileSize || 0)
+				)
+			}
+		}
+
 		res.json({
 			success: true,
-			photo
+			photo,
+			message: 'Photo uploaded successfully. Thumbnails are being generated.'
 		})
 	} catch (error) {
 		console.error('Register photo error:', error)

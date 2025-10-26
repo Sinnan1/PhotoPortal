@@ -30,6 +30,7 @@ model User {
   postPhotos          PostPhoto[]
   systemConfigUpdates SystemConfig[]     @relation("SystemConfigUpdates")
   adminInvitations    AdminInvitation[]  @relation("AdminInvitations")
+  uploadSessions      UploadSession[]    @relation("UploadSessions")
   photographer        User?              @relation("PhotographerClients", fields: [photographerId], references: [id])
   clients             User[]             @relation("PhotographerClients")
 
@@ -52,6 +53,7 @@ model Gallery {
   photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
   accessibleBy   GalleryAccess[]
   likedBy        LikedGallery[]
+  uploadSessions UploadSession[]    @relation("GalleryUploadSessions")
 
   @@map("galleries")
 }
@@ -74,22 +76,29 @@ model Folder {
 }
 
 model Photo {
-  id            String           @id @default(cuid())
-  filename      String
-  originalUrl   String
-  thumbnailUrl  String
-  fileSize      Int
-  downloadCount Int              @default(0)
-  createdAt     DateTime         @default(now())
-  largeUrl      String?
-  mediumUrl     String?
-  folderId      String
-  favoritedBy   FavoritedPhoto[]
-  coverFolders  Folder[]         @relation("FolderCover")
-  likedBy       LikedPhoto[]
-  folder        Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  postBy        PostPhoto[]
+  id              String           @id @default(cuid())
+  filename        String
+  originalUrl     String
+  thumbnailUrl    String?
+  fileSize        Int
+  downloadCount   Int              @default(0)
+  createdAt       DateTime         @default(now())
+  largeUrl        String?
+  mediumUrl       String?
+  folderId        String
+  uploadSessionId String?
+  thumbnailStatus ThumbnailStatus  @default(PENDING)
+  uploadStatus    UploadStatus     @default(COMPLETED)
+  favoritedBy     FavoritedPhoto[]
+  coverFolders    Folder[]         @relation("FolderCover")
+  likedBy         LikedPhoto[]
+  folder          Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  uploadSession   UploadSession?   @relation(fields: [uploadSessionId], references: [id], onDelete: SetNull)
+  postBy          PostPhoto[]
 
+  @@index([uploadSessionId])
+  @@index([thumbnailStatus])
+  @@index([uploadStatus])
   @@map("photos")
 }
 
@@ -226,4 +235,50 @@ enum AdminInvitationStatus {
   ACCEPTED
   EXPIRED
   REVOKED
+}
+
+enum ThumbnailStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum UploadStatus {
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
+enum UploadSessionStatus {
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model UploadSession {
+  id             String              @id @default(cuid())
+  userId         String
+  galleryId      String
+  folderId       String?
+  totalFiles     Int
+  uploadedFiles  Int                 @default(0)
+  failedFiles    Int                 @default(0)
+  totalBytes     BigInt              @default(0)
+  uploadedBytes  BigInt              @default(0)
+  status         UploadSessionStatus @default(IN_PROGRESS)
+  startedAt      DateTime            @default(now())
+  completedAt    DateTime?
+  lastActivityAt DateTime            @default(now())
+  errorMessage   String?
+  user           User                @relation("UploadSessions", fields: [userId], references: [id], onDelete: Cascade)
+  gallery        Gallery             @relation("GalleryUploadSessions", fields: [galleryId], references: [id], onDelete: Cascade)
+  photos         Photo[]
+
+  @@index([userId, status])
+  @@index([galleryId])
+  @@index([status, lastActivityAt])
+  @@map("upload_sessions")
 }

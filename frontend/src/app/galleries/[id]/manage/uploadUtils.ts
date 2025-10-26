@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
+import { UPLOAD_CONFIG } from '@/src/config/uploadConfig'
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload
+const CHUNK_SIZE = UPLOAD_CONFIG.CHUNK_SIZE // 10MB chunks for multipart upload
 
 export async function uploadFileToB2(
     file: File,
@@ -8,7 +9,8 @@ export async function uploadFileToB2(
     folderId: string,
     onProgress: (percent: number) => void,
     token: string,
-    BASE_URL: string
+    BASE_URL: string,
+    uploadSessionId?: string
 ): Promise<{ key: string }> {
     const uniqueId = uuidv4()
     const key = `${galleryId}/${uniqueId}_${file.name}`
@@ -155,7 +157,8 @@ export async function uploadFileToB2(
                 key,
                 filename: file.name,
                 folderId,
-                fileSize: file.size
+                fileSize: file.size,
+                uploadSessionId
             })
         })
 
