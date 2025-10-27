@@ -293,7 +293,8 @@ class UploadManager {
     folderId: string,
     onProgress: (percent: number) => void
   ): Promise<{ photoId: string }> {
-    const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+    // Use direct subdomain to bypass Cloudflare 100-second timeout
+    const BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
     const token = typeof document !== 'undefined'
       ? document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
       : undefined
