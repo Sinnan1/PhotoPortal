@@ -73,6 +73,9 @@ export default function ManageGalleryPage() {
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null)
   const [compressBeforeUpload, setCompressBeforeUpload] = useState(false)
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("")
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -217,13 +220,24 @@ export default function ManageGalleryPage() {
       )
 
       showToast(`Started uploading ${fileArray.length} ${fileArray.length === 1 ? 'photo' : 'photos'}`, 'success')
-      
-      // Refresh folder after a short delay to show new photos
-      setTimeout(() => {
-        if (selectedFolderId) {
-          handleFolderSelect(selectedFolderId)
+
+      // Set up polling to refresh folder when uploads complete
+      const checkInterval = setInterval(async () => {
+        const batches = uploadManager.getAllBatches()
+        const hasActiveUploads = batches.some(b =>
+          b.files.some(f => f.status === 'queued' || f.status === 'uploading')
+        )
+
+        if (!hasActiveUploads && selectedFolderId) {
+          clearInterval(checkInterval)
+          // Refresh folder to show new photos
+          const response = await api.getFolder(selectedFolderId)
+          setSelectedFolder(response.data)
         }
       }, 2000)
+
+      // Clear interval after 5 minutes to prevent memory leaks
+      setTimeout(() => clearInterval(checkInterval), 300000)
     } catch (error) {
       showToast("Failed to start upload", "error")
     }
@@ -349,26 +363,32 @@ export default function ManageGalleryPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center space-x-4">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Manage Gallery</h1>
-            <p className="text-gray-600">{gallery?.title || 'Loading...'}</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline">{gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos</Badge>
-          {gallery?.id && (
-            <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
-              <Button variant="outline">View Gallery</Button>
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <Link href="/dashboard">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
             </Link>
-          )}
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Manage Gallery</h1>
+              <p className="text-gray-600 text-sm sm:text-base">{gallery?.title || 'Loading...'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="whitespace-nowrap">
+              {gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos
+            </Badge>
+            {gallery?.id && (
+              <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
+                <Button variant="outline" size="sm" className="whitespace-nowrap">
+                  View Gallery
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
@@ -486,19 +506,47 @@ export default function ManageGalleryPage() {
               {selectedFolder ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
-                    <CardDescription>
-                      {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
+                        <CardDescription>
+                          {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
+                        </CardDescription>
+                      </div>
+                      {/* Search Input */}
+                      <div className="w-64">
+                        <Input
+                          type="text"
+                          placeholder="Search photos..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <FileList
-                      folder={selectedFolder}
+                      folder={{
+                        ...selectedFolder,
+                        photos: searchQuery
+                          ? selectedFolder.photos.filter(photo =>
+                            photo.filename.toLowerCase().includes(searchQuery.toLowerCase())
+                          )
+                          : selectedFolder.photos
+                      }}
                       onPhotoDelete={handleDeletePhoto}
                       onFolderSelect={handleFolderSelect}
                       onFolderRename={handleRenameFolder}
                       onFolderDelete={handleDeleteFolder}
                     />
+                    {searchQuery && selectedFolder.photos.filter(photo =>
+                      photo.filename.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          No photos found matching "{searchQuery}"
+                        </div>
+                      )}
                   </CardContent>
                 </Card>
               ) : (

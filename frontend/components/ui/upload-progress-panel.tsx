@@ -8,6 +8,7 @@ import { Button } from './button'
 export function UploadProgressPanel() {
   const [batches, setBatches] = useState<UploadBatch[]>([])
   const [isMinimized, setIsMinimized] = useState(false)
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const unsubscribe = uploadManager.subscribe((newBatches) => {
@@ -46,7 +47,7 @@ export function UploadProgressPanel() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white rounded-lg shadow-2xl border border-gray-200 z-50">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-w-md bg-white rounded-lg shadow-2xl border border-gray-200 z-50">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <div className="flex items-center space-x-2">
@@ -85,14 +86,29 @@ export function UploadProgressPanel() {
             const remaining = totalFiles - completed - failed
             const isActive = batch.files.some(f => f.status === 'queued' || f.status === 'uploading')
 
+            const isExpanded = expandedBatches.has(batch.id)
+            
             return (
               <div key={batch.id} className="p-4 border-b border-gray-100 last:border-b-0">
                 {/* Batch Summary */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-gray-900">
-                      {isActive ? 'Uploading' : 'Upload Complete'}
-                    </div>
+                    <button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedBatches)
+                        if (isExpanded) {
+                          newExpanded.delete(batch.id)
+                        } else {
+                          newExpanded.add(batch.id)
+                        }
+                        setExpandedBatches(newExpanded)
+                      }}
+                      className="text-sm font-medium text-gray-900 hover:text-[#425146] flex items-center space-x-2"
+                    >
+                      <span>{isActive ? 'Uploading' : 'Upload Complete'}</span>
+                      <span className="text-xs text-gray-500">({totalFiles} files)</span>
+                      <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
+                    </button>
                     <div className="flex items-center space-x-2">
                       {failed > 0 && (
                         <Button
@@ -159,9 +175,10 @@ export function UploadProgressPanel() {
                     </div>
                   )}
 
-                  {/* Individual Files (show recent 5) */}
-                  <div className="space-y-2 mt-3">
-                    {batch.files.slice(0, 5).map(file => (
+                  {/* Individual Files - Show all with scrolling when expanded */}
+                  {isExpanded && (
+                    <div className="space-y-2 mt-3 max-h-48 overflow-y-auto border-t border-gray-100 pt-3">
+                      {batch.files.map(file => (
                       <div key={file.id} className="flex items-center space-x-2 text-xs min-w-0">
                         {file.status === 'success' && (
                           <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
@@ -175,7 +192,7 @@ export function UploadProgressPanel() {
                         {file.status === 'queued' && (
                           <div className="h-3 w-3 rounded-full border-2 border-gray-300 flex-shrink-0" />
                         )}
-                        <span className="truncate flex-1 text-gray-700 min-w-0 overflow-hidden text-ellipsis">
+                        <span className="truncate flex-1 text-gray-700 min-w-0 overflow-hidden text-ellipsis" title={file.file?.name}>
                           {file.file?.name || 'Unknown file'}
                         </span>
                         {file.status === 'uploading' && (
@@ -188,13 +205,9 @@ export function UploadProgressPanel() {
                           <span className="text-gray-400 flex-shrink-0">({file.attempts}/3)</span>
                         )}
                       </div>
-                    ))}
-                    {batch.files.length > 5 && (
-                      <div className="text-xs text-gray-400 text-center">
-                        +{batch.files.length - 5} more files
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )
