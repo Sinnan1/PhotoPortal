@@ -33,7 +33,7 @@ class UploadManager {
   private batches: Map<string, UploadBatch> = new Map()
   private listeners: Set<UploadListener> = new Set()
   private activeUploads: Map<string, XMLHttpRequest> = new Map()
-  private maxConcurrent = 10
+  private maxConcurrent = 3  // Reduced from 10 to 3 for better reliability
   private maxRetries = 3
 
   constructor() {

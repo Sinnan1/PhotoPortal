@@ -22,7 +22,7 @@ export function UploadProgressPanel() {
     }
   }, [])
 
-  const activeBatches = batches.filter(b => 
+  const activeBatches = batches.filter(b =>
     b.files.some(f => f.status === 'queued' || f.status === 'uploading')
   )
 
@@ -46,7 +46,7 @@ export function UploadProgressPanel() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50">
+    <div className="fixed bottom-4 right-4 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white rounded-lg shadow-2xl border border-gray-200 z-50">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <div className="flex items-center space-x-2">
@@ -162,7 +162,7 @@ export function UploadProgressPanel() {
                   {/* Individual Files (show recent 5) */}
                   <div className="space-y-2 mt-3">
                     {batch.files.slice(0, 5).map(file => (
-                      <div key={file.id} className="flex items-center space-x-2 text-xs">
+                      <div key={file.id} className="flex items-center space-x-2 text-xs min-w-0">
                         {file.status === 'success' && (
                           <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
                         )}
@@ -175,17 +175,17 @@ export function UploadProgressPanel() {
                         {file.status === 'queued' && (
                           <div className="h-3 w-3 rounded-full border-2 border-gray-300 flex-shrink-0" />
                         )}
-                        <span className="truncate flex-1 text-gray-700">
+                        <span className="truncate flex-1 text-gray-700 min-w-0 overflow-hidden text-ellipsis">
                           {file.file?.name || 'Unknown file'}
                         </span>
                         {file.status === 'uploading' && (
-                          <span className="text-gray-500">{file.progress}%</span>
+                          <span className="text-gray-500 flex-shrink-0 whitespace-nowrap">{file.progress}%</span>
                         )}
                         {file.status === 'processing' && (
-                          <span className="text-gray-500">Processing...</span>
+                          <span className="text-gray-500 flex-shrink-0 whitespace-nowrap text-[10px]">Processing</span>
                         )}
                         {file.attempts > 1 && file.status !== 'success' && (
-                          <span className="text-gray-400">({file.attempts}/3)</span>
+                          <span className="text-gray-400 flex-shrink-0">({file.attempts}/3)</span>
                         )}
                       </div>
                     ))}
