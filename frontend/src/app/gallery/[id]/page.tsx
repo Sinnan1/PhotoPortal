@@ -511,6 +511,19 @@ function GalleryPage() {
     }
   };
 
+  const handleSetCoverPhoto = async (folderId: string, photoId: string) => {
+    try {
+      await api.setFolderCover(folderId, photoId || undefined);
+      showToast(photoId ? "Cover photo set successfully" : "Cover photo removed", "success");
+      
+      // Refresh the gallery to update cover photos
+      await fetchGallery();
+    } catch (error) {
+      console.error("Failed to set cover photo", error);
+      showToast("Failed to set cover photo", "error");
+    }
+  };
+
   const handleImageError = (photoId: string) => {
     setImageErrors(prev => new Set(prev).add(photoId));
   };
@@ -974,6 +987,7 @@ function GalleryPage() {
           folders={currentFolder.children}
           isPhotographer={user?.role === "PHOTOGRAPHER"}
           onFolderSelect={handleFolderSelect}
+          onSetCoverPhoto={user?.role === "PHOTOGRAPHER" ? handleSetCoverPhoto : undefined}
           showSelectionCounters={!!user}
         />
       )}
@@ -1083,6 +1097,7 @@ function GalleryPage() {
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}
                 onPhotoStatusChange={handlePhotoStatusChange}
+                onSetCoverPhoto={user?.role === "PHOTOGRAPHER" ? handleSetCoverPhoto : undefined}
                 viewMode={viewMode}
               />
             )}
