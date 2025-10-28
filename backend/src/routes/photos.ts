@@ -21,7 +21,10 @@ import {
 	downloadFavoritedPhotos,
 	downloadAllPhotos,
 	downloadFolderPhotos,
-	getDownloadProgress
+	getDownloadProgress,
+	getDirectPhotoDownloadUrl,
+	getDirectMultiplePhotoDownloadUrls,
+	getDirectFilteredPhotoDownloadUrls
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { auditMiddleware } from '../middleware/auditMiddleware'
@@ -79,5 +82,20 @@ router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, d
 
 // Download progress tracking
 router.get('/download/:downloadId/progress', authenticateToken, getDownloadProgress)
+
+// ============================================================================
+// DIRECT B2 DOWNLOAD ROUTES (New - Bandwidth Optimized)
+// ============================================================================
+// These routes generate pre-signed B2 URLs for direct downloads
+// Saves massive VPS bandwidth (100GB per download → 0GB)
+
+// Get direct download URL for single photo
+router.get('/:id/direct-download-url', authenticateToken, getDirectPhotoDownloadUrl)
+
+// Get direct download URLs for multiple photos (batch)
+router.post('/direct-download-urls', authenticateToken, getDirectMultiplePhotoDownloadUrls)
+
+// Get direct download URLs for filtered photos (liked/favorited)
+router.get('/gallery/:galleryId/direct-download-urls', authenticateToken, getDirectFilteredPhotoDownloadUrls)
 
 export default router

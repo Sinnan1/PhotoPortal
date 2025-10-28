@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import sharp from 'sharp'
 import os from 'os'
 import { v4 as uuidv4 } from 'uuid'
@@ -357,4 +358,142 @@ export const generateMultipleThumbnails = async (
 	}
 	
 	return results
+}
+/**
+ 
+* Generate a pre-signed URL for direct download from B2
+ * This allows clients to download directly from B2 without going through VPS
+ * Saves massive bandwidth on VPS (100GB per download → 0GB)
+ * 
+ * @param key - S3 object key (path in bucket)
+ * @param expiresIn - URL expiry time in seconds (default: 1 hour)
+ * @param filename - Optional filename for Content-Disposition header
+ * @returns Pre-signed URL that client can use to download directly from B2
+ */
+export const generatePresignedDownloadUrl = async (
+	key: string,
+	expiresIn: number = 3600, // 1 hour default
+	filename?: string
+): Promise<string> => {
+	try {
+		const command = new GetObjectCommand({
+			Bucket: process.env.S3_BUCKET_NAME!,
+			Key: key,
+			// Set Content-Disposition to force download with specific filename
+			...(filename && {
+				ResponseContentDisposition: `attachment; filename="${filename}"`
+			})
+		})
+
+		const signedUrl = await getSignedUrl(s3Client, command, { expiresIn })
+		
+		console.log(`✅ Generated pre-signed URL for ${key} (expires in ${expiresIn}s)`)
+		return signedUrl
+	} catch (error) {
+		console.error('Failed to generate pre-signed URL:', error)
+		throw new Error(`Failed to generate download URL for ${key}`)
+	}
+}
+
+/**
+ * Generate pre-signed URLs for multiple objects (batch operation)
+ * Useful for generating download links for multiple photos at once
+ * 
+ * @param keys - Array of S3 object keys
+ * @param expiresIn - URL expiry time in seconds
+ * @returns Array of pre-signed URLs
+ */
+export const generatePresignedDownloadUrls = async (
+	keys: string[],
+	expiresIn: number = 3600
+): Promise<{ key: string; url: string }[]> => {
+	try {
+		const urlPromises = keys.map(async (key) => ({
+			key,
+			url: await generatePresignedDownloadUrl(key, expiresIn)
+		}))
+
+		return await Promise.all(urlPromises)
+	} catch (error) {
+		console.error('Failed to generate pre-signed URLs:', error)
+		throw new Error('Failed to generate download URLs')
+	}
+}
+
+/**
+ * Upload a pre-generated ZIP file to B2 for direct downloads
+ * This allows us to create ZIPs once and serve them directly from B2
+ * 
+ * @param zipBuffer - ZIP file buffer
+ * @param galleryId - Gallery ID for organizing ZIPs
+ * @param zipType - Type of ZIP (all, folder, liked, favorited)
+ * @param identifier - Additional identifier (folder ID, user ID, etc.)
+ * @returns URL of uploaded ZIP file
+ */
+export const uploadZipToB2 = async (
+	zipBuffer: Buffer,
+	galleryId: string,
+	zipType: 'all' | 'folder' | 'liked' | 'favorited',
+	identifier?: string
+): Promise<string> => {
+	try {
+		const timestamp = Date.now()
+		const zipFilename = identifier 
+			? `${galleryId}/zips/${zipType}_${identifier}_${timestamp}.zip`
+			: `${galleryId}/zips/${zipType}_${timestamp}.zip`
+
+		const uploadCommand = new PutObjectCommand({
+			Bucket: process.env.S3_BUCKET_NAME!,
+			Key: zipFilename,
+			Body: zipBuffer,
+			ContentType: 'application/zip',
+			Metadata: {
+				type: 'zip',
+				galleryId,
+				zipType,
+				createdAt: new Date().toISOString()
+			}
+		})
+
+		await s3Client.send(uploadCommand)
+
+		const bucketName = process.env.S3_BUCKET_NAME!
+		const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
+		const zipUrl = `${endpoint}/${bucketName}/${zipFilename}`
+
+		console.log(`✅ Uploaded ZIP to B2: ${zipFilename}`)
+		return zipUrl
+	} catch (error) {
+		console.error('Failed to upload ZIP to B2:', error)
+		throw new Error('Failed to upload ZIP file')
+	}
+}
+
+/**
+ * Check if a ZIP file already exists in B2
+ * Useful for caching - avoid recreating ZIPs that already exist
+ * 
+ * @param galleryId - Gallery ID
+ * @param zipType - Type of ZIP
+ * @param identifier - Additional identifier
+ * @returns ZIP key if exists, null otherwise
+ */
+export const findExistingZip = async (
+	galleryId: string,
+	zipType: 'all' | 'folder' | 'liked' | 'favorited',
+	identifier?: string
+): Promise<string | null> => {
+	try {
+		// In a production system, you'd want to:
+		// 1. Store ZIP metadata in database
+		// 2. Check if ZIP is still valid (photos haven't changed)
+		// 3. Return cached ZIP if valid
+		
+		// For now, we'll always generate fresh ZIPs
+		// This can be optimized later with proper caching
+		return null
+	} catch (error) {
+		console.error('Failed to check for existing ZIP:', error)
+		return null
+	}
 }

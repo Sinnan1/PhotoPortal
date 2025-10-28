@@ -1361,3 +1361,122 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 		}
 	}
 };
+
+
+// ============================================================================
+// DIRECT B2 DOWNLOAD ENDPOINTS (New - Bandwidth Optimized)
+// ============================================================================
+
+import { DirectDownloadService } from '../services/directDownloadService'
+
+/**
+ * Generate direct download URL for a single photo
+ * Returns B2 pre-signed URL for client to download directly
+ * VPS bandwidth used: ~1KB (vs 25MB with streaming)
+ */
+export const getDirectPhotoDownloadUrl = async (req: AuthRequest, res: Response) => {
+	try {
+		const { id } = req.params
+		const userId = req.user!.id
+		const userRole = req.user!.role
+		const providedPassword = req.headers['x-gallery-password'] as string
+
+		const result = await DirectDownloadService.generatePhotoDownloadUrl(
+			id,
+			userId,
+			userRole,
+			providedPassword
+		)
+
+		res.json({
+			success: true,
+			data: result
+		})
+	} catch (error) {
+		console.error('Get direct photo download URL error:', error)
+		res.status(500).json({
+			success: false,
+			error: error instanceof Error ? error.message : 'Internal server error'
+		})
+	}
+}
+
+/**
+ * Generate direct download URLs for multiple photos
+ * Returns array of B2 pre-signed URLs
+ * Useful for batch downloads without creating ZIP
+ */
+export const getDirectMultiplePhotoDownloadUrls = async (req: AuthRequest, res: Response) => {
+	try {
+		const { photoIds } = req.body
+		const userId = req.user!.id
+		const userRole = req.user!.role
+		const providedPassword = req.headers['x-gallery-password'] as string
+
+		if (!Array.isArray(photoIds) || photoIds.length === 0) {
+			return res.status(400).json({
+				success: false,
+				error: 'photoIds array is required'
+			})
+		}
+
+		const results = await DirectDownloadService.generateMultiplePhotoDownloadUrls(
+			photoIds,
+			userId,
+			userRole,
+			providedPassword
+		)
+
+		res.json({
+			success: true,
+			data: results
+		})
+	} catch (error) {
+		console.error('Get direct multiple photo download URLs error:', error)
+		res.status(500).json({
+			success: false,
+			error: error instanceof Error ? error.message : 'Internal server error'
+		})
+	}
+}
+
+/**
+ * Generate direct download URLs for filtered photos (liked/favorited)
+ * Returns array of B2 pre-signed URLs
+ * Alternative to ZIP download - saves VPS bandwidth
+ */
+export const getDirectFilteredPhotoDownloadUrls = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params
+		const { filterType } = req.query
+		const userId = req.user!.id
+		const userRole = req.user!.role
+		const providedPassword = req.headers['x-gallery-password'] as string
+
+		if (filterType !== 'liked' && filterType !== 'favorited') {
+			return res.status(400).json({
+				success: false,
+				error: 'filterType must be "liked" or "favorited"'
+			})
+		}
+
+		const results = await DirectDownloadService.generateFilteredPhotoDownloadUrls(
+			galleryId,
+			userId,
+			userRole,
+			filterType,
+			providedPassword
+		)
+
+		res.json({
+			success: true,
+			data: results
+		})
+	} catch (error) {
+		console.error('Get direct filtered photo download URLs error:', error)
+		res.status(500).json({
+			success: false,
+			error: error instanceof Error ? error.message : 'Internal server error'
+		})
+	}
+}
