@@ -547,7 +547,7 @@ function GalleryPage() {
     if (currentFolder) {
       localStorage.setItem(`gallery-${galleryId}-folder-${currentFolder.id}-page`, '1');
     }
-  }, [filter, currentFolder, galleryId]);
+  }, [filter, currentFolder?.id, galleryId]);
 
   // Restore last page from localStorage on folder load
   useEffect(() => {
