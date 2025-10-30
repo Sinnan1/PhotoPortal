@@ -91,11 +91,19 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 		const galleries = await prisma.gallery.findMany({
 			where: whereClause,
 			include: {
-				photographer: userRole === 'ADMIN' ? {
-					select: { id: true, name: true, email: true }
-				} : undefined,
+				photographer:
+					userRole === 'ADMIN'
+						? {
+								select: { id: true, name: true, email: true }
+						  }
+						: undefined,
 				folders: {
 					include: {
+						photos: {
+							select: {
+								fileSize: true
+							}
+						},
 						coverPhoto: {
 							select: {
 								id: true,
@@ -113,15 +121,37 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 					}
 				},
 				_count: {
-					select: { folders: true }
+					select: { folders: true, likedBy: true, favoritedBy: true }
 				}
 			},
 			orderBy: { createdAt: 'desc' }
 		})
 
+		const galleriesWithStats = galleries.map((gallery) => {
+			const totalSize = gallery.folders.reduce((acc, folder) => {
+				return (
+					acc +
+					folder.photos.reduce((photoAcc, photo) => {
+						return photoAcc + (photo.fileSize || 0)
+					}, 0)
+				)
+			}, 0)
+
+			// remove photos from response
+			gallery.folders.forEach(f => {
+                // @ts-ignore
+                delete f.photos
+            });
+
+			return {
+				...gallery,
+				totalSize
+			}
+		})
+
 		res.json({
 			success: true,
-			data: galleries
+			data: galleriesWithStats
 		})
 	} catch (error) {
 		console.error('Get galleries error:', error)
