@@ -36,6 +36,7 @@ import {
 	getObjectStreamFromS3,
 } from "../utils/s3Storage";
 import { DownloadService } from "../services/downloadService";
+import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
@@ -1162,6 +1163,82 @@ export const downloadLikedPhotos = async (req: AuthRequest, res: Response) => {
 				error: error instanceof Error ? error.message : "Internal server error",
 			});
 		}
+	}
+};
+
+export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId, folderId, filter } = req.body;
+		const userId = req.user?.id;
+
+		if (!userId) {
+			return res.status(401).json({ success: false, error: "User not authenticated" });
+		}
+
+		// Verify gallery access
+		const hasAccess = await DownloadService.verifyGalleryAccess(
+			galleryId,
+			userId,
+			req.user?.role || "CLIENT",
+			req.headers["x-gallery-password"] as string
+		);
+
+		if (!hasAccess) {
+			return res.status(401).json({ success: false, error: "Access denied or password required" });
+		}
+
+		const ticketPayload = {
+			userId,
+			galleryId,
+			folderId,
+			filter,
+			timestamp: Date.now(),
+		};
+
+		const ticket = jwt.sign(ticketPayload, process.env.JWT_SECRET!, { expiresIn: '5m' }); // Ticket is valid for 5 minutes
+
+		const downloadUrl = `/api/photos/download-zip?ticket=${ticket}`;
+
+		res.json({ success: true, downloadUrl });
+
+	} catch (error) {
+		console.error("Create download ticket error:", error);
+		res.status(500).json({ success: false, error: "Failed to create download ticket" });
+	}
+};
+
+export const downloadWithTicket = async (req: Request, res: Response) => {
+	try {
+		const { ticket } = req.query;
+
+		if (!ticket) {
+			return res.status(400).json({ success: false, error: "Missing download ticket" });
+		}
+
+		const decoded = jwt.verify(ticket as string, process.env.JWT_SECRET!) as any;
+
+		const { userId, galleryId, folderId, filter } = decoded;
+
+		switch (filter) {
+			case 'all':
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "all", undefined, res);
+				break;
+			case 'folder':
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "folder", folderId, res);
+				break;
+			case 'liked':
+			case 'favorited':
+				await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res);
+				break;
+			default:
+				return res.status(400).json({ success: false, error: "Invalid download filter" });
+		}
+	} catch (error) {
+		console.error("Download with ticket error:", error);
+		if (error instanceof jwt.JsonWebTokenError) {
+			return res.status(401).json({ success: false, error: "Invalid or expired download ticket" });
+		}
+		res.status(500).json({ success: false, error: "Failed to process download" });
 	}
 };
 

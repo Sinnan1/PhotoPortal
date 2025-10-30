@@ -21,7 +21,9 @@ import {
 	downloadFavoritedPhotos,
 	downloadAllPhotos,
 	downloadFolderPhotos,
-	getDownloadProgress
+	getDownloadProgress,
+	createDownloadTicket,
+	downloadWithTicket
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { auditMiddleware } from '../middleware/auditMiddleware'
@@ -79,5 +81,11 @@ router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, d
 
 // Download progress tracking
 router.get('/download/:downloadId/progress', authenticateToken, getDownloadProgress)
+
+// Download ticket creation
+router.post('/download-ticket', authenticateToken, createDownloadTicket);
+
+// Ticket-based download
+router.get('/download-zip', downloadWithTicket);
 
 export default router

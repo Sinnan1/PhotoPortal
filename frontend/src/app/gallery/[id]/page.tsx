@@ -364,126 +364,21 @@ function GalleryPage() {
   };
 
   const handleDownloadCurrentFolder = async () => {
-    const currentPhotos = currentFolder?.photos || [];
-    if (!currentFolder || currentPhotos.length === 0) {
-      showToast("No photos in current folder", "info");
-      return;
-    }
-
-    setIsDownloadingCurrent(true);
-    showToast("Preparing folder download...", "info");
-
+    if (!currentFolder) return;
     try {
-      // Start the download and get the download ID immediately
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/folder/${currentFolder.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to download folder photos");
-      }
-
-      // Extract download ID and filename from headers immediately
-      const downloadId = response.headers.get('X-Download-ID');
-      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'folder_photos.zip';
-
-      // Start progress tracking immediately
-      if (downloadId) {
-        downloadCurrentProgress.startProgress(currentPhotos.length, downloadId);
-      }
-
-      // Now download the blob (this will take time)
-      const blob = await response.blob();
-
-      // Trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      showToast("Folder download started!", "success");
-    } catch (error: any) {
-      console.error("Failed to download folder photos:", error);
-      downloadCurrentProgress.errorProgress(error.message || "Failed to download folder photos");
-      showToast(error.message || "Failed to download folder photos", "error");
-    } finally {
-      setIsDownloadingCurrent(false);
+      const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
+      window.location.href = response.data.downloadUrl;
+    } catch (error) {
+      showToast("Failed to start download", "error");
     }
   };
 
   const handleDownloadAll = async () => {
-    const allPhotos = gallery?.folders?.flatMap(f => f?.photos || []) || [];
-    if (!gallery || allPhotos.length === 0) {
-      showToast("No photos to download", "info");
-      return;
-    }
-
-    setIsDownloadingAll(true);
-    showToast("Preparing all photos download...", "info");
-
     try {
-      // Start the download and get the download ID immediately
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/all`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to download all photos");
-      }
-
-      // Extract download ID and filename from headers immediately
-      const downloadId = response.headers.get('X-Download-ID');
-      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip';
-
-      // Start progress tracking immediately
-      if (downloadId) {
-        downloadAllProgress.startProgress(allPhotos.length, downloadId);
-      }
-
-      // Now download the blob (this will take time)
-      const blob = await response.blob();
-
-      // Trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      showToast("All photos download started!", "success");
-    } catch (error: any) {
-      console.error("Failed to download all photos:", error);
-      downloadAllProgress.errorProgress(error.message || "Failed to download all photos");
-      showToast(error.message || "Failed to download all photos", "error");
-    } finally {
-      setIsDownloadingAll(false);
+      const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
+      window.location.href = response.data.downloadUrl;
+    } catch (error) {
+      showToast("Failed to start download", "error");
     }
   };
 
