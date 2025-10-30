@@ -367,7 +367,7 @@ function GalleryPage() {
     if (!currentFolder) return;
     try {
       const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
-      window.location.href = response.data.downloadUrl;
+      window.location.href = response.downloadUrl;
     } catch (error) {
       console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
@@ -377,7 +377,7 @@ function GalleryPage() {
   const handleDownloadAll = async () => {
     try {
       const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
-      window.location.href = response.data.downloadUrl;
+      window.location.href = response.downloadUrl;
     } catch (error) {
       console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
