@@ -1197,7 +1197,8 @@ export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
 
 		const ticket = jwt.sign(ticketPayload, process.env.JWT_SECRET!, { expiresIn: '5m' }); // Ticket is valid for 5 minutes
 
-		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${req.protocol}://${req.get('host')}`;
+		const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${protocol}://${req.get('host')}`;
 		const downloadUrl = `${baseUrl}/api/photos/download-zip?ticket=${ticket}`;
 
 		res.json({ success: true, downloadUrl });
