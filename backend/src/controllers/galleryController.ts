@@ -137,6 +137,8 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 			orderBy: { createdAt: 'desc' }
 		})
 
+		console.log('Raw galleries data:', JSON.stringify(galleries, null, 2));
+
 		const galleriesWithStats = galleries.map((gallery) => {
 			const totalSize = gallery.folders.reduce((acc, folder) => {
 				return (
