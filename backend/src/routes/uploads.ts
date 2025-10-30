@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import express from 'express'
 import { authenticateToken, requireRole } from '../middleware/auth'
-import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload } from '../controllers/uploadsController'
+import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts } from '../controllers/uploadsController'
 import { generateThumbnail } from '../controllers/thumbnailController'
 import { UPLOAD_CONFIG } from '../config/uploadConfig'
 
@@ -80,6 +80,7 @@ router.post('/multipart/create', uploadRateLimit, authenticateToken, requireRole
 router.get('/multipart/sign', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), signMultipartPart)
 router.post('/multipart/complete', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), completeMultipartUpload)
 router.post('/multipart/abort', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), abortMultipartUpload)
+router.get('/multipart/parts', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), listUploadedParts)
 
 // Proxy upload to avoid browser CORS issues - using unified config
 const CHUNK_UPLOAD_LIMIT = `${Math.ceil(UPLOAD_CONFIG.CHUNK_SIZE / (1024 * 1024))}mb`

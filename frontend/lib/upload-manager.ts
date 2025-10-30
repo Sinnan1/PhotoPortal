@@ -2,6 +2,7 @@
  * Background Upload Manager
  * Handles uploads that persist even when user navigates away
  */
+import { uploadFileToB2 } from '@/app/galleries/[id]/manage/uploadUtils'
 
 export interface UploadFile {
   file: File
@@ -160,7 +161,18 @@ class UploadManager {
       const nextFile = batch.files.find(f => f.status === 'queued')
       if (!nextFile) return
 
-      await this.uploadFile(batchId, nextFile.id)
+      try {
+        await this.uploadFile(batchId, nextFile.id)
+      } catch (error) {
+        console.error(`Failed to process file ${nextFile.id}:`, error);
+        const file = batch.files.find(f => f.id === nextFile.id);
+        if (file) {
+          file.status = 'failed';
+          file.error = error instanceof Error ? error.message : 'An unknown error occurred';
+          batch.failedFiles++;
+          this.notify();
+        }
+      }
     }
   }
 
@@ -184,7 +196,17 @@ class UploadManager {
           fileToUpload = await this.compressImage(uploadFile.file)
         }
 
-        const result = await this.performUpload(
+        const token = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
+        : undefined;
+
+        if (!token) {
+          throw new Error('No auth token found');
+        }
+
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+        const result = await uploadFileToB2(
           fileToUpload,
           batch.galleryId,
           batch.folderId,
@@ -201,12 +223,13 @@ class UploadManager {
             batch.averageSpeed = elapsedTime > 0 ? batch.uploadedBytes / elapsedTime : 0
 
             this.notify()
-          }
+          },
+          token,
+          BASE_URL
         )
 
         uploadFile.status = 'success'
         uploadFile.progress = 100
-        uploadFile.photoId = result.photoId
         batch.completedFiles++
 
         // Recalculate final uploaded bytes

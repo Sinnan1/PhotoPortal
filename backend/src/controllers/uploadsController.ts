@@ -6,6 +6,7 @@ import {
   CompleteMultipartUploadCommand,
   GetObjectCommand,
   AbortMultipartUploadCommand,
+  ListPartsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PrismaClient } from "@prisma/client";
@@ -134,6 +135,39 @@ export const createMultipartUpload = async (req: Request, res: Response) => {
     res.status(500).json(errorResponse);
   }
 };
+
+export const listUploadedParts = async (req: Request, res: Response) => {
+  try {
+    const { key, uploadId } = req.query;
+
+    if (!key || !uploadId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required query parameters: key, uploadId",
+      });
+    }
+
+    console.log(`📄 Listing parts for B2 multipart upload: ${uploadId}`);
+
+    const command = new ListPartsCommand({
+      Bucket: process.env.S3_BUCKET_NAME!,
+      Key: key as string,
+      UploadId: uploadId as string,
+    });
+
+    const result = await s3Client.send(command);
+
+    console.log(`✅ Found ${result.Parts?.length || 0} parts for B2 upload: ${uploadId}`);
+
+    res.json({
+      success: true,
+      parts: result.Parts || [],
+    });
+  } catch (error) {
+    const errorResponse = handleB2Error(error, "List uploaded parts");
+    res.status(500).json(errorResponse);
+  }
+}
 
 export const signMultipartPart = async (req: Request, res: Response) => {
   try {

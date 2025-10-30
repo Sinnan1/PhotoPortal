@@ -3,6 +3,19 @@ import { UPLOAD_CONFIG } from "@/src/config/uploadConfig";
 
 const CHUNK_SIZE = UPLOAD_CONFIG.CHUNK_SIZE; // 10MB chunks for multipart upload
 
+const getUploadState = (file: File): { uploadId: string; key: string } | null => {
+  const state = localStorage.getItem(`upload-${file.name}-${file.size}`);
+  return state ? JSON.parse(state) : null;
+};
+
+const saveUploadState = (file: File, state: { uploadId: string; key: string }) => {
+  localStorage.setItem(`upload-${file.name}-${file.size}`, JSON.stringify(state));
+};
+
+const clearUploadState = (file: File) => {
+  localStorage.removeItem(`upload-${file.name}-${file.size}`);
+};
+
 export async function uploadFileToB2(
   file: File,
   galleryId: string,
@@ -12,14 +25,17 @@ export async function uploadFileToB2(
   BASE_URL: string,
   uploadSessionId?: string
 ): Promise<{ key: string }> {
-  const uniqueId = uuidv4();
-  const key = `${galleryId}/${uniqueId}_${file.name}`;
-  let uploadId: string | null = null;
+  let uploadState = getUploadState(file);
+  let key = uploadState?.key;
+  let uploadId = uploadState?.uploadId;
 
   try {
-    // Step 1: Initialize multipart upload
-    const initResponse = await fetch(`${BASE_URL}/uploads/multipart/create`, {
-      method: "POST",
+    if (!uploadState) {
+      const uniqueId = uuidv4();
+      key = `${galleryId}/${uniqueId}_${file.name}`;
+      // Step 1: Initialize multipart upload
+      const initResponse = await fetch(`${BASE_URL}/uploads/multipart/create`, {
+        method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -47,8 +63,10 @@ export async function uploadFileToB2(
     }
 
     uploadId = initData.uploadId;
-    const { key } = initData;
+    key = initData.key;
+    saveUploadState(file, { uploadId, key });
     console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
+    }
 
     // Step 2: Split file into chunks and get signed URLs
     const chunks: Blob[] = [];
@@ -61,10 +79,27 @@ export async function uploadFileToB2(
     const parts: { ETag: string; PartNumber: number }[] = [];
     let uploadedSize = 0;
 
+    if (uploadState) {
+      const response = await fetch(`${BASE_URL}/uploads/multipart/parts?key=${encodeURIComponent(key!)}&uploadId=${uploadId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if(response.ok) {
+        const { parts: existingParts } = await response.json();
+        parts.push(...existingParts);
+        uploadedSize = existingParts.reduce((acc: number, part: any) => acc + part.Size, 0);
+      }
+    }
+
     // Step 3: Upload each chunk
     for (let i = 0; i < chunks.length; i++) {
       const partNumber = i + 1;
       const chunk = chunks[i];
+
+      if (parts.some(p => p.PartNumber === partNumber)) {
+        continue;
+      }
 
       // Get signed URL for this part
       const signResponse = await fetch(
@@ -166,6 +201,7 @@ export async function uploadFileToB2(
     }
 
     console.log(`✅ B2 multipart upload completed: ${completeData.key}`);
+    clearUploadState(file);
 
     // Step 5: Generate thumbnail
     const thumbnailResponse = await fetch(
