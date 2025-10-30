@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateMultipleThumbnails = exports.getObjectStreamFromS3 = exports.getObjectFromS3 = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = void 0;
+exports.generateMultipleThumbnails = exports.getObjectStreamFromS3 = exports.getObjectFromS3 = exports.batchDeleteFromS3 = exports.deleteFromS3 = exports.uploadToS3 = exports.isRawFile = exports.SHARP_SUPPORTED_RAW = void 0;
+exports.createPlaceholderThumbnail = createPlaceholderThumbnail;
+exports.getContentType = getContentType;
 const tslib_1 = require("tslib");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const sharp_1 = tslib_1.__importDefault(require("sharp"));
@@ -8,8 +10,8 @@ const os_1 = tslib_1.__importDefault(require("os"));
 const uuid_1 = require("uuid");
 const path_1 = tslib_1.__importDefault(require("path"));
 const s3Client = new client_s3_1.S3Client({
-    region: 'us-east-005',
-    endpoint: 'https://s3.us-east-005.backblazeb2.com',
+    region: process.env.AWS_REGION || 'us-east-005',
+    endpoint: `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`,
     forcePathStyle: true,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -19,7 +21,7 @@ const s3Client = new client_s3_1.S3Client({
 // Limit Sharp concurrency to avoid CPU contention on small VPS instances
 sharp_1.default.concurrency(Math.min(3, Math.max(1, os_1.default.cpus().length)));
 // RAW file extensions that Sharp can handle
-const SHARP_SUPPORTED_RAW = ['.dng', '.tiff', '.tif'];
+exports.SHARP_SUPPORTED_RAW = ['.dng', '.tiff', '.tif'];
 // Function to check if file is a RAW format
 const isRawFile = (filename) => {
     const ext = path_1.default.extname(filename).toLowerCase();
@@ -30,6 +32,7 @@ const isRawFile = (filename) => {
     ];
     return rawExtensions.includes(ext);
 };
+exports.isRawFile = isRawFile;
 // Enhanced upload function with RAW file support
 const uploadToS3 = async (file, originalFilename, galleryId) => {
     try {
@@ -41,8 +44,8 @@ const uploadToS3 = async (file, originalFilename, galleryId) => {
         const thumbnailFilename = `${galleryId}/thumbnails/${uniqueId}_${baseName}_thumb.jpg`;
         let thumbnailBuffer;
         // Handle thumbnail creation based on file type
-        if (isRawFile(originalFilename)) {
-            if (SHARP_SUPPORTED_RAW.includes(fileExtension)) {
+        if ((0, exports.isRawFile)(originalFilename)) {
+            if (exports.SHARP_SUPPORTED_RAW.includes(fileExtension)) {
                 // Sharp can handle DNG, TIFF directly
                 try {
                     thumbnailBuffer = await (0, sharp_1.default)(file)
@@ -90,7 +93,7 @@ const uploadToS3 = async (file, originalFilename, galleryId) => {
             Metadata: {
                 originalName: originalFilename,
                 uploadedAt: new Date().toISOString(),
-                fileType: isRawFile(originalFilename) ? 'raw' : 'image',
+                fileType: (0, exports.isRawFile)(originalFilename) ? 'raw' : 'image',
                 fileSize: file.length.toString()
             }
         });
@@ -110,7 +113,7 @@ const uploadToS3 = async (file, originalFilename, galleryId) => {
         await s3Client.send(thumbnailUploadCommand);
         // Generate URLs
         const bucketName = process.env.S3_BUCKET_NAME;
-        const endpoint = 'https://s3.us-east-005.backblazeb2.com';
+        const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`;
         const originalUrl = `${endpoint}/${bucketName}/${filename}`;
         const thumbnailUrl = `${endpoint}/${bucketName}/${thumbnailFilename}`;
         return {
@@ -277,7 +280,7 @@ const generateMultipleThumbnails = async (file, originalFilename, galleryId) => 
     for (const [sizeName, dimensions] of Object.entries(thumbnailSizes)) {
         try {
             let thumbnailBuffer;
-            if (isRawFile(originalFilename) && !SHARP_SUPPORTED_RAW.includes(path_1.default.extname(originalFilename).toLowerCase())) {
+            if ((0, exports.isRawFile)(originalFilename) && !exports.SHARP_SUPPORTED_RAW.includes(path_1.default.extname(originalFilename).toLowerCase())) {
                 // Use placeholder for unsupported RAW files
                 thumbnailBuffer = await createPlaceholderThumbnail(originalFilename);
                 if (sizeName !== 'medium') {
@@ -313,7 +316,7 @@ const generateMultipleThumbnails = async (file, originalFilename, galleryId) => 
             });
             await s3Client.send(uploadCommand);
             const bucketName = process.env.S3_BUCKET_NAME;
-            const endpoint = 'https://s3.us-east-005.backblazeb2.com';
+            const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`;
             results[sizeName] = `${endpoint}/${bucketName}/${thumbnailFilename}`;
         }
         catch (error) {

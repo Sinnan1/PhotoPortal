@@ -7,6 +7,7 @@ const helmet_1 = tslib_1.__importDefault(require("helmet"));
 const morgan_1 = tslib_1.__importDefault(require("morgan"));
 const dotenv_1 = tslib_1.__importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
+const uploadConfig_1 = require("./config/uploadConfig");
 // Import routes
 const auth_1 = tslib_1.__importDefault(require("./routes/auth"));
 const adminAuth_1 = tslib_1.__importDefault(require("./routes/adminAuth"));
@@ -31,17 +32,25 @@ const PORT = process.env.PORT || 5000;
 const prisma = new client_1.PrismaClient();
 // Enhanced middleware for photo uploads
 app.use((0, helmet_1.default)());
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://your-production-domain.com']
+        : ['http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 app.use((0, morgan_1.default)('combined'));
-// Increased limits for batch photo uploads
-app.use(express_1.default.json({ limit: '100mb' }));
-app.use(express_1.default.urlencoded({ extended: true, limit: '100mb' }));
+// Increased limits for batch photo uploads - using unified config
+const EXPRESS_BODY_LIMIT = `${Math.ceil(uploadConfig_1.UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024))}mb`;
+app.use(express_1.default.json({ limit: EXPRESS_BODY_LIMIT }));
+app.use(express_1.default.urlencoded({ extended: true, limit: EXPRESS_BODY_LIMIT }));
 // Enhanced timeout middleware for upload and download operations
 app.use((req, res, next) => {
     // Set longer timeouts for upload routes
     if (req.path.includes('/upload') || req.method === 'POST' && req.path.includes('/photos')) {
-        req.setTimeout(10 * 60 * 1000); // 10 minutes for uploads
-        res.setTimeout(10 * 60 * 1000);
+        req.setTimeout(uploadConfig_1.UPLOAD_CONFIG.UPLOAD_TIMEOUT);
+        res.setTimeout(uploadConfig_1.UPLOAD_CONFIG.UPLOAD_TIMEOUT);
         console.log(`Extended timeout set for upload request: ${req.path}`);
     }
     // Set longer timeouts for download routes
@@ -61,7 +70,7 @@ app.use((req, res, next) => {
     // Log upload requests with more detail
     if (req.path.includes('/upload')) {
         console.log(`📤 Upload request started: ${req.method} ${req.path}`);
-        console.log(`📊 Content-Length: ${req.headers['content-length'] || 'unknown'}`);
+        console.log(`� Contaent-Length: ${req.headers['content-length'] || 'unknown'}`);
         // Track request completion
         const startTime = Date.now();
         const originalSend = res.send;
@@ -88,24 +97,11 @@ app.use('/api/photographers', photographers_1.default);
 app.use('/api/uploads', uploads_1.default);
 app.use('/api/folders', folders_1.default);
 app.use('/api/analytics', selectionAnalytics_1.default);
-// Upload configuration endpoint for frontend
+// Upload configuration endpoint for frontend - using unified config
 app.get('/api/upload-config', (req, res) => {
     res.json({
         success: true,
-        data: {
-            maxFileSize: 50 * 1024 * 1024, // 50MB
-            maxFiles: 50,
-            supportedTypes: [
-                'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/tiff',
-                'image/x-canon-cr2', 'image/x-nikon-nef', 'image/x-sony-arw', 'image/x-adobe-dng'
-            ],
-            supportedExtensions: [
-                '.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif',
-                '.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf'
-            ],
-            recommendedBatchSize: 20, // Recommend smaller batches for better UX
-            timeoutMinutes: 10
-        }
+        data: (0, uploadConfig_1.getUploadConfigForClient)()
     });
 });
 // System health endpoint with more detailed info
@@ -133,17 +129,20 @@ app.get('/api/system-status', (req, res) => {
 app.get('/', (req, res) => {
     res.json({
         message: 'Photo Gallery API is running!',
-        version: '1.0.0',
-        features: ['batch upload', 'raw file support', 'gallery management'],
+        version: '2.0.0',
+        features: ['high-volume uploads (2000 files)', 'raw file support', 'async thumbnails', 'upload sessions'],
         endpoints: {
-            upload: '/api/photos/upload/:galleryId',
+            upload: '/api/uploads/multipart/*',
             config: '/api/upload-config',
             health: '/api/system-status'
         }
     });
 });
-// Legacy health check (keep for compatibility)
+// Health check endpoints (both paths for compatibility)
 app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 // Enhanced database test with more info
@@ -185,7 +184,7 @@ app.use((err, req, res, next) => {
         return res.status(413).json({
             success: false,
             error: 'Request too large. Please reduce file sizes or batch size.',
-            maxSize: '100MB'
+            maxSize: EXPRESS_BODY_LIMIT
         });
     }
     if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
@@ -214,15 +213,22 @@ process.on('SIGINT', async () => {
 });
 // Export app for testing
 exports.default = app;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`� Env ironment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`� Feataures: Batch uploads, RAW support, Extended timeouts, Admin system`);
-    console.log(`⏰ Upload timeout: 10 minutes`);
-    console.log(`💾 Max file size: 50MB, Max batch: 50 files`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📦 Features: High-volume uploads (2000 files), RAW support, Async thumbnails`);
+    console.log(`⏰ Upload timeout: ${uploadConfig_1.UPLOAD_CONFIG.UPLOAD_TIMEOUT / 60000} minutes`);
+    console.log(`💾 Max file size: ${uploadConfig_1.UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`);
+    console.log(`📁 Max files per session: ${uploadConfig_1.UPLOAD_CONFIG.MAX_FILES_PER_SESSION}`);
     console.log(`🔗 Upload config: http://localhost:${PORT}/api/upload-config`);
-    console.log(`🔐 Admin auth: http://localhost:${PORT}/api/admin/auth`);
+    console.log(`�  Admin auth: http://localhost:${PORT}/api/admin/auth`);
     // Start admin session cleanup
     adminSessionManager_1.adminSessionManager.startAutomaticCleanup();
     console.log(`🧹 Admin session cleanup started`);
+    // Start upload session cleanup
+    const { uploadSessionService } = await Promise.resolve().then(() => tslib_1.__importStar(require('./services/uploadSessionService')));
+    setInterval(() => {
+        uploadSessionService.cleanupOldSessions(uploadConfig_1.UPLOAD_CONFIG.SESSION_RETENTION_DAYS);
+    }, uploadConfig_1.UPLOAD_CONFIG.CLEANUP_OLD_SESSIONS_INTERVAL);
+    console.log(`🧹 Upload session cleanup started (runs every ${uploadConfig_1.UPLOAD_CONFIG.CLEANUP_OLD_SESSIONS_INTERVAL / (24 * 60 * 60 * 1000)} days)`);
 });

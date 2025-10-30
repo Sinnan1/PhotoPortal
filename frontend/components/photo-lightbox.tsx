@@ -58,14 +58,14 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
 
   //     setKonamiSequence(prev => {
   //       const newSequence = [...prev, e.code].slice(-10)
-        
+
   //       // Check if we just completed the Konami code
   //       if (newSequence.length >= 10 && 
   //           newSequence.slice(-10).every((code, index) => code === konamiCode[index])) {
   //         setKonamiActivated(true)
   //         setImageStates(prevState => ({ ...prevState, viewMode: 'full' }))
   //       }
-        
+
   //       return newSequence
   //     })
   //   }
@@ -73,7 +73,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
   //   window.addEventListener('keydown', handleKonamiKeyDown)
   //   return () => window.removeEventListener('keydown', handleKonamiKeyDown)
   // }, []) // Empty dependency array - no recreation needed
-  
+
   const currentIndex = photos.findIndex((p) => p.id === photo.id)
   const isFirst = currentIndex === 0
   const isLast = currentIndex === photos.length - 1
@@ -137,7 +137,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
   // Function to toggle full size original (keyboard shortcut: F) - COMPLETELY REWRITTEN
   const toggleFullSize = async () => {
 
-    
+
     // Use functional update to get the most current state
     setImageStates(currentState => {
 
@@ -175,7 +175,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           }
         } else {
           console.log(`🔄 Need to load fresh full resolution for photo ${photo.id}`)
-          
+
           // Start loading - set loading state immediately
           const loadingState = {
             ...currentState,
@@ -192,7 +192,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
                 console.log(`🚫 Photo changed during load, discarding result`)
                 return { ...prevState, isLoading: false }
               }
-              
+
               return {
                 ...prevState,
                 fullRes: photo.originalUrl,
@@ -203,7 +203,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
               }
             })
           }
-          
+
           originalImg.onerror = () => {
             console.error('❌ Failed to load full size image:', photo.originalUrl)
             setImageStates(prevState => ({
@@ -211,7 +211,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
               isLoading: false
             }))
           }
-          
+
           originalImg.src = photo.originalUrl
 
           return loadingState
@@ -262,35 +262,79 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
     }
   }, [photo.largeUrl, dataSaverMode, imageStates.photoId, imageStates.highQuality, imageStates.isLoading])
 
-  // Touch gesture state
-  const [touchStart, setTouchStart] = useState<number | null>(null)
-  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  // Enhanced touch gesture state with visual feedback
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number; time: number } | null>(null)
+  const [touchCurrent, setTouchCurrent] = useState<{ x: number; y: number } | null>(null)
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null)
 
-  // Minimum swipe distance (in px)
-  const minSwipeDistance = 50
+  // Minimum swipe distance (in px) - reduced for better mobile UX
+  const minSwipeDistance = 30
+  const maxVerticalDistance = 100 // Prevent swipe if too much vertical movement
 
   const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null) // otherwise the swipe is fired even with usual touch events
-    setTouchStart(e.targetTouches[0].clientX)
+    const touch = e.targetTouches[0]
+    setTouchStart({
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    })
+    setTouchCurrent({ x: touch.clientX, y: touch.clientY })
+    setSwipeDirection(null)
   }
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX)
+    if (!touchStart) return
+
+    const touch = e.targetTouches[0]
+    setTouchCurrent({ x: touch.clientX, y: touch.clientY })
+
+    const deltaX = touch.clientX - touchStart.x
+    const deltaY = Math.abs(touch.clientY - touchStart.y)
+
+    // Only show direction if horizontal swipe is dominant
+    if (Math.abs(deltaX) > minSwipeDistance && deltaY < maxVerticalDistance) {
+      setSwipeDirection(deltaX > 0 ? 'right' : 'left')
+    } else {
+      setSwipeDirection(null)
+    }
   }
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
-
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > minSwipeDistance
-    const isRightSwipe = distance < -minSwipeDistance
-
-    if (isLeftSwipe && !isLast) {
-      onNext()
+    if (!touchStart || !touchCurrent) {
+      setTouchStart(null)
+      setTouchCurrent(null)
+      setSwipeDirection(null)
+      return
     }
-    if (isRightSwipe && !isFirst) {
-      onPrevious()
+
+    const deltaX = touchCurrent.x - touchStart.x
+    const deltaY = Math.abs(touchCurrent.y - touchStart.y)
+    const deltaTime = Date.now() - touchStart.time
+
+    // Calculate velocity for better swipe detection
+    const velocity = Math.abs(deltaX) / deltaTime
+
+    // Swipe is valid if:
+    // 1. Horizontal distance > minimum
+    // 2. Vertical distance < maximum (not a scroll)
+    // 3. Fast enough (velocity check)
+    const isValidSwipe = Math.abs(deltaX) > minSwipeDistance &&
+      deltaY < maxVerticalDistance &&
+      velocity > 0.3
+
+    if (isValidSwipe) {
+      if (deltaX > 0 && !isFirst) {
+        // Swipe right = previous
+        onPrevious()
+      } else if (deltaX < 0 && !isLast) {
+        // Swipe left = next
+        onNext()
+      }
     }
+
+    setTouchStart(null)
+    setTouchCurrent(null)
+    setSwipeDirection(null)
   }
 
   useEffect(() => {
@@ -330,39 +374,41 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
     }
   }, [isFirst, isLast, onClose, onNext, onPrevious, photo.originalUrl, dataSaverMode])
 
-  // Preload adjacent photos for instant navigation
+  // Aggressive preloading for instant navigation
   useEffect(() => {
     const preloadAdjacent = () => {
-      [-1, 1].forEach(offset => {
+      // Preload next 2 and previous 2 photos for instant navigation
+      [-2, -1, 1, 2].forEach(offset => {
         const adjacentIndex = currentIndex + offset
         if (adjacentIndex >= 0 && adjacentIndex < photos.length) {
           const adjacentPhoto = photos[adjacentIndex]
-          // Preload both medium and original quality
-          const mediumUrl = adjacentPhoto.originalUrl.replace('/original/', '/medium/') || adjacentPhoto.originalUrl
-          
-          // Preload medium quality
-          const mediumImg = document.createElement('img')
-          mediumImg.src = mediumUrl
-          
-          // FIXED: More conservative preloading to prevent interference
-          if (imageStates.viewMode !== 'full' && !imageStates.isLoading) {
-            setTimeout(() => {
-              console.log(`🔄 Preloading original for adjacent photo: ${adjacentPhoto.id}`)
-              const originalImg = document.createElement('img')
-              originalImg.src = adjacentPhoto.originalUrl
-            }, 2000) // Increased delay to prevent race conditions
+
+          // Priority preload for immediate neighbors (next/previous)
+          const isPriority = Math.abs(offset) === 1
+
+          // Preload high quality (largeUrl) immediately for instant navigation
+          const highQualityUrl = adjacentPhoto.largeUrl || adjacentPhoto.mediumUrl || adjacentPhoto.thumbnailUrl
+
+          if (isPriority) {
+            // Immediate preload for next/previous
+            const img = document.createElement('img')
+            img.src = highQualityUrl
+            console.log(`⚡ Priority preload: ${adjacentPhoto.id}`)
           } else {
-            console.log(`⏸️ Skipping original preload for ${adjacentPhoto.id} (viewMode: ${imageStates.viewMode}, isLoading: ${imageStates.isLoading})`)
+            // Delayed preload for +2/-2
+            setTimeout(() => {
+              const img = document.createElement('img')
+              img.src = highQualityUrl
+              console.log(`🔄 Background preload: ${adjacentPhoto.id}`)
+            }, 500)
           }
         }
       })
     }
-    
-    // Only preload if we're not loading the current image and not in full-size mode
-    if (!imageStates.isLoading && imageStates.viewMode !== 'full') {
-      preloadAdjacent()
-    }
-  }, [currentIndex, photos, imageStates.isLoading, imageStates.viewMode])
+
+    // Start preloading immediately
+    preloadAdjacent()
+  }, [currentIndex, photos])
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
@@ -423,14 +469,14 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         <Download className="h-5 w-5 sm:h-4 sm:w-4" />
       </Button>
 
-      {/* Quality Control Buttons - Mobile Responsive */}
-      <div className="absolute top-4 right-36 md:top-4 md:right-36 sm:top-3 sm:right-28 flex gap-2 z-10">
+      {/* Quality Control Buttons - Mobile: Bottom, Desktop: Top */}
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:top-4 md:right-36 flex gap-2 z-10">
         {/* High Quality Button - only show in data saver mode */}
         {dataSaverMode && imageStates.viewMode === 'high' && !imageStates.highQuality && photo.largeUrl && (
           <Button
             variant="ghost"
             size="sm"
-            className="text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl px-4 py-2 md:px-4 md:py-2 sm:px-3 sm:py-1 text-xs md:text-sm font-medium transition-all duration-300"
+            className="text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300"
             onClick={loadHighQuality}
             disabled={imageStates.isLoading}
             aria-label="Load high quality (2000x2000)"
@@ -443,21 +489,21 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         <Button
           variant="ghost"
           size="sm"
-          className="text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl px-4 py-2 md:px-4 md:py-2 sm:px-3 sm:py-1 text-xs md:text-sm font-medium transition-all duration-300 hover:scale-105"
+          className="text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 hover:scale-105"
           onClick={toggleFullSize}
           disabled={imageStates.isLoading}
           aria-label={imageStates.viewMode === 'full' ? "Back to high quality (F)" : "View full size (F)"}
         >
           {imageStates.isLoading ? "Loading..." :
-           imageStates.viewMode === 'full' ? "High Quality" : "Full Size (F)"}
+            imageStates.viewMode === 'full' ? "High Quality" : "Full Size (F)"}
         </Button>
       </div>
 
-      {/* Photo Counter and Quality Indicator - Mobile Responsive */}
-      <div className="absolute top-4 left-4 md:top-4 md:left-4 sm:top-3 sm:left-3 text-white z-10">
-        <div className="backdrop-blur-md bg-black/30 rounded-xl px-4 py-2 md:px-4 md:py-2 sm:px-3 sm:py-1 border border-white/10">
-          <div className="font-medium text-sm md:text-sm sm:text-xs">{currentIndex + 1} of {photos.length}</div>
-          <div className="text-xs md:text-xs sm:text-xs text-gray-200 mt-1">
+      {/* Photo Counter and Quality Indicator - Mobile: Bottom, Desktop: Top Left */}
+      <div className="absolute bottom-4 left-4 md:top-4 md:bottom-auto text-white z-10">
+        <div className="backdrop-blur-md bg-black/30 rounded-xl px-3 py-1.5 border border-white/10">
+          <div className="font-medium text-xs">{currentIndex + 1} of {photos.length}</div>
+          <div className="text-[10px] text-gray-200 mt-0.5 hidden md:block">
             {imageStates.viewMode === 'high' &&
               (dataSaverMode && !imageStates.highQuality
                 ? 'Medium Quality (1200px)'
@@ -465,18 +511,38 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
             {imageStates.viewMode === 'full' && 'Full Size Original'}
           </div>
           {dataSaverMode && (
-            <div className="text-xs md:text-xs sm:text-xs text-blue-300 font-medium mt-1">Data Saver Mode</div>
+            <div className="text-[10px] text-blue-300 font-medium mt-0.5 hidden md:block">Data Saver Mode</div>
           )}
         </div>
       </div>
 
-      {/* Main Image - Mobile Optimized */}
+      {/* Main Image - Mobile Optimized with Swipe Feedback */}
       <div
         className="relative max-w-[95vw] max-h-[95vh] md:max-w-[90vw] md:max-h-[90vh] sm:max-w-[100vw] sm:max-h-[100vh] w-full h-full flex items-center justify-center px-2 md:px-0"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        style={{
+          transform: touchStart && touchCurrent
+            ? `translateX(${(touchCurrent.x - touchStart.x) * 0.3}px)`
+            : 'translateX(0)',
+          transition: touchStart ? 'none' : 'transform 0.3s ease-out'
+        }}
       >
+        {/* Swipe Direction Indicator */}
+        {swipeDirection && (
+          <div className={`absolute top-1/2 -translate-y-1/2 z-20 ${swipeDirection === 'left' ? 'right-8' : 'left-8'
+            }`}>
+            <div className="bg-white/20 backdrop-blur-md rounded-full p-4 border-2 border-white/40 animate-pulse">
+              {swipeDirection === 'left' ? (
+                <ChevronRight className="h-8 w-8 text-white" />
+              ) : (
+                <ChevronLeft className="h-8 w-8 text-white" />
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="relative w-full h-full flex items-center justify-center">
           <Image
             src={imageStates.currentSrc || "/placeholder.svg"}
@@ -484,9 +550,8 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
             width={2000}
             height={2000}
             sizes="(max-width: 640px) 100vw, (max-width: 768px) 95vw, (max-width: 1200px) 90vw, 80vw"
-            className={`max-w-full max-h-full object-contain transition-all duration-500 ease-out ${
-              imageStates.imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-            }`}
+            className={`max-w-full max-h-full object-contain transition-all duration-300 ease-out ${imageStates.imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+              }`}
             priority
             unoptimized
             onLoad={() => {
@@ -514,8 +579,8 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
                   {/* Modern pulse dots */}
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 md:w-2 md:h-2 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 md:w-2 md:h-2 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-2 h-2 md:w-2 md:h-2 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 md:w-2 md:h-2 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 md:w-2 md:h-2 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                   <span className="text-white text-sm md:text-sm sm:text-xs font-medium">
                     Loading beautiful memories...

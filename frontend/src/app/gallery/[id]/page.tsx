@@ -36,7 +36,7 @@ import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summa
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 // Direct download URL should include /api suffix
-const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL 
+const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL
   ? `${process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL}/api`
   : API_BASE_URL;
 
@@ -147,12 +147,9 @@ function GalleryPage() {
   // Type alias for breadcrumb items
   type BreadcrumbItemType = 'gallery' | 'folder';
 
-  // Infinite scroll state
-  const [displayedPhotos, setDisplayedPhotos] = useState<Photo[]>([]);
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const PHOTOS_PER_PAGE = 30;
+  const PHOTOS_PER_PAGE = 50; // Good balance for performance and UX
 
   // Refs for components to trigger refreshes
   const gallerySelectionSummaryRef = useRef<{ refreshData: () => void } | null>(null);
@@ -367,126 +364,23 @@ function GalleryPage() {
   };
 
   const handleDownloadCurrentFolder = async () => {
-    const currentPhotos = currentFolder?.photos || [];
-    if (!currentFolder || currentPhotos.length === 0) {
-      showToast("No photos in current folder", "info");
-      return;
-    }
-
-    setIsDownloadingCurrent(true);
-    showToast("Preparing folder download...", "info");
-
+    if (!currentFolder) return;
     try {
-      // Start the download and get the download ID immediately
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/folder/${currentFolder.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to download folder photos");
-      }
-
-      // Extract download ID and filename from headers immediately
-      const downloadId = response.headers.get('X-Download-ID');
-      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'folder_photos.zip';
-
-      // Start progress tracking immediately
-      if (downloadId) {
-        downloadCurrentProgress.startProgress(currentPhotos.length, downloadId);
-      }
-
-      // Now download the blob (this will take time)
-      const blob = await response.blob();
-
-      // Trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      showToast("Folder download started!", "success");
-    } catch (error: any) {
-      console.error("Failed to download folder photos:", error);
-      downloadCurrentProgress.errorProgress(error.message || "Failed to download folder photos");
-      showToast(error.message || "Failed to download folder photos", "error");
-    } finally {
-      setIsDownloadingCurrent(false);
+      const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
+      window.location.href = response.downloadUrl;
+    } catch (error) {
+      console.error("Failed to start download:", error);
+      showToast("Failed to start download", "error");
     }
   };
 
   const handleDownloadAll = async () => {
-    const allPhotos = gallery?.folders?.flatMap(f => f?.photos || []) || [];
-    if (!gallery || allPhotos.length === 0) {
-      showToast("No photos to download", "info");
-      return;
-    }
-
-    setIsDownloadingAll(true);
-    showToast("Preparing all photos download...", "info");
-
     try {
-      // Start the download and get the download ID immediately
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/all`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(passwordRequired && password ? { 'x-gallery-password': password } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to download all photos");
-      }
-
-      // Extract download ID and filename from headers immediately
-      const downloadId = response.headers.get('X-Download-ID');
-      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip';
-
-      // Start progress tracking immediately
-      if (downloadId) {
-        downloadAllProgress.startProgress(allPhotos.length, downloadId);
-      }
-
-      // Now download the blob (this will take time)
-      const blob = await response.blob();
-
-      // Trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      showToast("All photos download started!", "success");
-    } catch (error: any) {
-      console.error("Failed to download all photos:", error);
-      downloadAllProgress.errorProgress(error.message || "Failed to download all photos");
-      showToast(error.message || "Failed to download all photos", "error");
-    } finally {
-      setIsDownloadingAll(false);
+      const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
+      window.location.href = response.downloadUrl;
+    } catch (error) {
+      console.error("Failed to start download:", error);
+      showToast("Failed to start download", "error");
     }
   };
 
@@ -511,6 +405,19 @@ function GalleryPage() {
     } catch (error) {
       console.error("Failed to delete photo", error);
       showToast("Failed to delete photo", "error");
+    }
+  };
+
+  const handleSetCoverPhoto = async (folderId: string, photoId: string) => {
+    try {
+      await api.setFolderCover(folderId, photoId || undefined);
+      showToast(photoId ? "Cover photo set successfully" : "Cover photo removed", "success");
+      
+      // Refresh the gallery to update cover photos
+      await fetchGallery();
+    } catch (error) {
+      console.error("Failed to set cover photo", error);
+      showToast("Failed to set cover photo", "error");
     }
   };
 
@@ -576,10 +483,8 @@ function GalleryPage() {
       const newBreadcrumbs = buildBreadcrumbPath(folder);
       setBreadcrumbItems(newBreadcrumbs);
 
-      // Reset photo display for new folder
-      setDisplayedPhotos([]);
+      // Reset to page 1 for new folder
       setCurrentPage(1);
-      setHasMore(true);
 
     } catch (error) {
       showToast("Failed to load folder", "error");
@@ -596,9 +501,7 @@ function GalleryPage() {
           { id: gallery.id, name: gallery.title, type: 'gallery' },
           { id: rootFolder.id, name: rootFolder.name, type: 'folder' }
         ]);
-        setDisplayedPhotos([]);
         setCurrentPage(1);
-        setHasMore(true);
       }
     } else {
       // Navigate to specific folder
@@ -617,6 +520,15 @@ function GalleryPage() {
     return currentFolder.photos;
   }, [currentFolder, filter, user]);
 
+  // Paginated photos
+  const paginatedPhotos = useMemo(() => {
+    const startIndex = (currentPage - 1) * PHOTOS_PER_PAGE;
+    const endIndex = startIndex + PHOTOS_PER_PAGE;
+    return filteredPhotos.slice(startIndex, endIndex);
+  }, [filteredPhotos, currentPage, PHOTOS_PER_PAGE]);
+
+  const totalPages = Math.ceil(filteredPhotos.length / PHOTOS_PER_PAGE);
+
   // Calculate liked and favorited photo counts for the entire gallery
   const galleryPhotoCounts = useMemo(() => {
     if (!gallery || !user) return { liked: 0, favorited: 0 };
@@ -628,51 +540,31 @@ function GalleryPage() {
     return { liked: likedCount, favorited: favoritedCount };
   }, [gallery, user]);
 
-  // Load more photos function
-  const loadMorePhotos = useCallback(() => {
-    if (!currentFolder || loadingMore || !hasMore) return;
-
-    setLoadingMore(true);
-    const startIndex = displayedPhotos.length;
-    const endIndex = startIndex + PHOTOS_PER_PAGE;
-    const newPhotos = filteredPhotos.slice(startIndex, endIndex);
-
-    // Use requestAnimationFrame for smoother updates
-    requestAnimationFrame(() => {
-      setDisplayedPhotos(prev => [...prev, ...newPhotos]);
-      setHasMore(endIndex < filteredPhotos.length);
-      setLoadingMore(false);
-    });
-  }, [currentFolder, filteredPhotos, displayedPhotos.length, loadingMore, hasMore, PHOTOS_PER_PAGE]);
-
-  // Intersection observer for infinite scroll
-  const observer = useRef<IntersectionObserver | null>(null);
-  const lastPhotoElementRef = useCallback((node: HTMLDivElement | null) => {
-    if (loadingMore) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore) {
-        loadMorePhotos();
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loadingMore, hasMore, loadMorePhotos]);
-
-  // Reset pagination when filter changes or folder loads
+  // Reset to page 1 when filter or folder changes
   useEffect(() => {
-    if (currentFolder && filteredPhotos.length > 0) {
-      // Use requestAnimationFrame for smoother initial render
-      requestAnimationFrame(() => {
-        const initialPhotos = filteredPhotos.slice(0, PHOTOS_PER_PAGE);
-        setDisplayedPhotos(initialPhotos);
-        setCurrentPage(2);
-        setHasMore(filteredPhotos.length > PHOTOS_PER_PAGE);
-      });
-    } else if (currentFolder && filteredPhotos.length === 0) {
-      setDisplayedPhotos([]);
-      setHasMore(false);
+    setCurrentPage(1);
+    // Store last page in localStorage
+    if (currentFolder) {
+      localStorage.setItem(`gallery-${galleryId}-folder-${currentFolder.id}-page`, '1');
     }
-  }, [filteredPhotos, currentFolder, PHOTOS_PER_PAGE]);
+  }, [filter, currentFolder, galleryId]);
+
+  // Restore last page from localStorage on folder load
+  useEffect(() => {
+    if (currentFolder) {
+      const savedPage = localStorage.getItem(`gallery-${galleryId}-folder-${currentFolder.id}-page`);
+      if (savedPage) {
+        setCurrentPage(parseInt(savedPage, 10));
+      }
+    }
+  }, [currentFolder, galleryId]);
+
+  // Save current page to localStorage
+  useEffect(() => {
+    if (currentFolder) {
+      localStorage.setItem(`gallery-${galleryId}-folder-${currentFolder.id}-page`, currentPage.toString());
+    }
+  }, [currentPage, currentFolder, galleryId]);
 
   if (loading) {
     return (
@@ -992,6 +884,7 @@ function GalleryPage() {
           folders={currentFolder.children}
           isPhotographer={user?.role === "PHOTOGRAPHER"}
           onFolderSelect={handleFolderSelect}
+          onSetCoverPhoto={user?.role === "PHOTOGRAPHER" ? handleSetCoverPhoto : undefined}
           showSelectionCounters={!!user}
         />
       )}
@@ -1075,11 +968,11 @@ function GalleryPage() {
             )}
           </div>
           <span className="text-sm text-muted-foreground">
-            {currentFolder ? currentFolder.photos.length : 0} photo{(currentFolder?.photos.length ?? 0) !== 1 ? 's' : ''}
+            Page {currentPage} of {totalPages} ({filteredPhotos.length} total)
           </span>
         </div>
 
-        {displayedPhotos.length === 0 && !loading ? (
+        {paginatedPhotos.length === 0 && !loading ? (
           <div className="text-center py-12">
             <Images className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-2 text-sm font-medium">
@@ -1095,28 +988,94 @@ function GalleryPage() {
               <FolderGrid
                 folder={{
                   ...currentFolder,
-                  photos: displayedPhotos
+                  photos: paginatedPhotos
                 }}
                 isPhotographer={user?.role === "PHOTOGRAPHER"}
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}
                 onPhotoStatusChange={handlePhotoStatusChange}
+                onSetCoverPhoto={user?.role === "PHOTOGRAPHER" ? handleSetCoverPhoto : undefined}
                 viewMode={viewMode}
               />
             )}
 
-            {/* Loading more indicator */}
-            {loadingMore && (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading more photos...</span>
-              </div>
-            )}
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
 
-            {/* End of photos indicator */}
-            {!hasMore && displayedPhotos.length > 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>You've reached the end! {displayedPhotos.length} photos total.</p>
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-10"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                    <>
+                      <span className="px-2">...</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-10"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </Button>
               </div>
             )}
           </>

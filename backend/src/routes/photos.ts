@@ -21,7 +21,9 @@ import {
 	downloadFavoritedPhotos,
 	downloadAllPhotos,
 	downloadFolderPhotos,
-	getDownloadProgress
+	getDownloadProgress,
+	createDownloadTicket,
+	downloadWithTicket
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { auditMiddleware } from '../middleware/auditMiddleware'
@@ -69,6 +71,7 @@ router.get('/posts', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']
 // Public routes (for clients)
 router.get('/gallery/:galleryId', getPhotos)
 router.get('/:id/download', downloadPhoto)
+router.post('/:id/download', downloadPhoto) // Support POST for secure credential passing
 
 // Filtered download routes
 router.get('/gallery/:galleryId/download/liked', authenticateToken, downloadLikedPhotos)
@@ -78,5 +81,11 @@ router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, d
 
 // Download progress tracking
 router.get('/download/:downloadId/progress', authenticateToken, getDownloadProgress)
+
+// Download ticket creation
+router.post('/download-ticket', authenticateToken, createDownloadTicket);
+
+// Ticket-based download
+router.get('/download-zip', downloadWithTicket);
 
 export default router

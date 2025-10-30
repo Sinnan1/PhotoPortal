@@ -596,11 +596,15 @@ const deletePhoto = async (req, res) => {
         // Delete from S3 storage with better error handling
         try {
             const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/');
-            const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
-            await Promise.all([
-                (0, s3Storage_1.deleteFromS3)(originalKey).catch(err => console.warn('Failed to delete original:', err)),
-                (0, s3Storage_1.deleteFromS3)(thumbnailKey).catch(err => console.warn('Failed to delete thumbnail:', err))
-            ]);
+            const deletePromises = [
+                (0, s3Storage_1.deleteFromS3)(originalKey).catch(err => console.warn('Failed to delete original:', err))
+            ];
+            // Only delete thumbnail if it exists (may be null for pending thumbnails)
+            if (photo.thumbnailUrl) {
+                const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
+                deletePromises.push((0, s3Storage_1.deleteFromS3)(thumbnailKey).catch(err => console.warn('Failed to delete thumbnail:', err)));
+            }
+            await Promise.all(deletePromises);
         }
         catch (storageError) {
             console.error('Storage deletion error:', storageError);
@@ -652,11 +656,13 @@ const bulkDeletePhotos = async (req, res) => {
         const deletePromises = photos.map(async (photo) => {
             try {
                 const originalKey = new URL(photo.originalUrl).pathname.split('/').slice(2).join('/');
-                const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
-                await Promise.all([
-                    (0, s3Storage_1.deleteFromS3)(originalKey),
-                    (0, s3Storage_1.deleteFromS3)(thumbnailKey)
-                ]);
+                const promises = [(0, s3Storage_1.deleteFromS3)(originalKey)];
+                // Only delete thumbnail if it exists (may be null for pending thumbnails)
+                if (photo.thumbnailUrl) {
+                    const thumbnailKey = new URL(photo.thumbnailUrl).pathname.split('/').slice(2).join('/');
+                    promises.push((0, s3Storage_1.deleteFromS3)(thumbnailKey));
+                }
+                await Promise.all(promises);
             }
             catch (error) {
                 console.warn(`Failed to delete storage for photo ${photo.id}:`, error);

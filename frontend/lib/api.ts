@@ -181,27 +181,31 @@ export const api = {
   // New function for downloading photo data directly
   downloadPhotoData: async (id: string, filename: string, galleryPassword?: string) => {
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/photos/${id}/download`, {
-      headers: {
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
-      },
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Download failed");
+    
+    // Create a temporary form to POST credentials (more secure than URL params)
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `${API_BASE_URL}/photos/${id}/download`;
+    form.target = '_blank';
+    form.style.display = 'none';
+    
+    if (token) {
+      const tokenInput = document.createElement('input');
+      tokenInput.name = 'token';
+      tokenInput.value = token;
+      form.appendChild(tokenInput);
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    
+    if (galleryPassword) {
+      const passwordInput = document.createElement('input');
+      passwordInput.name = 'password';
+      passwordInput.value = galleryPassword;
+      form.appendChild(passwordInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
   },
 
   // Like/Favorite APIs
@@ -244,6 +248,12 @@ export const api = {
   getLikedPhotos: () => apiRequest("/photos/liked"),
 
   getFavoritedPhotos: () => apiRequest("/photos/favorited"),
+
+  createDownloadTicket: (galleryId: string, data: { folderId?: string; filter: string }) =>
+    apiRequest(`/photos/download-ticket`, {
+      method: "POST",
+      body: JSON.stringify({ galleryId, ...data }),
+    }),
 
   likeGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/like`, {

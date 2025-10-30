@@ -415,17 +415,19 @@ const deleteGallery = async (req, res) => {
                 const deletePromises = allPhotos.map(async (photo) => {
                     // Extract the S3 keys from the URLs
                     const originalUrl = new URL(photo.originalUrl);
-                    const thumbnailUrl = new URL(photo.thumbnailUrl);
                     // Split pathname and remove bucket name to get just the filename
                     const originalPathParts = originalUrl.pathname.split('/');
-                    const thumbnailPathParts = thumbnailUrl.pathname.split('/');
                     // Remove empty string and bucket name, keep the rest as the key
                     const originalKey = originalPathParts.slice(2).join('/');
-                    const thumbnailKey = thumbnailPathParts.slice(2).join('/');
-                    return Promise.all([
-                        (0, s3Storage_1.deleteFromS3)(originalKey),
-                        (0, s3Storage_1.deleteFromS3)(thumbnailKey)
-                    ]);
+                    const promises = [(0, s3Storage_1.deleteFromS3)(originalKey)];
+                    // Only delete thumbnail if it exists (may be null for pending thumbnails)
+                    if (photo.thumbnailUrl) {
+                        const thumbnailUrl = new URL(photo.thumbnailUrl);
+                        const thumbnailPathParts = thumbnailUrl.pathname.split('/');
+                        const thumbnailKey = thumbnailPathParts.slice(2).join('/');
+                        promises.push((0, s3Storage_1.deleteFromS3)(thumbnailKey));
+                    }
+                    return Promise.all(promises);
                 });
                 await Promise.all(deletePromises);
                 console.log(`Deleted ${allPhotos.length} photos from S3 for gallery ${id}`);

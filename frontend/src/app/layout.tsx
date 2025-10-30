@@ -17,7 +17,22 @@ export const metadata: Metadata = {
     shortcut: "/Logo-Main.png",
     apple: "/Logo-Main.png",
   },
-  generator: 'v0.dev'
+  generator: 'v0.dev',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
+  themeColor: '#425146',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Yarrow Weddings',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 }
 
 export default function RootLayout({
