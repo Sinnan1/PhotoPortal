@@ -2,7 +2,7 @@
  * Background Upload Manager
  * Handles uploads that persist even when user navigates away
  */
-import { uploadFileToB2 } from '@/app/galleries/[id]/manage/uploadUtils'
+import { uploadFileToB2 } from '../src/app/galleries/[id]/manage/uploadUtils'
 
 export interface UploadFile {
   file: File
