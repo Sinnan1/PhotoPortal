@@ -25,10 +25,12 @@ import {
   Star,
   Trash2,
   Users,
+  HardDrive,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { CreateGalleryModal } from "@/components/create-gallery-modal";
+import { formatBytes } from "@/lib/utils";
 import { GalleryAccessModal } from "@/components/gallery-access-modal";
 import {
   DropdownMenu,
@@ -74,9 +76,12 @@ interface Gallery {
   expiresAt: string | null;
   createdAt: string;
   isExpired: boolean;
-  folders?: Folder[]; // Updated to use folders instead of direct photos
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
+  folders?: Folder[];
+  totalSize: number;
+  _count: {
+    likedBy: number;
+    favoritedBy: number;
+  };
 }
 
 export default function DashboardPage() {
@@ -118,49 +123,9 @@ export default function DashboardPage() {
     }
   };
 
-  const handleLikeGallery = async (galleryId: string) => {
-    try {
-      const gallery = galleries.find((g) => g.id === galleryId);
-      if (!gallery) return;
-
-      const isLiked = gallery.likedBy.some((like) => like.userId === user?.id);
-
-      if (isLiked) {
-        await api.unlikeGallery(galleryId);
-      } else {
-        await api.likeGallery(galleryId);
-      }
-
-      fetchGalleries();
-    } catch (error) {
-      showToast("Failed to update like status", "error");
-    }
-  };
-
   const handleShareGallery = (gallery: Gallery) => {
     setSelectedGallery(gallery);
     setShowShareModal(true);
-  };
-
-  const handleFavoriteGallery = async (galleryId: string) => {
-    try {
-      const gallery = galleries.find((g) => g.id === galleryId);
-      if (!gallery) return;
-
-      const isFavorited = gallery.favoritedBy.some(
-        (favorite) => favorite.userId === user?.id
-      );
-
-      if (isFavorited) {
-        await api.unfavoriteGallery(galleryId);
-      } else {
-        await api.favoriteGallery(galleryId);
-      }
-
-      fetchGalleries();
-    } catch (error) {
-      showToast("Failed to update favorite status", "error");
-    }
   };
 
   const handleManageAccess = (gallery: Gallery) => {
@@ -369,9 +334,15 @@ export default function DashboardPage() {
                 )}
 
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
-                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
-                    <Images className="mr-1 h-3 w-3 text-[#425146]" />
-                    <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
+                      <Images className="mr-1 h-3 w-3 text-[#425146]" />
+                      <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
+                    </div>
+                    <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
+                      <HardDrive className="mr-1 h-3 w-3 text-[#425146]" />
+                      <span className="font-medium">{formatBytes(gallery.totalSize)}</span>
+                    </div>
                   </div>
                   <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
                     <Download className="mr-1 h-3 w-3 text-[#425146]" />
@@ -394,39 +365,15 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-1 mt-2 px-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleLikeGallery(gallery.id)}
-                  >
-                    <Heart
-                      className={`mr-1 h-3 w-3 ${
-                        gallery.likedBy?.some((like) => like.userId === user?.id)
-                          ? "text-red-500 fill-current"
-                          : ""
-                      }`}
-                    />
-                    {gallery.likedBy?.length || 0}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleFavoriteGallery(gallery.id)}
-                  >
-                    <Star
-                      className={`mr-1 h-3 w-3 ${
-                        gallery.favoritedBy?.some(
-                          (favorite) => favorite.userId === user?.id
-                        )
-                          ? "text-yellow-500 fill-current"
-                          : ""
-                      }`}
-                    />
-                    {gallery.favoritedBy?.length || 0}
-                  </Button>
+                <div className="flex items-center justify-end gap-2 mt-2 px-1">
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Heart className="mr-1 h-3 w-3 text-red-500" />
+                    <span>{gallery._count.likedBy}</span>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Star className="mr-1 h-3 w-3 text-yellow-500" />
+                    <span>{gallery._count.favoritedBy}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
