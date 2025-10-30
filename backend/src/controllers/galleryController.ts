@@ -101,7 +101,13 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 					include: {
 						photos: {
 							select: {
-								fileSize: true
+								fileSize: true,
+								_count: {
+									select: {
+										likedBy: true,
+										favoritedBy: true
+									}
+								}
 							}
 						},
 						coverPhoto: {
@@ -120,16 +126,6 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						}
 					}
 				},
-				likedBy: {
-					select: {
-						userId: true
-					}
-				},
-				favoritedBy: {
-					select: {
-						userId: true
-					}
-				},
 				_count: {
 					select: { folders: true }
 				}
@@ -138,38 +134,34 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 		})
 
 		const galleriesWithStats = galleries.map((gallery) => {
+			let totalLikes = 0;
+			let totalFavorites = 0;
+
 			const totalSize = gallery.folders.reduce((acc, folder) => {
-				return (
-					acc +
-					folder.photos.reduce((photoAcc, photo) => {
-						return photoAcc + (photo.fileSize || 0)
-					}, 0)
-				)
-			}, 0)
+				const folderSize = folder.photos.reduce((photoAcc, photo) => {
+					totalLikes += photo._count.likedBy;
+					totalFavorites += photo._count.favoritedBy;
+					return photoAcc + (photo.fileSize || 0);
+				}, 0);
+				return acc + folderSize;
+			}, 0);
 
-			const likes = gallery.likedBy.length;
-			const favorites = gallery.favoritedBy.length;
-
-			// remove photos from response
+			// remove photos from response to keep payload light
 			gallery.folders.forEach(f => {
-                // @ts-ignore
-                delete f.photos
-            });
-			// @ts-ignore
-			delete gallery.likedBy;
-			// @ts-ignore
-			delete gallery.favoritedBy;
+				// @ts-ignore
+				delete f.photos;
+			});
 
 			return {
 				...gallery,
 				totalSize,
 				_count: {
-                    ...gallery._count,
-                    likedBy: likes,
-                    favoritedBy: favorites
-                }
-			}
-		})
+					...gallery._count,
+					likedBy: totalLikes,
+					favoritedBy: totalFavorites,
+				},
+			};
+		});
 
 		res.json({
 			success: true,
