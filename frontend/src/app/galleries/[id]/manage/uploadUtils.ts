@@ -14,6 +14,7 @@ export async function uploadFileToB2(
 ): Promise<{ key: string }> {
   const uniqueId = uuidv4();
   const key = `${galleryId}/${uniqueId}_${file.name}`;
+  let uploadId: string | null = null;
 
   try {
     // Step 1: Initialize multipart upload
@@ -45,7 +46,8 @@ export async function uploadFileToB2(
       throw new Error(initData.error || "Failed to initialize B2 upload");
     }
 
-    const { uploadId, key } = initData;
+    uploadId = initData.uploadId;
+    const { key } = initData;
     console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
 
     // Step 2: Split file into chunks and get signed URLs
@@ -222,7 +224,25 @@ export async function uploadFileToB2(
     console.log(`✅ Photo registered in B2: ${registerData.photo.id}`);
     return { key };
   } catch (error) {
-    console.error("Upload failed:", error);
+    console.error("Upload failed:", error instanceof Error ? error.message : String(error));
+
+    // If multipart upload was initialized, try to abort it
+    if (uploadId) {
+      try {
+        await fetch(`${BASE_URL}/uploads/multipart/abort`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ key, uploadId }),
+        });
+        console.log(`🧹 Aborted multipart upload: ${uploadId}`);
+      } catch (abortError) {
+        console.error("Failed to abort multipart upload:", abortError);
+      }
+    }
+
     throw error;
   }
 }

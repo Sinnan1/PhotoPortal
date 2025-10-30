@@ -5,6 +5,7 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   GetObjectCommand,
+  AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PrismaClient } from "@prisma/client";
@@ -13,6 +14,24 @@ import { v4 as uuidv4 } from "uuid";
 import { UPLOAD_CONFIG } from "../config/uploadConfig";
 
 const prisma = new PrismaClient();
+
+// Allowed MIME types for images
+const ALLOWED_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/x-canon-cr2',
+  'image/x-canon-cr3',
+  'image/x-nikon-nef',
+  'image/x-sony-arw',
+  'image/x-adobe-dng',
+  'image/x-olympus-orf',
+  'image/x-panasonic-rw2',
+  'image/tiff',
+];
 
 // B2 S3-Compatible Client Configuration
 const s3Client = new S3Client({
@@ -47,6 +66,14 @@ export const createMultipartUpload = async (req: Request, res: Response) => {
         success: false,
         error:
           "Missing required fields: filename, contentType, galleryId, folderId",
+      });
+    }
+
+    // Validate content type
+    if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid content type: ${contentType}. Only image files are allowed.`,
       });
     }
 
@@ -242,9 +269,8 @@ export const uploadPartProxy = async (req: Request, res: Response) => {
       method: "PUT",
       body: req.body,
       headers: {
-        "Content-Type":
-          req.headers["content-type"] || "application/octet-stream",
-        "Content-Length": bodySize.toString(),
+        "Content-Type": "application/octet-stream",
+        "Content-Length": req.headers['content-length']!,
       },
       signal: controller.signal,
     });
@@ -528,5 +554,38 @@ export const uploadDirect = async (req: Request, res: Response) => {
       success: false,
       error: error instanceof Error ? error.message : 'Upload failed',
     });
+  }
+};
+
+export const abortMultipartUpload = async (req: Request, res: Response) => {
+  try {
+    const { key, uploadId } = req.body;
+
+    if (!key || !uploadId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: key, uploadId",
+      });
+    }
+
+    console.log(`🗑️ Aborting B2 multipart upload: ${uploadId}`);
+
+    const command = new AbortMultipartUploadCommand({
+      Bucket: process.env.S3_BUCKET_NAME!,
+      Key: key,
+      UploadId: uploadId,
+    });
+
+    await s3Client.send(command);
+
+    console.log(`✅ B2 multipart upload aborted: ${uploadId}`);
+
+    res.json({
+      success: true,
+      message: "Multipart upload aborted successfully",
+    });
+  } catch (error) {
+    const errorResponse = handleB2Error(error, "Abort multipart upload");
+    res.status(500).json(errorResponse);
   }
 };

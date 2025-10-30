@@ -48,6 +48,18 @@ export interface DownloadProgress {
 // In-memory storage for download progress (in production, use Redis or database)
 const downloadProgress = new Map<string, DownloadProgress>()
 
+// Cleanup old download progress entries every 5 minutes
+setInterval(() => {
+    const now = new Date().getTime();
+    for (const [id, progress] of downloadProgress.entries()) {
+        // Remove if older than 30 minutes
+        if (now - progress.updatedAt.getTime() > 30 * 60 * 1000) {
+            downloadProgress.delete(id);
+            console.log(`🧹 Cleaned up stale download progress: ${id}`);
+        }
+    }
+}, 5 * 60 * 1000);
+
 export class DownloadService {
     static createDownload(filename: string, totalPhotos: number): string {
         const downloadId = uuidv4()
@@ -261,11 +273,12 @@ export class DownloadService {
 
         } catch (error) {
             console.error(`Download service error for ${downloadId}:`, error)
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during zip creation.';
             this.updateProgress(downloadId, {
                 status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: errorMessage
             })
-            throw error
+            throw new Error(errorMessage);
         } finally {
             // Clean up after a delay
             setTimeout(() => {

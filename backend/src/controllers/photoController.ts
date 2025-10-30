@@ -501,7 +501,7 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		stream.on("error", (error: any) => {
 			console.error("❌ Stream error:", error);
 			if (!res.headersSent) {
-				res.status(500).json({ success: false, error: "Download failed" });
+				res.status(500).json({ success: false, error: `Download failed: ${error.message}` });
 			}
 		});
 
@@ -511,9 +511,18 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 	} catch (error) {
 		console.error("❌ Download photo error for ID:", req.params.id);
 		console.error("Error details:", error);
+  if (error instanceof Error) {
+    if(error.name === 'NoSuchKey') {
+      return res.status(404).json({ success: false, error: "Photo not found in storage."});
+    }
+		return res.status(500).json({
+			success: false,
+			error: error.message,
+		});
+  }
 		res.status(500).json({
 			success: false,
-			error: "Internal server error",
+			error: "An unknown error occurred during download.",
 		});
 	}
 };
