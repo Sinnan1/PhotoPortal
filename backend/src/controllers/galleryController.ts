@@ -120,8 +120,18 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						}
 					}
 				},
+				likedBy: {
+					select: {
+						userId: true
+					}
+				},
+				favoritedBy: {
+					select: {
+						userId: true
+					}
+				},
 				_count: {
-					select: { folders: true, likedBy: true, favoritedBy: true }
+					select: { folders: true }
 				}
 			},
 			orderBy: { createdAt: 'desc' }
@@ -137,15 +147,27 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				)
 			}, 0)
 
+			const likes = gallery.likedBy.length;
+			const favorites = gallery.favoritedBy.length;
+
 			// remove photos from response
 			gallery.folders.forEach(f => {
                 // @ts-ignore
                 delete f.photos
             });
+			// @ts-ignore
+			delete gallery.likedBy;
+			// @ts-ignore
+			delete gallery.favoritedBy;
 
 			return {
 				...gallery,
-				totalSize
+				totalSize,
+				_count: {
+                    ...gallery._count,
+                    likedBy: likes,
+                    favoritedBy: favorites
+                }
 			}
 		})
 
