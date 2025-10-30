@@ -249,6 +249,12 @@ export const api = {
 
   getFavoritedPhotos: () => apiRequest("/photos/favorited"),
 
+  createDownloadTicket: (galleryId: string, data: { folderId?: string; filter: string }) =>
+    apiRequest(`/photos/download-ticket`, {
+      method: "POST",
+      body: JSON.stringify({ galleryId, ...data }),
+    }),
+
   likeGallery: (galleryId: string) =>
     apiRequest(`/galleries/${galleryId}/like`, {
       method: "POST",

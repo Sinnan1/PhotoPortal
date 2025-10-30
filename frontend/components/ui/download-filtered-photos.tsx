@@ -34,6 +34,7 @@ export function DownloadFilteredPhotos({
       const response = await api.createDownloadTicket(galleryId, { filter: filterType });
       window.location.href = response.data.downloadUrl;
     } catch (error) {
+      console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
     } finally {
       setDownloading(false);

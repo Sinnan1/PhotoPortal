@@ -21,6 +21,7 @@ import { FileList } from "@/components/file-list"
 import { uploadManager } from "@/lib/upload-manager"
 import { UploadProgressPanel } from "@/components/ui/upload-progress-panel"
 import { Checkbox } from "@/components/ui/checkbox"
+import { uploadFileToB2 } from '@/lib/uploadUtils'
 
 interface Photo {
   id: string

@@ -369,6 +369,7 @@ function GalleryPage() {
       const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
       window.location.href = response.data.downloadUrl;
     } catch (error) {
+      console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
     }
   };
@@ -378,6 +379,7 @@ function GalleryPage() {
       const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
       window.location.href = response.data.downloadUrl;
     } catch (error) {
+      console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
     }
   };
