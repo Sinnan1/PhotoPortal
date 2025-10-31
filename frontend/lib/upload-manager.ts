@@ -221,6 +221,18 @@ class UploadManager {
       } catch (error) {
         console.error(`Upload attempt ${attempt} failed:`, error)
 
+        // Don't retry duplicate errors
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed'
+        const isDuplicate = errorMessage.includes('already exists')
+
+        if (isDuplicate) {
+          uploadFile.status = 'failed'
+          uploadFile.error = errorMessage
+          batch.failedFiles++
+          this.notify()
+          return false
+        }
+
         if (attempt < this.maxRetries) {
           // Exponential backoff with jitter
           const delay = 1000 * Math.pow(2, attempt - 1) + Math.random() * 1000
@@ -228,7 +240,7 @@ class UploadManager {
           return attemptUpload(attempt + 1)
         } else {
           uploadFile.status = 'failed'
-          uploadFile.error = error instanceof Error ? error.message : 'Upload failed'
+          uploadFile.error = errorMessage
           batch.failedFiles++
           this.notify()
           return false
