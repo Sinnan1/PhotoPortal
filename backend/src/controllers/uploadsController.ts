@@ -278,66 +278,6 @@ export const completeMultipartUpload = async (req: Request, res: Response) => {
   }
 };
 
-export const uploadPartProxy = async (req: Request, res: Response) => {
-  try {
-    const { url } = req.query;
-
-    if (!url || typeof url !== "string") {
-      return res.status(400).json({
-        success: false,
-        error: "URL parameter is required",
-      });
-    }
-
-    const bodySize = req.body?.length || 0;
-    console.log(`📤 Proxying upload to B2: ${bodySize} bytes`);
-
-    // Set timeout for the B2 upload
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      UPLOAD_CONFIG.CHUNK_UPLOAD_TIMEOUT
-    );
-
-    const response = await fetch(url, {
-      method: "PUT",
-      body: req.body,
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Length": req.headers['content-length']!,
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    console.log(`📊 B2 response: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      console.error("❌ B2 upload failed:", errorText);
-      throw new Error(
-        `B2 upload failed with status: ${response.status} - ${errorText}`
-      );
-    }
-
-    const etag = response.headers.get("etag") || response.headers.get("ETag");
-    console.log(`✅ B2 upload successful, ETag: ${etag}`);
-
-    if (!etag) {
-      throw new Error("Missing ETag from B2 response");
-    }
-
-    res.json({
-      success: true,
-      etag,
-      contentLength: bodySize,
-    });
-  } catch (error) {
-    const errorResponse = handleB2Error(error, "Upload part proxy");
-    res.status(500).json(errorResponse);
-  }
-};
 
 export const registerPhoto = async (req: Request, res: Response) => {
   try {
