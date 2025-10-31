@@ -36,36 +36,41 @@ export async function uploadFileToB2(
       // Step 1: Initialize multipart upload
       const initResponse = await fetch(`${BASE_URL}/uploads/multipart/create`, {
         method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type || "application/octet-stream",
-        galleryId,
-        folderId,
-      }),
-    });
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+          galleryId,
+          folderId,
+        }),
+      });
 
-    if (!initResponse.ok) {
-      const text = await initResponse.text().catch(() => "<no body>");
-      throw new Error(
-        `Failed to initialize B2 upload: ${initResponse.status} ${initResponse.statusText} - ${text}`
-      );
-    }
+      if (!initResponse.ok) {
+        const text = await initResponse.text().catch(() => "<no body>");
+        throw new Error(
+          `Failed to initialize B2 upload: ${initResponse.status} ${initResponse.statusText} - ${text}`
+        );
+      }
 
-    const initData = await initResponse.json();
-    if (!initData.success) {
-      throw new Error(initData.error || "Failed to initialize B2 upload");
-    }
+      const initData = await initResponse.json();
+      if (!initData.success) {
+        throw new Error(initData.error || "Failed to initialize B2 upload");
+      }
 
-    uploadId = initData.uploadId;
-    key = initData.key;
-    saveUploadState(file, { uploadId, key });
-    console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
+      uploadId = initData.uploadId;
+      key = initData.key;
+      
+      if (!uploadId || !key) {
+        throw new Error("Failed to initialize B2 upload: missing uploadId or key");
+      }
+      
+      saveUploadState(file, { uploadId, key });
+      console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
     }
 
     // Step 2: Split file into chunks and get signed URLs
@@ -79,13 +84,18 @@ export async function uploadFileToB2(
     const parts: { ETag: string; PartNumber: number }[] = [];
     let uploadedSize = 0;
 
+    // Ensure key and uploadId are defined before proceeding
+    if (!key || !uploadId) {
+      throw new Error("Upload initialization failed: missing key or uploadId");
+    }
+
     if (uploadState) {
-      const response = await fetch(`${BASE_URL}/uploads/multipart/parts?key=${encodeURIComponent(key!)}&uploadId=${uploadId}`, {
+      const response = await fetch(`${BASE_URL}/uploads/multipart/parts?key=${encodeURIComponent(key)}&uploadId=${uploadId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      if(response.ok) {
+      if (response.ok) {
         const { parts: existingParts } = await response.json();
         parts.push(...existingParts);
         uploadedSize = existingParts.reduce((acc: number, part: any) => acc + part.Size, 0);
@@ -126,22 +136,15 @@ export async function uploadFileToB2(
 
       const { signedUrl } = signData;
 
-      // Upload chunk through backend proxy to avoid CORS issues
-      console.debug("Uploading part", partNumber, "via proxy");
-      const uploadResponse = await fetch(
-        `${BASE_URL}/uploads/multipart/upload?url=${encodeURIComponent(
-          signedUrl
-        )}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/octet-stream",
-          },
-          credentials: "include",
-          body: chunk,
-        }
-      );
+      // Upload chunk directly to B2 using presigned URL
+      console.debug("Uploading part", partNumber, "directly to B2");
+      const uploadResponse = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        body: chunk,
+      });
 
       if (!uploadResponse.ok) {
         const text = await uploadResponse.text().catch(() => "<no body>");
@@ -150,13 +153,8 @@ export async function uploadFileToB2(
         );
       }
 
-      // Get ETag from B2 proxy response
-      const uploadResult = await uploadResponse.json();
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "B2 upload part failed");
-      }
-
-      const etag = uploadResult.etag;
+      // Get ETag from B2 response headers
+      const etag = uploadResponse.headers.get("etag") || uploadResponse.headers.get("ETag");
       if (!etag) {
         throw new Error("Missing ETag from B2 upload response");
       }

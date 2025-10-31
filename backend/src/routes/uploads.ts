@@ -82,16 +82,8 @@ router.post('/multipart/complete', uploadRateLimit, authenticateToken, requireRo
 router.post('/multipart/abort', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), abortMultipartUpload)
 router.get('/multipart/parts', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), listUploadedParts)
 
-// Proxy upload to avoid browser CORS issues - using unified config
-const CHUNK_UPLOAD_LIMIT = `${Math.ceil(UPLOAD_CONFIG.CHUNK_SIZE / (1024 * 1024))}mb`
-router.put(
-  '/multipart/upload',
-  express.raw({ type: '*/*', limit: CHUNK_UPLOAD_LIMIT }),
-  uploadRateLimit,
-  authenticateToken,
-  requireRole('PHOTOGRAPHER'),
-  uploadPartProxy
-)
+// NOTE: Proxy upload endpoint removed - uploads now go directly to B2 using presigned URLs
+// This reduces VPS bandwidth usage by 50% (no longer proxying upload data through VPS)
 
 // Thumbnail generation with rate limiting
 router.post('/thumbnail/generate', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), generateThumbnail)

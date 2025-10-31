@@ -199,11 +199,12 @@ export const signMultipartPart = async (req: Request, res: Response) => {
     });
 
     // Generate signed URL for B2 with 1 hour expiration
+    // This URL allows direct browser upload to B2 without proxying through VPS
     const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 3600, // 1 hour
     });
 
-    console.log(`✅ B2 signed URL generated for part ${partNum}`);
+    console.log(`✅ B2 signed URL generated for part ${partNum} (direct upload)`);
 
     res.json({
       success: true,
