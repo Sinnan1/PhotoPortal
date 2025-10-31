@@ -111,13 +111,13 @@ class ThumbnailQueue {
                 job.originalFilename
             )
 
-            // Update photo record with thumbnail URLs
+            // Update photo record with thumbnail URL (using medium for all sizes)
             await prisma.photo.update({
                 where: { id: job.photoId },
                 data: {
-                    thumbnailUrl: thumbnailUrls.small,
+                    thumbnailUrl: thumbnailUrls.medium,
                     mediumUrl: thumbnailUrls.medium,
-                    largeUrl: thumbnailUrls.large,
+                    largeUrl: thumbnailUrls.medium,
                     thumbnailStatus: 'COMPLETED'
                 }
             })
@@ -140,13 +140,13 @@ class ThumbnailQueue {
     }
 
     /**
-     * Generate all thumbnail sizes for a photo
+     * Generate universal thumbnail (1200x1200) for a photo
      */
     private async generateThumbnails(
         s3Key: string,
         galleryId: string,
         originalFilename: string
-    ): Promise<{ small: string; medium: string; large: string }> {
+    ): Promise<{ medium: string }> {
         // Get file from S3
         const { fileBuffer, fileSize } = await this.getFileFromS3(s3Key)
 
@@ -155,9 +155,9 @@ class ThumbnailQueue {
         const fileExtension = rawExtension.toLowerCase()
         const baseName = path.basename(originalFilename, rawExtension)
 
-        const thumbnailUrls: { small?: string; medium?: string; large?: string } = {}
+        const thumbnailUrls: { medium?: string } = {}
 
-        // Generate each thumbnail size
+        // Generate single universal thumbnail size (1200x1200)
         for (const [sizeName, dimensions] of Object.entries(UPLOAD_CONFIG.THUMBNAIL_SIZES)) {
             try {
                 let thumbnailBuffer: Buffer
@@ -211,14 +211,12 @@ class ThumbnailQueue {
             }
         }
 
-        if (!thumbnailUrls.small || !thumbnailUrls.medium || !thumbnailUrls.large) {
-            throw new Error('Failed to generate all required thumbnail sizes')
+        if (!thumbnailUrls.medium) {
+            throw new Error('Failed to generate thumbnail')
         }
 
         return {
-            small: thumbnailUrls.small,
-            medium: thumbnailUrls.medium,
-            large: thumbnailUrls.large
+            medium: thumbnailUrls.medium
         }
     }
 

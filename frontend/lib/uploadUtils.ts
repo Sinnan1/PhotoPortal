@@ -136,15 +136,22 @@ export async function uploadFileToB2(
 
       const { signedUrl } = signData;
 
-      // Upload chunk directly to B2 using presigned URL
-      console.debug("Uploading part", partNumber, "directly to B2");
-      const uploadResponse = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/octet-stream",
-        },
-        body: chunk,
-      });
+      // Upload chunk through backend proxy to avoid CORS issues
+      console.debug("Uploading part", partNumber, "via proxy");
+      const uploadResponse = await fetch(
+        `${BASE_URL}/uploads/multipart/upload?url=${encodeURIComponent(
+          signedUrl
+        )}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/octet-stream",
+          },
+          credentials: "include",
+          body: chunk,
+        }
+      );
 
       if (!uploadResponse.ok) {
         const text = await uploadResponse.text().catch(() => "<no body>");
@@ -153,8 +160,13 @@ export async function uploadFileToB2(
         );
       }
 
-      // Get ETag from B2 response headers
-      const etag = uploadResponse.headers.get("etag") || uploadResponse.headers.get("ETag");
+      // Get ETag from B2 proxy response
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || "B2 upload part failed");
+      }
+
+      const etag = uploadResult.etag;
       if (!etag) {
         throw new Error("Missing ETag from B2 upload response");
       }

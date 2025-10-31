@@ -79,11 +79,9 @@ export const generateThumbnail = async (req: Request, res: Response) => {
         const fileExtension = rawExtension.toLowerCase()
         const baseName = path.basename(originalFilename, rawExtension)
 
-        // Generate multiple thumbnail sizes
+        // Generate single universal thumbnail size (1200x1200) for both grid and lightbox
         const thumbnailSizes = [
-            { name: 'small', width: 400, height: 400 },
-            { name: 'medium', width: 1200, height: 1200 },
-            { name: 'large', width: 2000, height: 2000 }
+            { name: 'medium', width: 1200, height: 1200 }
         ]
 
         const uploadedThumbnails: string[] = []
