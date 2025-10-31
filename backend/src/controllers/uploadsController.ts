@@ -517,6 +517,34 @@ export const uploadDirect = async (req: Request, res: Response) => {
         });
       }
 
+      // Check for duplicate file (same filename and size in same folder)
+      const existingPhoto = await prisma.photo.findFirst({
+        where: {
+          folderId,
+          filename: file.originalname,
+          fileSize: file.size,
+        },
+        select: { 
+          id: true, 
+          filename: true,
+          createdAt: true,
+        },
+      });
+
+      if (existingPhoto) {
+        console.log(`⚠️ Duplicate detected: ${file.originalname} (existing photo: ${existingPhoto.id})`);
+        return res.status(409).json({
+          success: false,
+          error: `File "${file.originalname}" already exists in this folder`,
+          duplicate: true,
+          existingPhoto: {
+            id: existingPhoto.id,
+            filename: existingPhoto.filename,
+            uploadedAt: existingPhoto.createdAt,
+          },
+        });
+      }
+
       // Generate unique B2 key
       const uniqueId = uuidv4();
       const fileExtension = path.extname(file.originalname);

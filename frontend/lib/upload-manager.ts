@@ -329,6 +329,14 @@ class UploadManager {
           } catch (error) {
             reject(new Error('Invalid response from server'))
           }
+        } else if (xhr.status === 409) {
+          // Duplicate file detected
+          try {
+            const response = JSON.parse(xhr.responseText)
+            reject(new Error(response.error || 'Duplicate file'))
+          } catch (error) {
+            reject(new Error('Duplicate file detected'))
+          }
         } else {
           reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
         }
