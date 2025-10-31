@@ -3,19 +3,6 @@ import { UPLOAD_CONFIG } from "@/src/config/uploadConfig";
 
 const CHUNK_SIZE = UPLOAD_CONFIG.CHUNK_SIZE; // 10MB chunks for multipart upload
 
-const getUploadState = (file: File): { uploadId: string; key: string } | null => {
-  const state = localStorage.getItem(`upload-${file.name}-${file.size}`);
-  return state ? JSON.parse(state) : null;
-};
-
-const saveUploadState = (file: File, state: { uploadId: string; key: string }) => {
-  localStorage.setItem(`upload-${file.name}-${file.size}`, JSON.stringify(state));
-};
-
-const clearUploadState = (file: File) => {
-  localStorage.removeItem(`upload-${file.name}-${file.size}`);
-};
-
 export async function uploadFileToB2(
   file: File,
   galleryId: string,
@@ -25,53 +12,41 @@ export async function uploadFileToB2(
   BASE_URL: string,
   uploadSessionId?: string
 ): Promise<{ key: string }> {
-  let uploadState = getUploadState(file);
-  let key = uploadState?.key;
-  let uploadId = uploadState?.uploadId;
+  const uniqueId = uuidv4();
+  const key = `${galleryId}/${uniqueId}_${file.name}`;
 
   try {
-    if (!uploadState) {
-      const uniqueId = uuidv4();
-      key = `${galleryId}/${uniqueId}_${file.name}`;
-      // Step 1: Initialize multipart upload
-      const initResponse = await fetch(`${BASE_URL}/uploads/multipart/create`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type || "application/octet-stream",
-          galleryId,
-          folderId,
-        }),
-      });
+    // Step 1: Initialize multipart upload
+    const initResponse = await fetch(`${BASE_URL}/uploads/multipart/create`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        galleryId,
+        folderId,
+      }),
+    });
 
-      if (!initResponse.ok) {
-        const text = await initResponse.text().catch(() => "<no body>");
-        throw new Error(
-          `Failed to initialize B2 upload: ${initResponse.status} ${initResponse.statusText} - ${text}`
-        );
-      }
-
-      const initData = await initResponse.json();
-      if (!initData.success) {
-        throw new Error(initData.error || "Failed to initialize B2 upload");
-      }
-
-      uploadId = initData.uploadId;
-      key = initData.key;
-      
-      if (!uploadId || !key) {
-        throw new Error("Failed to initialize B2 upload: missing uploadId or key");
-      }
-      
-      saveUploadState(file, { uploadId, key });
-      console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
+    if (!initResponse.ok) {
+      const text = await initResponse.text().catch(() => "<no body>");
+      throw new Error(
+        `Failed to initialize B2 upload: ${initResponse.status} ${initResponse.statusText} - ${text}`
+      );
     }
+
+    const initData = await initResponse.json();
+    if (!initData.success) {
+      throw new Error(initData.error || "Failed to initialize B2 upload");
+    }
+
+    const { uploadId, key: returnedKey } = initData;
+    console.log(`✅ B2 multipart upload initialized: ${uploadId}`);
 
     // Step 2: Split file into chunks and get signed URLs
     const chunks: Blob[] = [];
@@ -84,37 +59,15 @@ export async function uploadFileToB2(
     const parts: { ETag: string; PartNumber: number }[] = [];
     let uploadedSize = 0;
 
-    // Ensure key and uploadId are defined before proceeding
-    if (!key || !uploadId) {
-      throw new Error("Upload initialization failed: missing key or uploadId");
-    }
-
-    if (uploadState) {
-      const response = await fetch(`${BASE_URL}/uploads/multipart/parts?key=${encodeURIComponent(key)}&uploadId=${uploadId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const { parts: existingParts } = await response.json();
-        parts.push(...existingParts);
-        uploadedSize = existingParts.reduce((acc: number, part: any) => acc + part.Size, 0);
-      }
-    }
-
     // Step 3: Upload each chunk
     for (let i = 0; i < chunks.length; i++) {
       const partNumber = i + 1;
       const chunk = chunks[i];
 
-      if (parts.some(p => p.PartNumber === partNumber)) {
-        continue;
-      }
-
       // Get signed URL for this part
       const signResponse = await fetch(
         `${BASE_URL}/uploads/multipart/sign?key=${encodeURIComponent(
-          key
+          returnedKey
         )}&uploadId=${uploadId}&partNumber=${partNumber}`,
         {
           headers: {
@@ -191,7 +144,7 @@ export async function uploadFileToB2(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          key,
+          key: returnedKey,
           uploadId,
           parts,
         }),
@@ -211,7 +164,6 @@ export async function uploadFileToB2(
     }
 
     console.log(`✅ B2 multipart upload completed: ${completeData.key}`);
-    clearUploadState(file);
 
     // Step 5: Generate thumbnail
     const thumbnailResponse = await fetch(
@@ -223,7 +175,7 @@ export async function uploadFileToB2(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          key,
+          key: returnedKey,
           galleryId,
         }),
       }
@@ -247,7 +199,7 @@ export async function uploadFileToB2(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        key,
+        key: returnedKey,
         filename: file.name,
         folderId,
         fileSize: file.size,
@@ -268,27 +220,9 @@ export async function uploadFileToB2(
     }
 
     console.log(`✅ Photo registered in B2: ${registerData.photo.id}`);
-    return { key };
+    return { key: returnedKey };
   } catch (error) {
-    console.error("Upload failed:", error instanceof Error ? error.message : String(error));
-
-    // If multipart upload was initialized, try to abort it
-    if (uploadId) {
-      try {
-        await fetch(`${BASE_URL}/uploads/multipart/abort`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ key, uploadId }),
-        });
-        console.log(`🧹 Aborted multipart upload: ${uploadId}`);
-      } catch (abortError) {
-        console.error("Failed to abort multipart upload:", abortError);
-      }
-    }
-
+    console.error("Upload failed:", error);
     throw error;
   }
 }
