@@ -11,7 +11,7 @@ function Card({ className, clickable, ...props }: CardProps) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-card text-card-foreground rounded-xl border shadow-sm",
         clickable && "cursor-pointer hover:shadow-md transition-shadow duration-200 card-clickable",
         className
       )}
