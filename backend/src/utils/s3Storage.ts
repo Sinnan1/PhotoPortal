@@ -53,6 +53,7 @@ export const uploadToS3 = async (
 				// Sharp can handle DNG, TIFF directly
 				try {
 					thumbnailBuffer = await sharp(file)
+						.rotate() // Auto-rotate based on EXIF orientation
 						.resize(400, 400, {
 							fit: 'inside',
 							withoutEnlargement: true
@@ -72,6 +73,7 @@ export const uploadToS3 = async (
 			// Regular image files
 			try {
 				thumbnailBuffer = await sharp(file)
+					.rotate() // Auto-rotate based on EXIF orientation
 					.resize(400, 400, {
 						fit: 'inside',
 						withoutEnlargement: true
@@ -140,7 +142,7 @@ export const uploadToS3 = async (
 // Create placeholder thumbnail for unsupported RAW files
 export async function createPlaceholderThumbnail(filename: string): Promise<Buffer> {
 	const extension = path.extname(filename).toUpperCase().replace('.', '')
-	
+
 	// Create a simple SVG placeholder
 	const svgContent = `
 		<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
@@ -156,7 +158,7 @@ export async function createPlaceholderThumbnail(filename: string): Promise<Buff
 			<polygon points="100,140 160,140 130,110" fill="#d1d5db"/>
 		</svg>
 	`
-	
+
 	// Convert SVG to JPEG using Sharp
 	return await sharp(Buffer.from(svgContent))
 		.jpeg({ quality: 80 })
@@ -182,7 +184,7 @@ export function getContentType(extension: string): string {
 		'.pef': 'image/x-pentax-pef',
 		'.raf': 'image/x-fuji-raf'
 	}
-	
+
 	return contentTypes[extension.toLowerCase()] || 'application/octet-stream'
 }
 
@@ -202,7 +204,7 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 			filename,
 			code: (error as any)?.$metadata?.httpStatusCode
 		})
-		
+
 		// Don't throw error if file doesn't exist (404)
 		if ((error as any)?.$metadata?.httpStatusCode !== 404) {
 			throw new Error(`Failed to delete ${filename} from storage`)
@@ -212,13 +214,13 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 
 // Batch delete function for better performance
 export const batchDeleteFromS3 = async (filenames: string[]): Promise<void> => {
-	const deletePromises = filenames.map(filename => 
+	const deletePromises = filenames.map(filename =>
 		deleteFromS3(filename).catch(error => {
 			console.warn(`Failed to delete ${filename}:`, error.message)
 			return null // Don't fail the entire batch for one file
 		})
 	)
-	
+
 	await Promise.all(deletePromises)
 }
 
@@ -226,14 +228,14 @@ export const batchDeleteFromS3 = async (filenames: string[]): Promise<void> => {
 export const getObjectFromS3 = async (key: string, bucketName?: string): Promise<Buffer> => {
 	try {
 		const targetBucket = bucketName || process.env.S3_BUCKET_NAME!
-		
+
 		console.log(`🔍 Attempting to retrieve from bucket: ${targetBucket}, key: ${key}`)
-		
+
 		const command = new GetObjectCommand({
 			Bucket: targetBucket,
 			Key: key
 		})
-		
+
 		const response = await s3Client.send(command)
 		const buffer = await streamToBuffer(response.Body)
 		return buffer
@@ -251,19 +253,19 @@ export const getObjectFromS3 = async (key: string, bucketName?: string): Promise
 export const getObjectStreamFromS3 = async (key: string, bucketName?: string): Promise<{ stream: any, contentLength: number }> => {
 	try {
 		const targetBucket = bucketName || process.env.S3_BUCKET_NAME!
-		
+
 		console.log(`🚀 Setting up stream from bucket: ${targetBucket}, key: ${key}`)
-		
+
 		const command = new GetObjectCommand({
 			Bucket: targetBucket,
 			Key: key
 		})
-		
+
 		const response = await s3Client.send(command)
 		const contentLength = response.ContentLength || 0
-		
+
 		console.log(`⚡ Stream ready, content length: ${contentLength} bytes`)
-		
+
 		return {
 			stream: response.Body,
 			contentLength
@@ -299,15 +301,15 @@ export const generateMultipleThumbnails = async (
 		medium: { width: 1200, height: 1200 }, // Lightbox - high quality viewing  
 		large: { width: 2000, height: 2000 }   // Detailed evaluation before full download
 	}
-	
+
 	const results: { [size: string]: string } = {}
 	const uniqueId = uuidv4()
 	const baseName = path.basename(originalFilename, path.extname(originalFilename))
-	
+
 	for (const [sizeName, dimensions] of Object.entries(thumbnailSizes)) {
 		try {
 			let thumbnailBuffer: Buffer
-			
+
 			if (isRawFile(originalFilename) && !SHARP_SUPPORTED_RAW.includes(path.extname(originalFilename).toLowerCase())) {
 				// Use placeholder for unsupported RAW files
 				thumbnailBuffer = await createPlaceholderThumbnail(originalFilename)
@@ -319,8 +321,9 @@ export const generateMultipleThumbnails = async (
 						.toBuffer()
 				}
 			} else {
-				// Process with Sharp
+				// Process with Sharp with auto-rotation
 				thumbnailBuffer = await sharp(file)
+					.rotate() // Auto-rotate based on EXIF orientation
 					.resize(dimensions.width, dimensions.height, {
 						fit: 'inside',
 						withoutEnlargement: true
@@ -328,9 +331,9 @@ export const generateMultipleThumbnails = async (
 					.jpeg({ quality: 80 })
 					.toBuffer()
 			}
-			
+
 			const thumbnailFilename = `${galleryId}/thumbnails/${uniqueId}_${baseName}_${sizeName}.jpg`
-			
+
 			const uploadCommand = new PutObjectCommand({
 				Bucket: process.env.S3_BUCKET_NAME!,
 				Key: thumbnailFilename,
@@ -343,18 +346,18 @@ export const generateMultipleThumbnails = async (
 					uploadedAt: new Date().toISOString()
 				}
 			})
-			
+
 			await s3Client.send(uploadCommand)
-			
+
 			const bucketName = process.env.S3_BUCKET_NAME!
 			const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
 			results[sizeName] = `${endpoint}/${bucketName}/${thumbnailFilename}`
-			
+
 		} catch (error) {
 			console.error(`Failed to generate ${sizeName} thumbnail:`, error)
 			// Continue with other sizes even if one fails
 		}
 	}
-	
+
 	return results
 }

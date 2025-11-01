@@ -78,19 +78,24 @@ const getGalleries = async (req, res) => {
         const galleries = await prisma.gallery.findMany({
             where: whereClause,
             include: {
-                photographer: userRole === 'ADMIN' ? {
-                    select: { id: true, name: true, email: true }
-                } : undefined,
+                photographer: userRole === 'ADMIN'
+                    ? {
+                        select: { id: true, name: true, email: true }
+                    }
+                    : undefined,
                 folders: {
                     include: {
                         photos: {
-                            include: {
-                                likedBy: true,
-                                favoritedBy: true,
-                                postBy: true
+                            select: {
+                                fileSize: true,
+                                _count: {
+                                    select: {
+                                        likedBy: true,
+                                        favoritedBy: true
+                                    }
+                                }
                             }
                         },
-                        children: true,
                         coverPhoto: {
                             select: {
                                 id: true,
@@ -107,17 +112,41 @@ const getGalleries = async (req, res) => {
                         }
                     }
                 },
-                likedBy: true,
-                favoritedBy: true,
                 _count: {
                     select: { folders: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
+        const galleriesWithStats = galleries.map((gallery) => {
+            let totalLikes = 0;
+            let totalFavorites = 0;
+            const totalSize = gallery.folders.reduce((acc, folder) => {
+                const folderSize = folder.photos.reduce((photoAcc, photo) => {
+                    totalLikes += photo._count.likedBy;
+                    totalFavorites += photo._count.favoritedBy;
+                    return photoAcc + (photo.fileSize || 0);
+                }, 0);
+                return acc + folderSize;
+            }, 0);
+            // remove photos from response to keep payload light
+            gallery.folders.forEach(f => {
+                // @ts-ignore
+                delete f.photos;
+            });
+            return {
+                ...gallery,
+                totalSize,
+                _count: {
+                    ...gallery._count,
+                    likedBy: totalLikes,
+                    favoritedBy: totalFavorites,
+                },
+            };
+        });
         res.json({
             success: true,
-            data: galleries
+            data: galleriesWithStats
         });
     }
     catch (error) {

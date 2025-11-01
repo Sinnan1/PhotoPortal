@@ -49,6 +49,7 @@ const uploadToS3 = async (file, originalFilename, galleryId) => {
                 // Sharp can handle DNG, TIFF directly
                 try {
                     thumbnailBuffer = await (0, sharp_1.default)(file)
+                        .rotate() // Auto-rotate based on EXIF orientation
                         .resize(400, 400, {
                         fit: 'inside',
                         withoutEnlargement: true
@@ -71,6 +72,7 @@ const uploadToS3 = async (file, originalFilename, galleryId) => {
             // Regular image files
             try {
                 thumbnailBuffer = await (0, sharp_1.default)(file)
+                    .rotate() // Auto-rotate based on EXIF orientation
                     .resize(400, 400, {
                     fit: 'inside',
                     withoutEnlargement: true
@@ -292,8 +294,9 @@ const generateMultipleThumbnails = async (file, originalFilename, galleryId) => 
                 }
             }
             else {
-                // Process with Sharp
+                // Process with Sharp with auto-rotation
                 thumbnailBuffer = await (0, sharp_1.default)(file)
+                    .rotate() // Auto-rotate based on EXIF orientation
                     .resize(dimensions.width, dimensions.height, {
                     fit: 'inside',
                     withoutEnlargement: true

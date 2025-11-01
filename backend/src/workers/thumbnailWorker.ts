@@ -83,8 +83,9 @@ async function generateThumbnail() {
         // Download original image
         const fileBuffer = await getFileFromS3(s3Key)
 
-        // Generate thumbnail
+        // Generate thumbnail with auto-rotation based on EXIF orientation
         const thumbnailBuffer = await sharp(fileBuffer)
+            .rotate() // Auto-rotate based on EXIF orientation
             .resize(thumbnailSize.width, thumbnailSize.height, {
                 fit: 'inside',
                 withoutEnlargement: true

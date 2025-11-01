@@ -408,6 +408,57 @@ export const api = {
 
   getDownloadProgress: (downloadId: string) => apiRequest(`/photos/download/${downloadId}/progress`),
 
+  // Excel Export APIs
+  exportLikedPhotosToExcel: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export/liked`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export liked photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'liked_photos.xlsx'
+    };
+  },
+
+  exportFavoritedPhotosToExcel: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export/favorited`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export favorited photos");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'favorited_photos.xlsx'
+    };
+  },
+
   downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string) => {
     const token = getAuthToken();
     if (!token) {

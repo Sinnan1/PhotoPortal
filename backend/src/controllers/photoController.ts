@@ -30,6 +30,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
+import * as XLSX from "xlsx";
 import {
 	uploadToS3,
 	deleteFromS3,
@@ -512,15 +513,15 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 	} catch (error) {
 		console.error("❌ Download photo error for ID:", req.params.id);
 		console.error("Error details:", error);
-  if (error instanceof Error) {
-    if(error.name === 'NoSuchKey') {
-      return res.status(404).json({ success: false, error: "Photo not found in storage."});
-    }
-		return res.status(500).json({
-			success: false,
-			error: error.message,
-		});
-  }
+		if (error instanceof Error) {
+			if (error.name === 'NoSuchKey') {
+				return res.status(404).json({ success: false, error: "Photo not found in storage." });
+			}
+			return res.status(500).json({
+				success: false,
+				error: error.message,
+			});
+		}
 		res.status(500).json({
 			success: false,
 			error: "An unknown error occurred during download.",
@@ -1446,6 +1447,236 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 		} else {
 			// If headers are already sent, we can't send JSON, so just end the response
 			res.end();
+		}
+	}
+};
+
+// Export liked photos filenames to Excel
+export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+		const providedPassword =
+			(req.headers["x-gallery-password"] as string | undefined) ||
+			(req.query.password as string | undefined);
+
+		// Verify gallery access
+		const hasAccess = await DownloadService.verifyGalleryAccess(
+			galleryId,
+			userId,
+			req.user!.role,
+			providedPassword
+		);
+
+		if (!hasAccess) {
+			return res.status(401).json({
+				success: false,
+				error: "Access denied or password required",
+			});
+		}
+
+		// Get gallery info
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: { title: true }
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Get liked photos
+		const likedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				likedBy: {
+					some: {
+						userId,
+					},
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (likedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No liked photos found",
+			});
+		}
+
+		// Prepare data for Excel
+		const excelData = likedPhotos.map((photo, index) => ({
+			'#': index + 1,
+			'Filename': photo.filename,
+			'Folder': photo.folder?.name || 'Root',
+			'Liked Date': photo.createdAt.toISOString().split('T')[0]
+		}));
+
+		// Create workbook and worksheet
+		const workbook = XLSX.utils.book_new();
+		const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+		// Set column widths
+		worksheet['!cols'] = [
+			{ wch: 5 },  // #
+			{ wch: 50 }, // Filename
+			{ wch: 20 }, // Folder
+			{ wch: 15 }  // Liked Date
+		];
+
+		XLSX.utils.book_append_sheet(workbook, worksheet, 'Liked Photos');
+
+		// Generate Excel file buffer
+		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_liked_photos.xlsx`;
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', excelBuffer.length);
+
+		// Send the file
+		res.send(excelBuffer);
+
+	} catch (error) {
+		console.error("Export liked photos to Excel error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
+		}
+	}
+};
+
+// Export favorited photos filenames to Excel
+export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+		const providedPassword =
+			(req.headers["x-gallery-password"] as string | undefined) ||
+			(req.query.password as string | undefined);
+
+		// Verify gallery access
+		const hasAccess = await DownloadService.verifyGalleryAccess(
+			galleryId,
+			userId,
+			req.user!.role,
+			providedPassword
+		);
+
+		if (!hasAccess) {
+			return res.status(401).json({
+				success: false,
+				error: "Access denied or password required",
+			});
+		}
+
+		// Get gallery info
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: { title: true }
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Get favorited photos
+		const favoritedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				favoritedBy: {
+					some: {
+						userId,
+					},
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (favoritedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No favorited photos found",
+			});
+		}
+
+		// Prepare data for Excel
+		const excelData = favoritedPhotos.map((photo, index) => ({
+			'#': index + 1,
+			'Filename': photo.filename,
+			'Folder': photo.folder?.name || 'Root',
+			'Favorited Date': photo.createdAt.toISOString().split('T')[0]
+		}));
+
+		// Create workbook and worksheet
+		const workbook = XLSX.utils.book_new();
+		const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+		// Set column widths
+		worksheet['!cols'] = [
+			{ wch: 5 },  // #
+			{ wch: 50 }, // Filename
+			{ wch: 20 }, // Folder
+			{ wch: 15 }  // Favorited Date
+		];
+
+		XLSX.utils.book_append_sheet(workbook, worksheet, 'Favorited Photos');
+
+		// Generate Excel file buffer
+		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_favorited_photos.xlsx`;
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', excelBuffer.length);
+
+		// Send the file
+		res.send(excelBuffer);
+
+	} catch (error) {
+		console.error("Export favorited photos to Excel error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
 		}
 	}
 };

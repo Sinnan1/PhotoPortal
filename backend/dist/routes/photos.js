@@ -34,11 +34,19 @@ router.get('/posts', auth_1.authenticateToken, (0, auth_1.requireAnyRole)(['PHOT
 // Public routes (for clients)
 router.get('/gallery/:galleryId', photoController_1.getPhotos);
 router.get('/:id/download', photoController_1.downloadPhoto);
+router.post('/:id/download', photoController_1.downloadPhoto); // Support POST for secure credential passing
 // Filtered download routes
 router.get('/gallery/:galleryId/download/liked', auth_1.authenticateToken, photoController_1.downloadLikedPhotos);
 router.get('/gallery/:galleryId/download/favorited', auth_1.authenticateToken, photoController_1.downloadFavoritedPhotos);
 router.get('/gallery/:galleryId/download/all', auth_1.authenticateToken, photoController_1.downloadAllPhotos);
 router.get('/gallery/:galleryId/download/folder/:folderId', auth_1.authenticateToken, photoController_1.downloadFolderPhotos);
+// Excel export routes
+router.get('/gallery/:galleryId/export/liked', auth_1.authenticateToken, photoController_1.exportLikedPhotosToExcel);
+router.get('/gallery/:galleryId/export/favorited', auth_1.authenticateToken, photoController_1.exportFavoritedPhotosToExcel);
 // Download progress tracking
 router.get('/download/:downloadId/progress', auth_1.authenticateToken, photoController_1.getDownloadProgress);
+// Download ticket creation
+router.post('/download-ticket', auth_1.authenticateToken, photoController_1.createDownloadTicket);
+// Ticket-based download
+router.get('/download-zip', photoController_1.downloadWithTicket);
 exports.default = router;

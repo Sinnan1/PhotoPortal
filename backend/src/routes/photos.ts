@@ -23,7 +23,9 @@ import {
 	downloadFolderPhotos,
 	getDownloadProgress,
 	createDownloadTicket,
-	downloadWithTicket
+	downloadWithTicket,
+	exportLikedPhotosToExcel,
+	exportFavoritedPhotosToExcel
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { auditMiddleware } from '../middleware/auditMiddleware'
@@ -78,6 +80,10 @@ router.get('/gallery/:galleryId/download/liked', authenticateToken, downloadLike
 router.get('/gallery/:galleryId/download/favorited', authenticateToken, downloadFavoritedPhotos)
 router.get('/gallery/:galleryId/download/all', authenticateToken, downloadAllPhotos)
 router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, downloadFolderPhotos)
+
+// Excel export routes
+router.get('/gallery/:galleryId/export/liked', authenticateToken, exportLikedPhotosToExcel)
+router.get('/gallery/:galleryId/export/favorited', authenticateToken, exportFavoritedPhotosToExcel)
 
 // Download progress tracking
 router.get('/download/:downloadId/progress', authenticateToken, getDownloadProgress)
