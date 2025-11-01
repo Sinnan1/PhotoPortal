@@ -350,16 +350,32 @@ export default function DashboardPage() {
                             Edit Gallery
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleShareGallery(gallery)}>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShareGallery(gallery);
+                          }}
+                        >
                           <Share2 className="mr-2 h-4 w-4" />
                           Share
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleManageAccess(gallery)}>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleManageAccess(gallery);
+                          }}
+                        >
                           <Users className="mr-2 h-4 w-4" />
                           Manage Access
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleDeleteGallery(gallery.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteGallery(gallery.id);
+                          }}
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
