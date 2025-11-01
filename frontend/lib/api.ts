@@ -459,6 +459,8 @@ export const api = {
     };
   },
 
+  getGalleryPhotoStats: (galleryId: string) => apiRequest(`/photos/gallery/${galleryId}/stats`),
+
   downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string) => {
     const token = getAuthToken();
     if (!token) {

@@ -40,9 +40,11 @@ router.get('/gallery/:galleryId/download/liked', auth_1.authenticateToken, photo
 router.get('/gallery/:galleryId/download/favorited', auth_1.authenticateToken, photoController_1.downloadFavoritedPhotos);
 router.get('/gallery/:galleryId/download/all', auth_1.authenticateToken, photoController_1.downloadAllPhotos);
 router.get('/gallery/:galleryId/download/folder/:folderId', auth_1.authenticateToken, photoController_1.downloadFolderPhotos);
-// Excel export routes
-router.get('/gallery/:galleryId/export/liked', auth_1.authenticateToken, photoController_1.exportLikedPhotosToExcel);
-router.get('/gallery/:galleryId/export/favorited', auth_1.authenticateToken, photoController_1.exportFavoritedPhotosToExcel);
+// Excel export routes (photographer only)
+router.get('/gallery/:galleryId/export/liked', auth_1.authenticateToken, (0, auth_1.requireAnyRole)(['PHOTOGRAPHER', 'ADMIN']), photoController_1.exportLikedPhotosToExcel);
+router.get('/gallery/:galleryId/export/favorited', auth_1.authenticateToken, (0, auth_1.requireAnyRole)(['PHOTOGRAPHER', 'ADMIN']), photoController_1.exportFavoritedPhotosToExcel);
+// Gallery photo stats (photographer only)
+router.get('/gallery/:galleryId/stats', auth_1.authenticateToken, (0, auth_1.requireAnyRole)(['PHOTOGRAPHER', 'ADMIN']), photoController_1.getGalleryPhotoStats);
 // Download progress tracking
 router.get('/download/:downloadId/progress', auth_1.authenticateToken, photoController_1.getDownloadProgress);
 // Download ticket creation

@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder } from "lucide-react"
+import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder, FileSpreadsheet, Heart, Star } from "lucide-react"
 import Link from "next/link"
 import { FolderTree } from "@/components/folder-tree"
 import { FileList } from "@/components/file-list"
@@ -85,13 +85,31 @@ export default function ManageGalleryPage() {
     downloadLimit: "",
   })
 
+  // Excel export state
+  const [photoStats, setPhotoStats] = useState<{ likedCount: number; favoritedCount: number } | null>(null)
+  const [isExportingLiked, setIsExportingLiked] = useState(false)
+  const [isExportingFavorited, setIsExportingFavorited] = useState(false)
+
 
 
   useEffect(() => {
     if (user?.role === "PHOTOGRAPHER") {
       fetchGallery()
+      fetchPhotoStats()
     }
   }, [user, galleryId])
+
+  const fetchPhotoStats = async () => {
+    try {
+      const response = await api.getGalleryPhotoStats(galleryId)
+      setPhotoStats({
+        likedCount: response.data.likedCount,
+        favoritedCount: response.data.favoritedCount
+      })
+    } catch (error) {
+      console.error("Failed to load photo stats:", error)
+    }
+  }
 
   // Enable folder selection on the hidden input when present
   useEffect(() => {
@@ -329,6 +347,36 @@ export default function ManageGalleryPage() {
     }
   }
 
+  const handleExportToExcel = async (filterType: 'liked' | 'favorited') => {
+    const setExporting = filterType === 'liked' ? setIsExportingLiked : setIsExportingFavorited
+    
+    setExporting(true)
+    try {
+      const exportFunc = filterType === 'liked' 
+        ? api.exportLikedPhotosToExcel 
+        : api.exportFavoritedPhotosToExcel
+      
+      const { blob, filename } = await exportFunc(galleryId)
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      showToast(`Excel file downloaded: ${filename}`, "success")
+    } catch (error) {
+      console.error("Failed to export to Excel:", error)
+      showToast("Failed to export to Excel", "error")
+    } finally {
+      setExporting(false)
+    }
+  }
+
 
 
   if (user?.role !== "PHOTOGRAPHER") {
@@ -507,22 +555,66 @@ export default function ManageGalleryPage() {
               {selectedFolder ? (
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
-                        <CardDescription>
-                          {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
-                        </CardDescription>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
+                          <CardDescription>
+                            {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
+                          </CardDescription>
+                        </div>
                       </div>
-                      {/* Search Input */}
-                      <div className="w-64">
-                        <Input
-                          type="text"
-                          placeholder="Search photos..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="h-9"
-                        />
+                      
+                      {/* Search and Export Controls */}
+                      <div className="flex items-center justify-center gap-3">
+                        {/* Search Input - Centered */}
+                        <div className="flex-1 max-w-md">
+                          <Input
+                            type="text"
+                            placeholder="Search photos..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9"
+                          />
+                        </div>
+                        
+                        {/* Excel Export Buttons */}
+                        {photoStats && (photoStats.likedCount > 0 || photoStats.favoritedCount > 0) && (
+                          <div className="flex items-center gap-2">
+                            {photoStats.likedCount > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleExportToExcel('liked')}
+                                disabled={isExportingLiked}
+                                className="whitespace-nowrap"
+                              >
+                                {isExportingLiked ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Heart className="h-4 w-4 mr-2 text-red-500" />
+                                )}
+                                Export Liked ({photoStats.likedCount})
+                              </Button>
+                            )}
+                            {photoStats.favoritedCount > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleExportToExcel('favorited')}
+                                disabled={isExportingFavorited}
+                                className="whitespace-nowrap"
+                              >
+                                {isExportingFavorited ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Star className="h-4 w-4 mr-2 text-yellow-500" />
+                                )}
+                                Export Starred ({photoStats.favoritedCount})
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardHeader>

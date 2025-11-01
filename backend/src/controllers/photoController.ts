@@ -1451,34 +1451,27 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 	}
 };
 
-// Export liked photos filenames to Excel
+// Export liked photos filenames to Excel (Photographer/Admin only)
 export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) => {
 	try {
 		const { galleryId } = req.params;
 		const userId = req.user!.id;
-		const providedPassword =
-			(req.headers["x-gallery-password"] as string | undefined) ||
-			(req.query.password as string | undefined);
 
-		// Verify gallery access
-		const hasAccess = await DownloadService.verifyGalleryAccess(
-			galleryId,
-			userId,
-			req.user!.role,
-			providedPassword
-		);
-
-		if (!hasAccess) {
-			return res.status(401).json({
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
 				success: false,
-				error: "Access denied or password required",
+				error: "Access denied. Photographers only.",
 			});
 		}
 
-		// Get gallery info
+		// Get gallery info and verify ownership
 		const gallery = await prisma.gallery.findUnique({
 			where: { id: galleryId },
-			select: { title: true }
+			select: {
+				title: true,
+				photographerId: true
+			}
 		});
 
 		if (!gallery) {
@@ -1488,16 +1481,22 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 			});
 		}
 
-		// Get liked photos
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL liked photos from ALL clients
 		const likedPhotos = await prisma.photo.findMany({
 			where: {
 				folder: {
 					galleryId: galleryId
 				},
 				likedBy: {
-					some: {
-						userId,
-					},
+					some: {}  // Get all liked photos
 				},
 			},
 			select: {
@@ -1506,6 +1505,17 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 				folder: {
 					select: {
 						name: true
+					}
+				},
+				likedBy: {
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
 					}
 				}
 			},
@@ -1521,13 +1531,20 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 			});
 		}
 
-		// Prepare data for Excel
-		const excelData = likedPhotos.map((photo, index) => ({
-			'#': index + 1,
-			'Filename': photo.filename,
-			'Folder': photo.folder?.name || 'Root',
-			'Liked Date': photo.createdAt.toISOString().split('T')[0]
-		}));
+		// Prepare data for Excel - one row per client like
+		let rowNumber = 0;
+		const excelData = likedPhotos.flatMap(photo =>
+			photo.likedBy.map((like) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Liked By': like.user.name || like.user.email,
+					'Liked Date': like.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
 
 		// Create workbook and worksheet
 		const workbook = XLSX.utils.book_new();
@@ -1538,6 +1555,7 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 			{ wch: 5 },  // #
 			{ wch: 50 }, // Filename
 			{ wch: 20 }, // Folder
+			{ wch: 30 }, // Liked By
 			{ wch: 15 }  // Liked Date
 		];
 
@@ -1566,34 +1584,27 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 	}
 };
 
-// Export favorited photos filenames to Excel
+// Export favorited photos filenames to Excel (Photographer/Admin only)
 export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Response) => {
 	try {
 		const { galleryId } = req.params;
 		const userId = req.user!.id;
-		const providedPassword =
-			(req.headers["x-gallery-password"] as string | undefined) ||
-			(req.query.password as string | undefined);
 
-		// Verify gallery access
-		const hasAccess = await DownloadService.verifyGalleryAccess(
-			galleryId,
-			userId,
-			req.user!.role,
-			providedPassword
-		);
-
-		if (!hasAccess) {
-			return res.status(401).json({
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
 				success: false,
-				error: "Access denied or password required",
+				error: "Access denied. Photographers only.",
 			});
 		}
 
-		// Get gallery info
+		// Get gallery info and verify ownership
 		const gallery = await prisma.gallery.findUnique({
 			where: { id: galleryId },
-			select: { title: true }
+			select: {
+				title: true,
+				photographerId: true
+			}
 		});
 
 		if (!gallery) {
@@ -1603,16 +1614,22 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 			});
 		}
 
-		// Get favorited photos
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL favorited photos from ALL clients
 		const favoritedPhotos = await prisma.photo.findMany({
 			where: {
 				folder: {
 					galleryId: galleryId
 				},
 				favoritedBy: {
-					some: {
-						userId,
-					},
+					some: {}  // Get all favorited photos
 				},
 			},
 			select: {
@@ -1621,6 +1638,17 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 				folder: {
 					select: {
 						name: true
+					}
+				},
+				favoritedBy: {
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
 					}
 				}
 			},
@@ -1636,13 +1664,20 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 			});
 		}
 
-		// Prepare data for Excel
-		const excelData = favoritedPhotos.map((photo, index) => ({
-			'#': index + 1,
-			'Filename': photo.filename,
-			'Folder': photo.folder?.name || 'Root',
-			'Favorited Date': photo.createdAt.toISOString().split('T')[0]
-		}));
+		// Prepare data for Excel - one row per client favorite
+		let rowNumber = 0;
+		const excelData = favoritedPhotos.flatMap(photo =>
+			photo.favoritedBy.map((favorite) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Favorited By': favorite.user.name || favorite.user.email,
+					'Favorited Date': favorite.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
 
 		// Create workbook and worksheet
 		const workbook = XLSX.utils.book_new();
@@ -1653,6 +1688,7 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 			{ wch: 5 },  // #
 			{ wch: 50 }, // Filename
 			{ wch: 20 }, // Folder
+			{ wch: 30 }, // Favorited By
 			{ wch: 15 }  // Favorited Date
 		];
 
@@ -1678,5 +1714,85 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 				error: error instanceof Error ? error.message : "Internal server error",
 			});
 		}
+	}
+};
+
+// Get liked and favorited photo counts for a gallery (photographer only)
+export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Access denied. Photographers only.",
+			});
+		}
+
+		// Get gallery to verify ownership
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				photographerId: true,
+				title: true
+			}
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to view this gallery's stats",
+			});
+		}
+
+		// Get counts of liked and favorited photos
+		const likedCount = await prisma.photo.count({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				likedBy: {
+					some: {}
+				}
+			}
+		});
+
+		const favoritedCount = await prisma.photo.count({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				favoritedBy: {
+					some: {}
+				}
+			}
+		});
+
+		res.json({
+			success: true,
+			data: {
+				galleryId,
+				galleryTitle: gallery.title,
+				likedCount,
+				favoritedCount
+			}
+		});
+
+	} catch (error) {
+		console.error("Get gallery photo stats error:", error);
+		res.status(500).json({
+			success: false,
+			error: error instanceof Error ? error.message : "Internal server error",
+		});
 	}
 };
