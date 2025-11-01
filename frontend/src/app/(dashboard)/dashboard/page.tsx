@@ -199,12 +199,12 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
-      <div className="flex justify-between items-start mb-12">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-12">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
-          <p className="text-muted-foreground text-lg">Manage your photo galleries</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 font-audrey">Dashboard</h1>
+          <p className="text-muted-foreground text-base sm:text-lg">Manage your photo galleries</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="lg" className="shadow-sm">
+        <Button onClick={() => setShowCreateModal(true)} size="lg" className="shadow-sm w-full sm:w-auto">
           <Plus className="mr-2 h-5 w-5" />
           Create Gallery
         </Button>
@@ -263,7 +263,7 @@ export default function DashboardPage() {
 
       {/* Galleries Section */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold tracking-tight">Your Galleries</h2>
+        <h2 className="text-3xl font-bold tracking-tight font-audrey">Your Galleries</h2>
       </div>
 
       {loading ? (
