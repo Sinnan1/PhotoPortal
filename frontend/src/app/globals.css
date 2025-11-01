@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
@@ -40,53 +39,69 @@
   --sidebar-accent-foreground: oklch(0.2 0 0);
   --sidebar-border: oklch(0.9 0.008 85);
   --sidebar-ring: oklch(0.6 0.04 85);
-
-  /* Olive green accent for complementary contrast */
-  --olive-green: oklch(0.45 0.08 120);
-  --olive-green-light: oklch(0.65 0.06 120);
-  --olive-green-dark: oklch(0.35 0.1 120);
 }
 
 .dark {
-  /* Dark mode - deep gold/beige variations */
-  --background: oklch(0.12 0.008 85);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.18 0.012 85);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.18 0.012 85);
-  --popover-foreground: oklch(0.95 0 0);
-  /* Enhanced warm gold for dark mode */
-  --primary: oklch(0.7 0.06 85);
-  --primary-foreground: oklch(0.12 0 0);
-  --secondary: oklch(0.22 0.015 85);
-  --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.2 0.012 85);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(0.25 0.02 85);
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.55 0.08 25);
-  --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.25 0.015 85);
-  --input: oklch(0.22 0.014 85);
-  --ring: oklch(0.7 0.06 85);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.18 0.012 85);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.7 0.06 85);
-  --sidebar-primary-foreground: oklch(0.12 0 0);
-  --sidebar-accent: oklch(0.22 0.015 85);
-  --sidebar-accent-foreground: oklch(0.9 0 0);
-  --sidebar-border: oklch(0.25 0.015 85);
-  --sidebar-ring: oklch(0.7 0.06 85);
+  /* Dark Mode - Olive Green Brand Theme */
+  /* #425146 olive green converted to oklch: oklch(0.32 0.025 150) */
+  /* #90856c mauve/taupe converted to oklch: oklch(0.57 0.02 75) */
 
-  /* Olive green accents for dark mode */
-  --olive-green: oklch(0.55 0.08 120);
-  --olive-green-light: oklch(0.7 0.06 120);
-  --olive-green-dark: oklch(0.4 0.1 120);
+  --background: oklch(0.18 0.015 145);
+  /* Dark olive-toned background */
+  --foreground: oklch(0.95 0.005 145);
+  /* Almost white with slight olive tint */
+  --card: oklch(0.22 0.018 145);
+  /* Slightly lighter dark olive */
+  --card-foreground: oklch(0.95 0.005 145);
+  --popover: oklch(0.24 0.018 145);
+  --popover-foreground: oklch(0.95 0.005 145);
+
+  /* Primary color - Olive Green #425146 */
+  --primary: oklch(0.45 0.04 150);
+  /* Brightened olive for better visibility */
+  --primary-foreground: oklch(0.98 0.01 150);
+
+  /* Secondary color - #90856c Mauve/Taupe */
+  --secondary: oklch(0.57 0.02 75);
+  --secondary-foreground: oklch(0.15 0.01 75);
+
+  --muted: oklch(0.25 0.015 145);
+  --muted-foreground: oklch(0.65 0.01 145);
+  --accent: oklch(0.57 0.02 75);
+  /* Using secondary color for accents */
+  --accent-foreground: oklch(0.15 0.01 75);
+
+  --destructive: oklch(0.55 0.12 15);
+  /* Muted red for errors */
+  --destructive-foreground: oklch(0.95 0.01 15);
+
+  --border: oklch(0.28 0.015 145);
+  --input: oklch(0.24 0.015 145);
+  --ring: oklch(0.45 0.04 150);
+  /* Olive green for focus rings */
+
+  /* Chart colors with olive/earth tones */
+  --chart-1: oklch(0.5 0.06 150);
+  /* Olive green */
+  --chart-2: oklch(0.6 0.04 75);
+  /* Mauve/taupe */
+  --chart-3: oklch(0.55 0.08 40);
+  /* Warm earth tone */
+  --chart-4: oklch(0.52 0.05 120);
+  /* Sage green */
+  --chart-5: oklch(0.58 0.06 90);
+  /* Muted gold */
+
+  --sidebar: oklch(0.2 0.015 145);
+  --sidebar-foreground: oklch(0.95 0.005 145);
+  --sidebar-primary: oklch(0.45 0.04 150);
+  /* Olive green */
+  --sidebar-primary-foreground: oklch(0.98 0.01 150);
+  --sidebar-accent: oklch(0.57 0.02 75);
+  /* Mauve/taupe */
+  --sidebar-accent-foreground: oklch(0.15 0.01 75);
+  --sidebar-border: oklch(0.28 0.015 145);
+  --sidebar-ring: oklch(0.45 0.04 150);
 }
 
 @theme inline {
@@ -132,6 +147,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -140,54 +156,56 @@
 
     /* Muted gold/beige mesh gradient background */
     background: linear-gradient(135deg,
-      oklch(0.85 0.015 85) 0%,    /* Light gold */
-      oklch(0.82 0.018 85) 25%,   /* Slightly darker gold */
-      oklch(0.78 0.022 85) 50%,   /* Medium gold */
-      oklch(0.82 0.018 85) 75%,   /* Back to slightly darker */
-      oklch(0.85 0.015 85) 100%   /* Light gold */
-    );
+        oklch(0.85 0.015 85) 0%,
+        /* Light gold */
+        oklch(0.82 0.018 85) 25%,
+        /* Slightly darker gold */
+        oklch(0.78 0.022 85) 50%,
+        /* Medium gold */
+        oklch(0.82 0.018 85) 75%,
+        /* Back to slightly darker */
+        oklch(0.85 0.015 85) 100%
+        /* Light gold */
+      );
     background-attachment: fixed;
     min-height: 100vh;
   }
 
-  /* Enhanced dark mode with muted gold gradient */
+  /* Dark olive-toned gradient background */
   .dark body {
-    background: linear-gradient(135deg,
-      oklch(0.18 0.008 85) 0%,    /* Dark gold */
-      oklch(0.15 0.01 85) 25%,    /* Darker gold */
-      oklch(0.12 0.012 85) 50%,   /* Deep gold */
-      oklch(0.15 0.01 85) 75%,    /* Back to darker */
-      oklch(0.18 0.008 85) 100%   /* Dark gold */
-    );
+    background: linear-gradient(145deg,
+        oklch(0.20 0.018 145) 0%,
+        /* Slightly lighter olive-gray */
+        oklch(0.18 0.015 145) 35%,
+        /* Main dark olive background */
+        oklch(0.16 0.020 155) 100%
+        /* Deeper olive-gray */
+      );
     background-attachment: fixed;
   }
 }
 
 @layer components {
-  /* Olive green accent utilities */
-  .accent-olive-green {
-    color: var(--olive-green);
+
+  /* Fix gray text classes in dark mode */
+  .dark .text-gray-900 {
+    color: oklch(0.95 0.005 145) !important;
   }
 
-  .bg-olive-green {
-    background-color: var(--olive-green);
+  .dark .text-gray-800 {
+    color: oklch(0.90 0.005 145) !important;
   }
 
-  .bg-olive-green-light {
-    background-color: var(--olive-green-light);
+  .dark .text-gray-700 {
+    color: oklch(0.85 0.005 145) !important;
   }
 
-  .hover-olive-green:hover {
-    background-color: var(--olive-green);
-    color: white;
+  .dark .text-gray-600 {
+    color: oklch(0.75 0.005 145) !important;
   }
 
-  .border-olive-green {
-    border-color: var(--olive-green);
-  }
-
-  .text-olive-green {
-    color: var(--olive-green);
+  .dark .text-gray-500 {
+    color: oklch(0.65 0.005 145) !important;
   }
 
   /* Modernist shimmer animation for skeleton loaders */
@@ -199,6 +217,7 @@
     0% {
       transform: translateX(-100%);
     }
+
     100% {
       transform: translateX(100%);
     }
@@ -212,8 +231,8 @@
   /* Enhanced photo grid items */
   .photo-grid-item {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .photo-grid-item:hover {
@@ -228,11 +247,25 @@
   }
 
   @keyframes rainbow {
-    0% { filter: hue-rotate(0deg); }
-    25% { filter: hue-rotate(90deg); }
-    50% { filter: hue-rotate(180deg); }
-    75% { filter: hue-rotate(270deg); }
-    100% { filter: hue-rotate(360deg); }
+    0% {
+      filter: hue-rotate(0deg);
+    }
+
+    25% {
+      filter: hue-rotate(90deg);
+    }
+
+    50% {
+      filter: hue-rotate(180deg);
+    }
+
+    75% {
+      filter: hue-rotate(270deg);
+    }
+
+    100% {
+      filter: hue-rotate(360deg);
+    }
   }
 
   .wedding-joke:hover::after {
@@ -241,7 +274,7 @@
     top: -40px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.8);
+    background: rgba(0, 0, 0, 0.8);
     color: white;
     padding: 8px 12px;
     border-radius: 8px;
@@ -253,7 +286,10 @@
   }
 
   @keyframes joke-fade-in {
-    to { opacity: 1; transform: translateX(-50%) translateY(-5px); }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-5px);
+    }
   }
 
   /* Secret photographer jokes */
@@ -322,11 +358,12 @@
   }
 
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(75, 85, 99, 0.5);
+    background: rgba(66, 81, 70, 0.5);
+    /* Olive-toned scrollbar */
   }
 
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(75, 85, 99, 0.7);
+    background: rgba(66, 81, 70, 0.7);
   }
 
   /* Logo color filter - changes white to #425146 */

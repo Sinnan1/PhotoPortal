@@ -24,16 +24,16 @@ interface ThemeContextValue {
   // Current portal and theme mode
   portal: PortalType;
   mode: ThemeMode;
-  
+
   // Theme configurations
   portalTheme: PortalTheme;
   colorScheme: ColorScheme;
   navigationTheme: NavigationTheme;
-  
+
   // Theme switching functions
   setPortal: (portal: PortalType) => void;
   toggleMode: () => void;
-  
+
   // Utility functions
   isLoading: boolean;
   getThemeClass: (category: string, variant: string) => string;
@@ -67,11 +67,11 @@ export function UnifiedThemeProvider({
 }: ThemeProviderProps) {
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  
+
   // State for current portal and loading status
   const [portal, setPortalState] = useState<PortalType>(defaultPortal);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Determine current portal from pathname
   useEffect(() => {
     if (enableAutoPortalDetection && pathname) {
@@ -79,15 +79,15 @@ export function UnifiedThemeProvider({
       setPortalState(detectedPortal);
     }
   }, [pathname, enableAutoPortalDetection]);
-  
+
   // Get current theme mode
   const mode: ThemeMode = (resolvedTheme as ThemeMode) || 'light';
-  
+
   // Get theme configurations
   const portalTheme = getPortalTheme(portal);
   const colorScheme = getColorScheme(portal, mode);
   const navigationTheme = getNavigationTheme();
-  
+
   // Apply theme to document when portal or mode changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -95,23 +95,23 @@ export function UnifiedThemeProvider({
       setIsLoading(false);
     }
   }, [portal, mode]);
-  
+
   // Theme switching functions
   const setPortal = (newPortal: PortalType) => {
     setPortalState(newPortal);
   };
-  
+
   const toggleMode = () => {
     setTheme(mode === 'dark' ? 'light' : 'dark');
   };
-  
+
   // Utility function to get theme classes
   const getThemeClass = (category: string, variant: string): string => {
     // This could be expanded to return specific theme classes
     // For now, it returns a basic implementation
     return `theme-${category}-${variant}`;
   };
-  
+
   const contextValue: ThemeContextValue = {
     portal,
     mode,
@@ -123,7 +123,7 @@ export function UnifiedThemeProvider({
     isLoading,
     getThemeClass,
   };
-  
+
   return (
     <ThemeContext.Provider value={contextValue}>
       {children}
@@ -147,37 +147,35 @@ export function useUnifiedTheme(): ThemeContextValue {
  */
 export function useThemeClasses() {
   const { colorScheme, navigationTheme, mode, portal } = useUnifiedTheme();
-  
+
   return {
     // Navigation classes
     nav: {
       container: `bg-[${navigationTheme.background}] text-[${navigationTheme.text}]`,
-      logo: `text-[${navigationTheme.logo}]`,
       item: `text-[${navigationTheme.text}] hover:bg-[${navigationTheme.hover}]`,
-      active: `bg-[${navigationTheme.active}] text-[${navigationTheme.text}]`,
     },
-    
+
     // Button classes
     button: {
       primary: `bg-[${colorScheme.primary}] text-white hover:bg-[${colorScheme.primaryDark}]`,
-      secondary: `bg-[${colorScheme.secondary}] text-[${colorScheme.text}] hover:bg-[${colorScheme.secondaryDark}]`,
+      secondary: `bg-[${colorScheme.secondary}] text-[${colorScheme.text}] hover:opacity-90`,
       ghost: `hover:bg-[${colorScheme.surface}] text-[${colorScheme.text}]`,
     },
-    
+
     // Surface classes
     surface: {
       primary: `bg-[${colorScheme.background}] text-[${colorScheme.text}]`,
       secondary: `bg-[${colorScheme.surface}] text-[${colorScheme.text}]`,
       card: `bg-[${colorScheme.surface}] border border-[${colorScheme.border}] text-[${colorScheme.text}]`,
     },
-    
+
     // Text classes
     text: {
       primary: `text-[${colorScheme.text}]`,
       secondary: `text-[${colorScheme.textSecondary}]`,
       muted: `text-[${colorScheme.textMuted}]`,
     },
-    
+
     // Status classes
     status: {
       success: `text-[${colorScheme.success}] bg-[${colorScheme.success}]/10 border border-[${colorScheme.success}]/20`,
@@ -185,7 +183,7 @@ export function useThemeClasses() {
       error: `text-[${colorScheme.error}] bg-[${colorScheme.error}]/10 border border-[${colorScheme.error}]/20`,
       info: `text-[${colorScheme.info}] bg-[${colorScheme.info}]/10 border border-[${colorScheme.info}]/20`,
     },
-    
+
     // Portal-specific classes
     portal: `portal-${portal}`,
     mode: mode,
@@ -212,7 +210,7 @@ export function withUnifiedTheme<P extends object>(
  */
 export function useThemeConfig() {
   const { portal, mode } = useUnifiedTheme();
-  
+
   return {
     config: UNIFIED_THEME_CONFIG,
     currentPortal: portal,
@@ -231,21 +229,21 @@ import { ThemeProvider as NextThemeProvider } from 'next-themes';
 
 interface CompatibleThemeProviderProps {
   children: React.ReactNode;
-  attribute?: string;
+  attribute?: 'class' | 'data-theme' | 'data-mode';
   defaultTheme?: string;
   enableSystem?: boolean;
 }
 
-export function ThemeProvider({ 
-  children, 
-  attribute = "class", 
-  defaultTheme = "system", 
-  enableSystem = true 
+export function ThemeProvider({
+  children,
+  attribute = "class",
+  defaultTheme = "system",
+  enableSystem = true
 }: CompatibleThemeProviderProps) {
   return (
-    <NextThemeProvider 
-      attribute={attribute} 
-      defaultTheme={defaultTheme} 
+    <NextThemeProvider
+      attribute={attribute}
+      defaultTheme={defaultTheme}
       enableSystem={enableSystem}
     >
       <UnifiedThemeProvider>

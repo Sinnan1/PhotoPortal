@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun, Share2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,12 @@ import {
 
 export function Navigation() {
   const { user, logout } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <nav className="border-b border-border/20 bg-[#505c51] backdrop-blur-xl supports-[backdrop-filter]:bg-[#505c51]/90 shadow-sm">
@@ -51,7 +57,7 @@ export function Navigation() {
               onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
               className="hover:bg-white/10 text-white hover:text-white transition-all duration-300 cursor-pointer"
             >
-              {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              {mounted && (resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />)}
             </Button>
 
             {user ? (
