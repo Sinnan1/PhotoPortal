@@ -173,7 +173,10 @@ const getGallery = async (req, res) => {
                                 favoritedBy: true,
                                 postBy: true
                             },
-                            orderBy: { createdAt: 'desc' }
+                            orderBy: [
+                                { capturedAt: 'asc' },
+                                { createdAt: 'asc' }
+                            ]
                         },
                         children: {
                             include: {
@@ -183,7 +186,10 @@ const getGallery = async (req, res) => {
                                         favoritedBy: true,
                                         postBy: true
                                     },
-                                    orderBy: { createdAt: 'desc' }
+                                    orderBy: [
+                                        { capturedAt: 'asc' },
+                                        { createdAt: 'asc' }
+                                    ]
                                 },
                                 children: true, // For deeper nesting
                                 coverPhoto: {
@@ -698,12 +704,30 @@ const getClientGalleries = async (req, res) => {
         });
         // Transform the data to match the expected format
         const galleries = accessibleGalleries.map((access) => {
-            // Calculate total photo count from all folders
-            const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => sum + folder._count.photos, 0);
+            let totalLikes = 0;
+            let totalFavorites = 0;
+            // Calculate total photo count and likes/favorites from all folders
+            const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => {
+                folder.photos.forEach(photo => {
+                    totalLikes += photo.likedBy.length;
+                    totalFavorites += photo.favoritedBy.length;
+                });
+                return sum + folder._count.photos;
+            }, 0);
+            // Remove photos from response to keep payload light
+            access.gallery.folders.forEach(f => {
+                // @ts-ignore
+                delete f.photos;
+            });
             return {
                 ...access.gallery,
                 photoCount: totalPhotoCount,
-                isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
+                isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false,
+                _count: {
+                    ...access.gallery._count,
+                    likedBy: totalLikes,
+                    favoritedBy: totalFavorites,
+                }
             };
         });
         res.json({

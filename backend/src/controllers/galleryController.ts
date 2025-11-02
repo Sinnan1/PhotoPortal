@@ -192,7 +192,10 @@ export const getGallery = async (req: Request, res: Response) => {
 								favoritedBy: true,
 								postBy: true
 							},
-							orderBy: { createdAt: 'desc' }
+							orderBy: [
+								{ capturedAt: 'asc' },
+								{ createdAt: 'asc' }
+							]
 						},
 						children: {
 							include: {
@@ -202,7 +205,10 @@ export const getGallery = async (req: Request, res: Response) => {
 										favoritedBy: true,
 										postBy: true
 									},
-									orderBy: { createdAt: 'desc' }
+									orderBy: [
+										{ capturedAt: 'asc' },
+										{ createdAt: 'asc' }
+									]
 								},
 								children: true, // For deeper nesting
 								coverPhoto: {

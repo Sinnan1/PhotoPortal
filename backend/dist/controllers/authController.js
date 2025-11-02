@@ -8,7 +8,7 @@ const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const register = async (req, res) => {
     try {
-        const { email, password, name, role = 'CLIENT' } = req.body;
+        const { email, password, name, role = 'PHOTOGRAPHER' } = req.body;
         // Validate input
         if (!email || !password || !name) {
             return res.status(400).json({
