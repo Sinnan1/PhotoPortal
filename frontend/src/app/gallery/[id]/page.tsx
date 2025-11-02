@@ -830,31 +830,39 @@ function GalleryPage() {
       </div>
 
       {/* Modern Gallery Header Section */}
-      <div className="mb-8 space-y-6">
+      <div className="mb-6 sm:mb-8 space-y-4 sm:space-y-6">
         {/* Top Bar: Title + Main Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 rounded-full"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-full flex-shrink-0"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
             >
               {sidebarCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
             </Button>
-            <h1 className="text-4xl font-bold tracking-tight">{gallery.title}</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight truncate">{gallery.title}</h1>
           </div>
 
           {/* Download Actions - Grouped in Dropdown */}
-          <DropdownMenu>
+          <DropdownMenu modal={true}>
             <DropdownMenuTrigger asChild>
-              <Button size="lg" className="shadow-sm">
-                <Download className="mr-2 h-5 w-5" />
-                Download
+              <Button className="shadow-sm flex-shrink-0 h-9 px-3 sm:h-10 sm:px-4">
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 z-[60]">
+              {/* Show message if no photos available */}
+              {(!currentFolder?.photos || currentFolder.photos.length === 0) && 
+               (!gallery.folders?.flatMap(f => f?.photos || []).length) && (
+                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                  No photos available to download
+                </div>
+              )}
+
               {/* Current Folder Download */}
               {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
                 <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
@@ -905,83 +913,86 @@ function GalleryPage() {
 
         {/* Description (if exists) */}
         {gallery.description && (
-          <p className="text-muted-foreground text-lg max-w-3xl">{gallery.description}</p>
+          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-3xl">{gallery.description}</p>
         )}
 
         {/* Navigation Bar: Breadcrumb + Info */}
-        <div className="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-xl border">
-          <div className="flex items-center gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 sm:px-4 bg-muted/30 rounded-xl border">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 min-w-0">
             {/* Breadcrumb */}
-            <BreadcrumbNavigation
-              items={breadcrumbItems}
-              onNavigate={handleBreadcrumbNavigate}
-            />
+            <div className="min-w-0">
+              <BreadcrumbNavigation
+                items={breadcrumbItems}
+                onNavigate={handleBreadcrumbNavigate}
+              />
+            </div>
 
-            {/* Divider */}
-            <div className="h-5 w-px bg-border" />
+            {/* Divider - Hidden on mobile */}
+            <div className="hidden sm:block h-5 w-px bg-border flex-shrink-0" />
 
             {/* Gallery Info */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground flex-wrap">
               <div className="flex items-center gap-1.5">
-                <User className="h-4 w-4" />
-                <span>{gallery.photographer.name}</span>
+                <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate">{gallery.photographer.name}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Images className="h-4 w-4" />
+                <Images className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span>{currentFolder?._count?.photos ?? 0} photos</span>
               </div>
             </div>
           </div>
 
           {/* Data Saver Toggle */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-sm font-medium text-muted-foreground">Data Saver</span>
-            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+          <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground">Data Saver</span>
+            <div className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
               <input
                 type="checkbox"
                 checked={dataSaverMode}
                 onChange={(e) => setDataSaverMode(e.target.checked)}
                 className="sr-only"
               />
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${dataSaverMode ? 'translate-x-6' : 'translate-x-1'}`} />
+              <span className={`inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-background transition-transform ${dataSaverMode ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0.5 sm:translate-x-1'}`} />
             </div>
           </label>
         </div>
 
         {/* Control Bar: View Mode + Filters */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* View Mode Toggle */}
           <div className="flex gap-1 p-1 bg-muted/50 rounded-lg border">
             <Button
               variant={viewMode === "grid" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("grid")}
-              className="h-9 px-4"
+              className="h-8 sm:h-9 px-3 sm:px-4 flex-1 sm:flex-initial"
             >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Grid
+              <Grid3X3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Grid</span>
             </Button>
             <Button
               variant={viewMode === "tile" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("tile")}
-              className="h-9 px-4"
+              className="h-8 sm:h-9 px-3 sm:px-4 flex-1 sm:flex-initial"
             >
-              <RectangleHorizontal className="h-4 w-4 mr-2" />
-              Tile
+              <RectangleHorizontal className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Tile</span>
             </Button>
           </div>
 
           {/* Filter Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
             <Button
               variant={filter === "all" ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter("all")}
-              className="h-9 px-4"
+              className="h-8 sm:h-9 px-2.5 sm:px-4 whitespace-nowrap flex-shrink-0"
             >
-              All
-              <Badge variant="secondary" className="ml-2">
+              <span className="hidden sm:inline">All</span>
+              <span className="sm:hidden">All</span>
+              <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
                 {currentFolder ? currentFolder.photos.length : 0}
               </Badge>
             </Button>
@@ -989,11 +1000,11 @@ function GalleryPage() {
               variant={filter === "liked" ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter("liked")}
-              className="h-9 px-4"
+              className="h-8 sm:h-9 px-2.5 sm:px-4 whitespace-nowrap flex-shrink-0"
             >
-              <Heart className="h-4 w-4 mr-2" />
-              Liked
-              <Badge variant="secondary" className="ml-2">
+              <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Liked</span>
+              <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
                 {currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0}
               </Badge>
             </Button>
@@ -1001,11 +1012,11 @@ function GalleryPage() {
               variant={filter === "favorited" ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter("favorited")}
-              className="h-9 px-4"
+              className="h-8 sm:h-9 px-2.5 sm:px-4 whitespace-nowrap flex-shrink-0"
             >
-              <Star className="h-4 w-4 mr-2" />
-              Favorited
-              <Badge variant="secondary" className="ml-2">
+              <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Favorited</span>
+              <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
                 {currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
               </Badge>
             </Button>
@@ -1061,9 +1072,9 @@ function GalleryPage() {
 
       {/* Photo Grid Section */}
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold text-foreground">Photos</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Photos</h2>
             {/* Current Folder Selection Counter */}
             {currentFolder && user && (
               <SelectionCounter
@@ -1072,7 +1083,7 @@ function GalleryPage() {
                 totalPhotos={currentFolder.photos.length}
                 compact={true}
                 showBreakdown={true}
-                className="text-sm"
+                className="text-xs sm:text-sm"
                 onCountsUpdate={(counts) => {
                   setSelectionCounts(prev => ({
                     ...prev,
@@ -1082,7 +1093,7 @@ function GalleryPage() {
               />
             )}
           </div>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs sm:text-sm text-muted-foreground">
             Page {currentPage} of {totalPages} ({filteredPhotos.length} total)
           </span>
         </div>
@@ -1116,81 +1127,88 @@ function GalleryPage() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-8">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="hidden sm:inline-flex"
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3"
+                  >
+                    <span className="hidden sm:inline">Previous</span>
+                    <span className="sm:hidden">Prev</span>
+                  </Button>
 
-                {/* Page numbers */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
+                  {/* Page numbers */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 2) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 1) {
+                        pageNum = totalPages - 2 + i;
+                      } else {
+                        pageNum = currentPage - 1 + i;
+                      }
 
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className="w-10"
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
-                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                    <>
-                      <span className="px-2">...</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(totalPages)}
-                        className="w-10"
-                      >
-                        {totalPages}
-                      </Button>
-                    </>
-                  )}
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="w-9 sm:w-10 px-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                    {totalPages > 3 && currentPage < totalPages - 1 && (
+                      <>
+                        <span className="px-1 text-xs">...</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="w-9 sm:w-10 px-0"
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3"
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="hidden sm:inline-flex"
+                  >
+                    Last
+                  </Button>
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  Last
-                </Button>
               </div>
             )}
           </>

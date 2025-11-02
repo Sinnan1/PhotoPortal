@@ -43,7 +43,8 @@ interface Photo {
 interface Folder {
   id: string;
   name: string;
-  photos: Photo[];
+  photos?: Photo[];
+  coverPhoto?: Photo;
   _count: {
     photos: number;
   };
@@ -229,9 +230,9 @@ export default function ClientDashboardPage() {
               {/* Cover Image */}
               <Link href={`/gallery/${gallery.id}`}>
                 <div className="relative aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted overflow-hidden">
-                  {gallery.folders && gallery.folders.length > 0 && gallery.folders[0].photos && gallery.folders[0].photos.length > 0 ? (
+                  {gallery.folders && gallery.folders.length > 0 && gallery.folders[0].coverPhoto ? (
                     <Image
-                      src={gallery.folders[0].photos[0].thumbnailUrl || "/placeholder.svg"}
+                      src={gallery.folders[0].coverPhoto.thumbnailUrl || "/placeholder.svg"}
                       alt={gallery.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
