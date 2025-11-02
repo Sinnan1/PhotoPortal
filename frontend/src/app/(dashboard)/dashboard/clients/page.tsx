@@ -45,6 +45,9 @@ import {
   Mail,
   Calendar,
   Loader2,
+  UserPlus,
+  TrendingUp,
+  CheckCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -119,8 +122,8 @@ export default function ClientsPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground mt-2">
             This page is only available to photographers.
           </p>
         </div>
@@ -129,42 +132,48 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Modern Header */}
+      <div className="flex justify-between items-start mb-12">
         <div>
-          <h1 className="text-3xl font-bold">Client Management</h1>
-          <p className="text-muted-foreground mt-2">Manage your clients and their access</p>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Client Management</h1>
+          <p className="text-muted-foreground text-lg">Manage your clients and their gallery access</p>
         </div>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button size="lg" className="shadow-sm">
+              <Plus className="mr-2 h-5 w-5" />
               Add Client
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-2xl">Add New Client</DialogTitle>
+              <DialogDescription className="text-base">
                 Create a new client account. They will receive login credentials.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateClient}>
-              <div className="space-y-4">
+              <div className="space-y-5 py-4">
                 <div>
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name" className="text-sm font-medium mb-2 block">
+                    Full Name
+                  </Label>
                   <Input
                     id="name"
                     value={newClient.name}
                     onChange={(e) =>
                       setNewClient({ ...newClient, name: e.target.value })
                     }
-                    placeholder="Client's full name"
+                    placeholder="John Doe"
+                    className="h-11"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium mb-2 block">
+                    Email Address
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -172,12 +181,15 @@ export default function ClientsPage() {
                     onChange={(e) =>
                       setNewClient({ ...newClient, email: e.target.value })
                     }
-                    placeholder="client@example.com"
+                    placeholder="john@example.com"
+                    className="h-11"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium mb-2 block">
+                    Password
+                  </Label>
                   <Input
                     id="password"
                     type="password"
@@ -186,20 +198,23 @@ export default function ClientsPage() {
                       setNewClient({ ...newClient, password: e.target.value })
                     }
                     placeholder="••••••••"
+                    className="h-11"
                     required
                   />
                 </div>
               </div>
-              <DialogFooter className="mt-6">
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowCreateDialog(false)}
+                  className="h-11"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={creating}>
+                <Button type="submit" disabled={creating} className="h-11">
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <UserPlus className="mr-2 h-4 w-4" />
                   Create Client
                 </Button>
               </DialogFooter>
@@ -208,132 +223,147 @@ export default function ClientsPage() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{clients.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Active client accounts
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Clients</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {clients.filter(
-                (client) =>
-                  new Date(client.createdAt) >
-                  new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-              ).length}
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <Card className="border-2 hover:border-primary/20 transition-colors">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-3 bg-primary/10 rounded-2xl">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <TrendingUp className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Added in last 30 days
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
+              <p className="text-4xl font-bold tracking-tight">{clients.length}</p>
+              <p className="text-xs text-muted-foreground">Active client accounts</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Client Status</CardTitle>
-            <Badge variant="secondary">Active</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{clients.length}</div>
-            <p className="text-xs text-muted-foreground">
-              All clients active
-            </p>
+        <Card className="border-2 hover:border-primary/20 transition-colors">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-3 bg-blue-100 dark:bg-blue-950/30 rounded-2xl">
+                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-500" />
+              </div>
+              <Badge variant="secondary" className="text-xs">30 days</Badge>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Recent Clients</p>
+              <p className="text-4xl font-bold tracking-tight">
+                {clients.filter(
+                  (client) =>
+                    new Date(client.createdAt) >
+                    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                ).length}
+              </p>
+              <p className="text-xs text-muted-foreground">Added in last 30 days</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 hover:border-primary/20 transition-colors">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-3 bg-green-100 dark:bg-green-950/30 rounded-2xl">
+                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-500" />
+              </div>
+              <Badge variant="outline" className="text-xs border-green-600 text-green-600">Active</Badge>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Client Status</p>
+              <p className="text-4xl font-bold tracking-tight">{clients.length}</p>
+              <p className="text-xs text-muted-foreground">All clients active</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Clients Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Clients</CardTitle>
-          <CardDescription>
+      {/* Modern Clients Table */}
+      <Card className="border-2">
+        <CardHeader className="border-b bg-muted/30">
+          <CardTitle className="text-2xl">Your Clients</CardTitle>
+          <CardDescription className="text-base">
             Manage client accounts and their gallery access
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : clients.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-2 text-sm font-medium">
-                No clients yet
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Get started by adding your first client.
-              </p>
-              <div className="mt-6">
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Client
-                </Button>
+            <div className="text-center py-20 px-4">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/50 mb-6">
+                <Users className="h-10 w-10 text-muted-foreground" />
               </div>
+              <h3 className="text-xl font-semibold mb-2">No clients yet</h3>
+              <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+                Get started by adding your first client to share galleries and collaborate.
+              </p>
+              <Button size="lg" onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-5 w-5" />
+                Add Your First Client
+              </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clients.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Mail className="mr-2 h-4 w-4 text-gray-400" />
-                        {client.email}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{client.role}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(client.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleRemoveClient(client.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Remove Client
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-b-2">
+                    <TableHead className="h-14 text-sm font-semibold">Name</TableHead>
+                    <TableHead className="h-14 text-sm font-semibold">Email</TableHead>
+                    <TableHead className="h-14 text-sm font-semibold">Role</TableHead>
+                    <TableHead className="h-14 text-sm font-semibold">Joined</TableHead>
+                    <TableHead className="text-right h-14 text-sm font-semibold">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {clients.map((client) => (
+                    <TableRow key={client.id} className="hover:bg-muted/50 transition-colors">
+                      <TableCell className="font-semibold py-5">{client.name}</TableCell>
+                      <TableCell className="py-5">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span>{client.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-5">
+                        <Badge variant="outline" className="font-medium">
+                          {client.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-5 text-muted-foreground">
+                        {new Date(client.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right py-5">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              onClick={() => handleRemoveClient(client.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove Client
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

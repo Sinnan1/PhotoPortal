@@ -17,6 +17,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
@@ -637,89 +643,184 @@ function GalleryPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ willChange: 'scroll-position' }}>
-      {/* Slideout Sidebar */}
+      {/* Modern Gallery Sidebar */}
       <div
-        className={`fixed inset-0 z-50 ${sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'
-          }`}
+        className={`fixed inset-0 z-50 ${sidebarCollapsed ? 'pointer-events-none' : 'pointer-events-auto'}`}
       >
         {/* Backdrop */}
         <div
-          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sidebarCollapsed ? 'opacity-0' : 'opacity-100'
-            }`}
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}
           onClick={() => setSidebarCollapsed(true)}
         />
 
-        {/* Sidebar */}
+        {/* Modern Sidebar */}
         <div
-          className={`absolute left-0 top-0 h-full w-80 bg-background border-r border-border shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'
-            }`}
+          className={`absolute left-0 top-0 h-full w-80 bg-background border-r shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarCollapsed ? '-translate-x-full' : 'translate-x-0'}`}
         >
-          {/* Main Content Area */}
-          <div className="flex-1 p-4 overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground">Folders</h3>
+          {/* Header */}
+          <div className="flex-shrink-0 p-6 border-b">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-2xl font-bold tracking-tight">Folders</h2>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
+                size="icon"
+                className="h-9 w-9 rounded-full"
                 onClick={() => setSidebarCollapsed(true)}
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
+            <p className="text-sm text-muted-foreground">Navigate your gallery</p>
+          </div>
 
-            {/* Gallery Selection Summary */}
+          {/* Main Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Selection Progress Card */}
             {gallery && user && (
-              <div className="mb-6">
-                <GallerySelectionSummary
-                  ref={gallerySelectionSummaryRef}
-                  galleryId={galleryId}
-                  compact={true}
-                  showFolderBreakdown={false}
-                  className="mb-4"
-                />
-              </div>
+              <Card className="border-2">
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Selection Progress</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {currentFolder && currentFolder.photos.length > 0
+                          ? Math.round((currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / currentFolder.photos.length) * 100)
+                          : 0}%
+                      </Badge>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-300"
+                        style={{
+                          width: currentFolder && currentFolder.photos.length > 0
+                            ? `${Math.round((currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / currentFolder.photos.length) * 100)}%`
+                            : '0%'
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {currentFolder
+                          ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length
+                          : 0} photos selected
+                      </span>
+                      <span>of {currentFolder?._count?.photos || 0} total</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-muted-foreground">Toggle Folders</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
+            {/* Folder Navigation */}
+            <div>
+              <button
                 onClick={() => setShowFolderTree(!showFolderTree)}
+                className="flex items-center justify-between w-full mb-3 group"
               >
-                <ChevronRight className={`h-3 w-3 transition-transform ${showFolderTree ? 'rotate-90' : ''}`} />
-              </Button>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Your Folders
+                </h3>
+                <ChevronRight
+                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showFolderTree ? 'rotate-90' : ''}`}
+                />
+              </button>
+
+              {showFolderTree && (
+                <div className="space-y-1">
+                  {gallery.folders?.map((folder, index) => {
+                    const isActive = currentFolder?.id === folder.id;
+                    const likedCount = folder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length;
+                    const favoritedCount = folder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length;
+
+                    return (
+                      <div key={folder.id}>
+                        {/* Main Folder Button */}
+                        <button
+                          onClick={() => handleFolderSelect(folder.id)}
+                          className={`w-full flex items-center justify-between p-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <Folder
+                              className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+                            />
+                            <span className="font-medium truncate">{folder.name}</span>
+                          </div>
+                          <Badge
+                            variant={isActive ? "secondary" : "outline"}
+                            className="ml-2 flex-shrink-0"
+                          >
+                            {folder._count?.photos || 0}
+                          </Badge>
+                        </button>
+
+                        {/* Selection Stats (below folder) */}
+                        {(likedCount > 0 || favoritedCount > 0) && (
+                          <div
+                            className={`flex items-center gap-3 px-3 py-2 ml-7 text-xs ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                          >
+                            {likedCount > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Heart className="h-3 w-3" />
+                                <span>{likedCount}/{folder._count?.photos || 0}</span>
+                              </div>
+                            )}
+                            {favoritedCount > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Star className="h-3 w-3" />
+                                <span>{favoritedCount}/{folder._count?.photos || 0}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Render child folders recursively */}
+                        {folder.children && folder.children.length > 0 && (
+                          <div className="ml-4 mt-1 border-l-2 border-border pl-2">
+                            <CompactFolderTree
+                              folder={folder as any}
+                              level={1}
+                              currentFolderId={currentFolder?.id}
+                              onFolderSelect={handleFolderSelect}
+                              isFirst={false}
+                              showSelectionCounters={!!user}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {showFolderTree && (
-              <div className="space-y-1 max-h-96 overflow-y-auto">
-                {gallery.folders?.map((folder, index) => (
-                  <CompactFolderTree
-                    key={folder.id}
-                    folder={folder as any}
-                    level={0}
-                    currentFolderId={currentFolder?.id}
-                    onFolderSelect={handleFolderSelect}
-                    isFirst={index === 0}
-                    showSelectionCounters={!!user}
+            {/* Gallery-wide Selection Summary */}
+            {gallery && user && (
+              <Card className="border-2">
+                <CardContent className="p-4">
+                  <h3 className="text-sm font-semibold mb-3">Gallery Summary</h3>
+                  <GallerySelectionSummary
+                    ref={gallerySelectionSummaryRef}
+                    galleryId={galleryId}
+                    compact={true}
+                    showFolderBreakdown={false}
                   />
-                ))}
-              </div>
+                </CardContent>
+              </Card>
             )}
           </div>
 
-          {/* Edit Gallery Button - At the very bottom */}
+          {/* Footer - Edit Gallery Button */}
           {user?.role === "PHOTOGRAPHER" && (
-            <div className="flex-shrink-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="flex-shrink-0 p-6 border-t bg-muted/30">
               <Link href={`/galleries/${galleryId}/manage`}>
                 <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
+                  variant="default"
+                  size="lg"
+                  className="w-full shadow-sm"
                   onClick={() => setSidebarCollapsed(true)}
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-4 w-4 mr-2" />
                   Edit Gallery
                 </Button>
               </Link>
@@ -728,78 +829,192 @@ function GalleryPage() {
         </div>
       </div>
 
-      {/* Gallery Header */}
-      <div className="mb-8">
-        <div className="flex-1 min-w-0">
+      {/* Modern Gallery Header Section */}
+      <div className="mb-8 space-y-6">
+        {/* Top Bar: Title + Main Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
+            </Button>
+            <h1 className="text-4xl font-bold tracking-tight">{gallery.title}</h1>
+          </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="flex items-center gap-3 mb-2 sm:mb-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-muted"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-              >
-                {sidebarCollapsed ? (
-                  <Menu className="h-4 w-4" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
+          {/* Download Actions - Grouped in Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="lg" className="shadow-sm">
+                <Download className="mr-2 h-5 w-5" />
+                Download
               </Button>
-              <h1 className="text-3xl font-bold">{gallery.title}</h1>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              {/* Standard Download Buttons */}
-              <div className="flex items-center space-x-2">
-                {/* Download Current Folder Button */}
-                {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadCurrentFolder}
-                    disabled={isDownloadingCurrent}
-                    className="mr-2"
-                  >
-                    {isDownloadingCurrent ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-2 h-4 w-4" />
-                    )}
-                    Current Folder
-                  </Button>
-                )}
-
-                {/* Download All Button */}
-                {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
-                  <Button onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                    {isDownloadingAll ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-2 h-4 w-4" />
-                    )}
-                    Download All
-                  </Button>
-                )}
-              </div>
-
-              {/* Filtered Download Components */}
-              {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
-                <DownloadFilteredPhotos
-                  galleryId={galleryId}
-                  galleryTitle={gallery.title}
-                  galleryPassword={passwordRequired ? password : undefined}
-                  likedCount={galleryPhotoCounts.liked}
-                  favoritedCount={galleryPhotoCounts.favorited}
-                  className="flex-shrink-0"
-                />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {/* Current Folder Download */}
+              {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+                <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
+                  {isDownloadingCurrent ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Folder className="mr-2 h-4 w-4" />
+                  )}
+                  Current Folder ({currentFolder.photos.length})
+                </DropdownMenuItem>
               )}
+
+              {/* Download All */}
+              {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
+                <DropdownMenuItem onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                  {isDownloadingAll ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Images className="mr-2 h-4 w-4" />
+                  )}
+                  All Photos ({gallery.folders?.flatMap(f => f?.photos || []).length})
+                </DropdownMenuItem>
+              )}
+
+              {/* Divider */}
+              {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
+                <div className="my-1 h-px bg-border" />
+              )}
+
+              {/* Download Liked */}
+              {user && galleryPhotoCounts.liked > 0 && (
+                <DropdownMenuItem>
+                  <Heart className="mr-2 h-4 w-4 text-red-500" />
+                  Liked Photos ({galleryPhotoCounts.liked})
+                </DropdownMenuItem>
+              )}
+
+              {/* Download Favorited */}
+              {user && galleryPhotoCounts.favorited > 0 && (
+                <DropdownMenuItem>
+                  <Star className="mr-2 h-4 w-4 text-yellow-500" />
+                  Favorited Photos ({galleryPhotoCounts.favorited})
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Description (if exists) */}
+        {gallery.description && (
+          <p className="text-muted-foreground text-lg max-w-3xl">{gallery.description}</p>
+        )}
+
+        {/* Navigation Bar: Breadcrumb + Info */}
+        <div className="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-xl border">
+          <div className="flex items-center gap-6">
+            {/* Breadcrumb */}
+            <BreadcrumbNavigation
+              items={breadcrumbItems}
+              onNavigate={handleBreadcrumbNavigate}
+            />
+
+            {/* Divider */}
+            <div className="h-5 w-px bg-border" />
+
+            {/* Gallery Info */}
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <User className="h-4 w-4" />
+                <span>{gallery.photographer.name}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Images className="h-4 w-4" />
+                <span>{currentFolder?._count?.photos ?? 0} photos</span>
+              </div>
             </div>
           </div>
 
-          {/* Download Progress Indicators - Now using backend progress tracking */}
-          <div className="space-y-3 mt-4">
-            {/* Download All Progress */}
+          {/* Data Saver Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-sm font-medium text-muted-foreground">Data Saver</span>
+            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+              <input
+                type="checkbox"
+                checked={dataSaverMode}
+                onChange={(e) => setDataSaverMode(e.target.checked)}
+                className="sr-only"
+              />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${dataSaverMode ? 'translate-x-6' : 'translate-x-1'}`} />
+            </div>
+          </label>
+        </div>
+
+        {/* Control Bar: View Mode + Filters */}
+        <div className="flex items-center justify-between">
+          {/* View Mode Toggle */}
+          <div className="flex gap-1 p-1 bg-muted/50 rounded-lg border">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className="h-9 px-4"
+            >
+              <Grid3X3 className="h-4 w-4 mr-2" />
+              Grid
+            </Button>
+            <Button
+              variant={viewMode === "tile" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("tile")}
+              className="h-9 px-4"
+            >
+              <RectangleHorizontal className="h-4 w-4 mr-2" />
+              Tile
+            </Button>
+          </div>
+
+          {/* Filter Buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant={filter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter("all")}
+              className="h-9 px-4"
+            >
+              All
+              <Badge variant="secondary" className="ml-2">
+                {currentFolder ? currentFolder.photos.length : 0}
+              </Badge>
+            </Button>
+            <Button
+              variant={filter === "liked" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter("liked")}
+              className="h-9 px-4"
+            >
+              <Heart className="h-4 w-4 mr-2" />
+              Liked
+              <Badge variant="secondary" className="ml-2">
+                {currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0}
+              </Badge>
+            </Button>
+            <Button
+              variant={filter === "favorited" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter("favorited")}
+              className="h-9 px-4"
+            >
+              <Star className="h-4 w-4 mr-2" />
+              Favorited
+              <Badge variant="secondary" className="ml-2">
+                {currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
+              </Badge>
+            </Button>
+          </div>
+        </div>
+
+        {/* Download Progress Indicators */}
+        {(downloadAllProgress.progressState.isActive || downloadCurrentProgress.progressState.isActive) && (
+          <div className="space-y-3">
             {downloadAllProgress.progressState.isActive && downloadAllProgress.progressState.downloadId && (
               <DownloadProgress
                 downloadId={downloadAllProgress.progressState.downloadId}
@@ -814,7 +1029,6 @@ function GalleryPage() {
               />
             )}
 
-            {/* Download Current Folder Progress */}
             {downloadCurrentProgress.progressState.isActive && downloadCurrentProgress.progressState.downloadId && (
               <DownloadProgress
                 downloadId={downloadCurrentProgress.progressState.downloadId}
@@ -829,53 +1043,7 @@ function GalleryPage() {
               />
             )}
           </div>
-
-          {gallery.description && (
-            <p className="text-muted-foreground mb-4">{gallery.description}</p>
-          )}
-
-          {/* Breadcrumb Navigation */}
-          <BreadcrumbNavigation
-            items={breadcrumbItems}
-            onNavigate={handleBreadcrumbNavigate}
-            className="mb-4"
-          />
-
-          <div className="flex items-center space-x-6 text-sm text-muted-foreground">
-            <div className="flex items-center">
-              <User className="mr-1 h-4 w-4" />
-              {gallery.photographer.name}
-            </div>
-            <div className="flex items-center">
-              <Images className="mr-1 h-4 w-4" />
-              {currentFolder?._count?.photos ?? 0} photos
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls Section - Fixed Layout */}
-      <div className="space-y-4 mb-6">
-        {/* Data Saver Toggle */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dataSaverMode}
-              onChange={(e) => setDataSaverMode(e.target.checked)}
-              className="sr-only"
-            />
-            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${dataSaverMode ? 'bg-primary' : 'bg-muted-foreground/30'
-              }`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${dataSaverMode ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-            </div>
-            <span className="ml-2 text-sm text-foreground">
-              Data Saver {dataSaverMode && <span className="text-primary font-medium">ON</span>}
-            </span>
-          </label>
-        </div>
-
+        )}
       </div>
 
       {/* Folder Tiles Section */}
@@ -889,60 +1057,7 @@ function GalleryPage() {
         />
       )}
 
-      {/* View Mode and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6">
-        {/* View Mode Toggle */}
-        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
-          <Button
-            variant={viewMode === "grid" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("grid")}
-            className="h-8 px-3"
-          >
-            <Grid3X3 className="h-4 w-4 mr-1" />
-            Grid
-          </Button>
-          <Button
-            variant={viewMode === "tile" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("tile")}
-            className="h-8 px-3"
-          >
-            <RectangleHorizontal className="h-4 w-4 mr-1" />
-            Tile
-          </Button>
-        </div>
 
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("all")}
-            className="h-8"
-          >
-            All ({currentFolder ? currentFolder.photos.length : 0})
-          </Button>
-          <Button
-            variant={filter === "liked" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("liked")}
-            className="h-8"
-          >
-            <Heart className="mr-2 h-4 w-4" />
-            Liked ({currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0})
-          </Button>
-          <Button
-            variant={filter === "favorited" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("favorited")}
-            className="h-8"
-          >
-            <Star className="mr-2 h-4 w-4" />
-            Favorited ({currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0})
-          </Button>
-        </div>
-      </div>
 
       {/* Photo Grid Section */}
       <div className="mb-4">

@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Total Photos</CardTitle>
                 <Images className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="pb-6">
                 <div className="text-2xl font-bold">{totals?.photos || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   Across all galleries
@@ -136,7 +136,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Total Galleries</CardTitle>
                 <Eye className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="pb-6">
                 <div className="text-2xl font-bold">{totals?.galleries || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   Active galleries
@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="pb-6">
                 <div className="text-2xl font-bold">{totals?.clients || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   Registered clients
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
                 Photos with the highest number of likes
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {mostLikedPhotos.length === 0 ? (
                 <div className="text-center py-8">
                   <Heart className="mx-auto h-12 w-12 text-gray-400" />
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
                 Photos with the highest number of favorites
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {mostFavoritedPhotos.length === 0 ? (
                 <div className="text-center py-8">
                   <Star className="mx-auto h-12 w-12 text-gray-400" />
@@ -277,7 +277,7 @@ export default function AnalyticsPage() {
                 Galleries with the highest download counts
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {mostViewedGalleries.length === 0 ? (
                 <div className="text-center py-8">
                   <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
