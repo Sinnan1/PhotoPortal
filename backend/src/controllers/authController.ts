@@ -15,7 +15,7 @@ interface AuthRequest extends Request {
 
 export const register = async (req: Request, res: Response) => {
 	try {
-		const { email, password, name, role = 'CLIENT' } = req.body
+		const { email, password, name, role = 'PHOTOGRAPHER' } = req.body
 
 		// Validate input
 		if (!email || !password || !name) {

@@ -1,171 +1,154 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
 import Link from "next/link"
-import { useAuth } from "@/lib/auth-context"
-import { useToast } from "@/components/ui/toast"
+import Image from "next/image"
+import { useAuth } from "@/lib/auth-context" // Assuming this path
+import { useToast } from "@/components/ui/use-toast" // Standard shadcn path
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 import { Loader2, Download, Heart, ShieldCheck } from "lucide-react"
 
+// 1. Define the form schema
+const formSchema = z.object({
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }),
+  password: z.string().min(1, {
+    message: "Password is required.",
+  }),
+})
+
 export default function ClientLoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
   const { clientLogin } = useAuth()
-  const { showToast } = useToast()
+  const { toast } = useToast()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  // 2. Set up the form
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: "", password: "" },
+  })
 
+  // 3. Handle submission
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await clientLogin(email, password)
-      showToast("Successfully logged in!", "success")
+      await clientLogin(values.email, values.password)
+      toast({ title: "Success!", description: "Welcome to your gallery." })
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Login failed", "error")
-    } finally {
-      setLoading(false)
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "Please check your credentials.",
+      })
     }
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[hsl(var(--primary))] via-[hsl(var(--primary)/0.97)] to-[hsl(var(--primary)/0.90)] text-primary-foreground flex items-center justify-center px-4 py-10">
-      {/* Olive depth gradient (translucent so olive base shows through) */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-20 bg-gradient-to-b from-primary/30 via-primary/15 to-transparent"
-      />
-      {/* Subtle radial accent */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20 opacity-30"
-        style={{
-          backgroundImage: "radial-gradient(60% 50% at 20% 10%, hsl(var(--primary) / 0.18) 0%, transparent 60%)",
-        }}
-      />
-      {/* Soft dotted pattern for depth */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, hsl(var(--primary) / 0.25) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      {/* Oversized brand icon watermark (Source URL) */}
-      <img
-        aria-hidden
-        src="/ICON-01.png"
-        alt=""
-        className="pointer-events-none absolute -z-10 right-[-5%] top-1/2 -translate-y-1/2 w-[440px] md:w-[560px] lg:w-[640px] opacity-10"
+    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
+      {/* 1. Full-screen Background Image */}
+      <Image
+        src="/placeholder-wedding-photo-3.jpg" // Replace with your BEST photo
+        alt="Yarrow Weddings & Co gallery"
+        layout="fill"
+        objectFit="cover"
+        className="-z-20 brightness-[0.6]" // Darken the image for contrast
+        priority
       />
 
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Brand */}
-        <div className="text-center">
-          {/* Provided Source URL per your instruction */}
-          <img
-            src="/LOGO-02.png"
+      {/* Optional: Add a subtle dark overlay for better text readability */}
+      <div className="absolute inset-0 -z-10 bg-black/30" />
+
+      {/* 2. Centered "Glassmorphism" Card */}
+      <Card className="relative z-10 w-full max-w-md border-white/20 bg-background/70 backdrop-blur-lg shadow-2xl">
+        <CardHeader className="text-center">
+          <Image
+            src="/LOGO-02.png" // Using the light-on-dark logo
             alt="Yarrow Weddings & Co"
-            className="mx-auto h-20 md:h-24"
+            width={180}
+            height={50}
+            className="mx-auto mb-4"
           />
-          <h2 className="mt-4 text-3xl md:text-4xl font-bold text-balance">Client Lounge</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Access your private galleries</p>
-        </div>
+          <CardTitle className="text-3xl font-bold">Client Lounge</CardTitle>
+          <CardDescription>Welcome. Sign in to access your private gallery.</CardDescription>
+        </CardHeader>
 
-        {/* Mini gallery strip to differentiate client page */}
-        <div className="grid grid-cols-3 gap-3">
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 1"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 2"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 3"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="grid gap-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="name@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-        {/* Glassmorphism card */}
-        <Card className="rounded-3xl border border-primary/30 bg-background/8 supports-[backdrop-filter]:bg-background/5 backdrop-blur-3xl backdrop-saturate-200 bg-clip-padding shadow-2xl ring-1 ring-primary/25">
-          <CardHeader>
-            <CardTitle className="text-2xl text-primary">Welcome Back</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Enter your client credentials to access your galleries
-            </CardDescription>
-          </CardHeader>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center">
+                      <FormLabel>Password</FormLabel>
+                      <Link
+                        href="/forgot-password-client" // Ensure this link is correct
+                        className="ml-auto inline-block text-sm underline"
+                      >
+                        Forgot?
+                      </Link>
+                    </div>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-5">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="mt-1 mb-2"
-                />
-              </div>
-            </CardContent>
-
-            <CardFooter className="flex flex-col space-y-5">
-              <Button type="submit" className="w-full rounded-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In as Client
-              </Button>
-
-              {/* Benefits row for the client experience */}
-              <ul className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <Download className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Download originals
+              {/* Feature Callouts - Kept from your original design */}
+              <ul className="grid grid-cols-3 gap-3 pt-2 text-center text-xs text-muted-foreground">
+                <li className="flex flex-col items-center gap-1.5 rounded-lg border bg-background/50 p-2">
+                  <Download className="h-4 w-4" />
+                  <span>Download</span>
                 </li>
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <Heart className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Favorites
+                <li className="flex flex-col items-center gap-1.5 rounded-lg border bg-background/50 p-2">
+                  <Heart className="h-4 w-4" />
+                  <span>Favorites</span>
                 </li>
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Secure access
+                <li className="flex flex-col items-center gap-1.5 rounded-lg border bg-background/50 p-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Secure</span>
                 </li>
               </ul>
+            </CardContent>
 
-              <div className="text-center text-sm text-muted-foreground">
-                <p>Are you a photographer?</p>
-                <Link href="/login" className="text-primary font-medium hover:underline">
-                  Sign in as photographer
+            <CardFooter className="flex flex-col gap-4">
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Access Your Gallery
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                Are you a photographer?{" "}
+                <Link href="/login" className="font-semibold text-primary underline">
+                  Sign in here
                 </Link>
-              </div>
+              </p>
             </CardFooter>
           </form>
-        </Card>
-      </div>
+        </Form>
+      </Card>
     </div>
   )
 }
