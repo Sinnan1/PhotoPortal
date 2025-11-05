@@ -45,8 +45,8 @@ export default function RegisterPage() {
 
     try {
       const { confirmPassword, ...registerData } = formData
-      // Add CLIENT role (requires approval)
-      const result = await register({ ...registerData, role: "CLIENT" })
+      // Add PHOTOGRAPHER role (requires approval)
+      const result = await register({ ...registerData, role: "PHOTOGRAPHER" })
       
       if (result?.requiresApproval) {
         setApprovalMessage(result.message || "Your account is pending approval")
