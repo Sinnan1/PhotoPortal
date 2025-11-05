@@ -63,7 +63,7 @@ export const register = async (req: Request, res: Response) => {
 			where: { configKey: 'registration.requireApproval' }
 		})
 
-		const requiresApproval = requireApprovalConfig?.configValue === true && role.toUpperCase() === 'PHOTOGRAPHER'
+		const requiresApproval = requireApprovalConfig?.configValue === true && role.toUpperCase() === 'CLIENT'
 
 		// Hash password
 		const hashedPassword = await bcrypt.hash(password, 12)
@@ -76,7 +76,7 @@ export const register = async (req: Request, res: Response) => {
 			role: role.toUpperCase(),
 			...(requiresApproval && {
 				suspendedAt: new Date(),
-				suspensionReason: 'Pending admin approval for photographer account'
+				suspensionReason: 'Pending admin approval'
 			})
 		}
 
@@ -99,7 +99,7 @@ export const register = async (req: Request, res: Response) => {
 				success: true,
 				data: {
 					user,
-					message: 'Account created successfully. Your photographer account is pending admin approval.',
+					message: 'Account created successfully. Your account is pending admin approval.',
 					requiresApproval: true
 				}
 			})
