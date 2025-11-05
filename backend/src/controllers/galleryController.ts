@@ -134,13 +134,18 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 		})
 
 		const galleriesWithStats = galleries.map((gallery) => {
-			let totalLikes = 0;
-			let totalFavorites = 0;
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
 
 			const totalSize = gallery.folders.reduce((acc, folder) => {
 				const folderSize = folder.photos.reduce((photoAcc, photo) => {
-					totalLikes += photo._count.likedBy;
-					totalFavorites += photo._count.favoritedBy;
+					// Count unique photos that have at least one like/favorite
+					if (photo._count.likedBy > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo._count.favoritedBy > 0) {
+						uniqueFavoritedPhotos++;
+					}
 					return photoAcc + (photo.fileSize || 0);
 				}, 0);
 				return acc + folderSize;
@@ -157,8 +162,8 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				totalSize,
 				_count: {
 					...gallery._count,
-					likedBy: totalLikes,
-					favoritedBy: totalFavorites,
+					likedBy: uniqueLikedPhotos,
+					favoritedBy: uniqueFavoritedPhotos,
 				},
 			};
 		});
@@ -761,14 +766,19 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 
 		// Transform the data to match the expected format
 		const galleries = accessibleGalleries.map((access) => {
-			let totalLikes = 0;
-			let totalFavorites = 0;
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
 
-			// Calculate total photo count and likes/favorites from all folders
+			// Calculate total photo count and count unique photos with likes/favorites
 			const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => {
 				folder.photos.forEach(photo => {
-					totalLikes += photo.likedBy.length;
-					totalFavorites += photo.favoritedBy.length;
+					// Count unique photos that have at least one like/favorite
+					if (photo.likedBy.length > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo.favoritedBy.length > 0) {
+						uniqueFavoritedPhotos++;
+					}
 				});
 				return sum + folder._count.photos;
 			}, 0);
@@ -785,8 +795,8 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false,
 				_count: {
 					...access.gallery._count,
-					likedBy: totalLikes,
-					favoritedBy: totalFavorites,
+					likedBy: uniqueLikedPhotos,
+					favoritedBy: uniqueFavoritedPhotos,
 				}
 			}
 		})
