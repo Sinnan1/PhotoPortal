@@ -96,6 +96,12 @@ const navigationItems: NavigationItem[] = [
     ],
   },
   {
+    id: "activity",
+    label: "User Activity",
+    icon: Activity,
+    path: "/admin/activity",
+  },
+  {
     id: "analytics",
     label: "System Analytics",
     icon: BarChart3,

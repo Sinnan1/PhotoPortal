@@ -15,6 +15,7 @@ import adminAnalyticsRoutes from './routes/adminAnalytics'
 import adminSystemConfigRoutes from './routes/adminSystemConfig'
 import adminInvitationsRoutes from './routes/adminInvitations'
 import auditRoutes from './routes/audit'
+import activityRoutes from './routes/activity'
 import galleryRoutes from './routes/galleries'
 import photoRoutes from './routes/photos'
 import photographersRoutes from './routes/photographers'
@@ -99,6 +100,7 @@ app.use('/api/admin/analytics', adminAnalyticsRoutes)
 app.use('/api/admin/system-config', adminSystemConfigRoutes)
 app.use('/api/admin/invitations', adminInvitationsRoutes)
 app.use('/api/admin/audit', auditRoutes)
+app.use('/api/admin/activity', activityRoutes)
 app.use('/api/galleries', galleryRoutes)
 app.use('/api/photos', photoRoutes)
 app.use('/api/photographers', photographersRoutes)

@@ -608,6 +608,28 @@ export const uploadDirect = async (req: Request, res: Response) => {
 
       console.log(`✅ Photo registered: ${photo.id}`);
 
+      // Log upload activity to audit log
+      try {
+        await prisma.adminAuditLog.create({
+          data: {
+            adminId: photographerId,
+            action: 'UPLOAD_PHOTOS',
+            targetType: 'photo',
+            targetId: photo.id,
+            details: {
+              filename: file.originalname,
+              fileSize: file.size,
+              folderId,
+              galleryId: folder.galleryId,
+            },
+            ipAddress: req.ip || req.socket.remoteAddress || null,
+          },
+        });
+      } catch (auditError) {
+        console.error('Failed to log upload activity:', auditError);
+        // Don't fail the upload if audit logging fails
+      }
+
       // Queue thumbnail generation
       const { parallelThumbnailQueue } = await import('../services/parallelThumbnailQueue');
       await parallelThumbnailQueue.add({

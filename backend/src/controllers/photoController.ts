@@ -729,6 +729,22 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 			skipDuplicates: true,
 		});
 
+		// Log activity
+		try {
+			await prisma.adminAuditLog.create({
+				data: {
+					adminId: userId,
+					action: 'LIKE_PHOTO',
+					targetType: 'photo',
+					targetId: id,
+					details: { photoId: id, galleryId: photo.folder.galleryId },
+					ipAddress: req.ip || req.socket.remoteAddress || null,
+				},
+			});
+		} catch (auditError) {
+			console.error('Failed to log like activity:', auditError);
+		}
+
 		return res.json({ success: true, message: "Photo liked (synced)" });
 	} catch (error) {
 		console.error("Like photo error:", error);
@@ -835,6 +851,22 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 			})),
 			skipDuplicates: true,
 		});
+
+		// Log activity
+		try {
+			await prisma.adminAuditLog.create({
+				data: {
+					adminId: userId,
+					action: 'FAVORITE_PHOTO',
+					targetType: 'photo',
+					targetId: id,
+					details: { photoId: id, galleryId: photo.folder.galleryId },
+					ipAddress: req.ip || req.socket.remoteAddress || null,
+				},
+			});
+		} catch (auditError) {
+			console.error('Failed to log favorite activity:', auditError);
+		}
 
 		return res.json({ success: true, message: "Photo favorited (synced)" });
 	} catch (error) {
