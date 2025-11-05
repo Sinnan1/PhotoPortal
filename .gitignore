@@ -13,9 +13,6 @@
 .env.local
 backend/.env
 frontend/.env.local
-.env.production
-.env.staging
-
 
 # Logs
 npm-debug.log*
@@ -41,3 +38,16 @@ Thumbs.db
 
 # Documentation and development files (excluded from production)
 docs/
+*.md
+!README.md
+
+# Kiro folder
+.kiro/
+
+# Docker override (for local dev only, not production)
+docker-compose.override.yml
+
+# Development exports and logs
+*-export.txt
+npm_output.log
+*.log
