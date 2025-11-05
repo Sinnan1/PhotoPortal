@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Camera } from "lucide-react"
+import { Loader2, Camera, CheckCircle, Clock } from "lucide-react"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -19,6 +19,8 @@ export default function RegisterPage() {
     confirmPassword: "",
   })
   const [loading, setLoading] = useState(false)
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [approvalMessage, setApprovalMessage] = useState("")
   const { register } = useAuth()
   const { showToast } = useToast()
 
@@ -44,8 +46,14 @@ export default function RegisterPage() {
     try {
       const { confirmPassword, ...registerData } = formData
       // Add PHOTOGRAPHER role (backend also defaults to this)
-      await register({ ...registerData, role: "PHOTOGRAPHER" })
-      showToast("Account created successfully!", "success")
+      const result = await register({ ...registerData, role: "PHOTOGRAPHER" })
+      
+      if (result?.requiresApproval) {
+        setApprovalMessage(result.message || "Your account is pending approval")
+        setShowApprovalModal(true)
+      } else {
+        showToast("Account created successfully!", "success")
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Registration failed", "error")
     } finally {
@@ -54,7 +62,62 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="fixed left-0 right-0 bottom-0 top-16 lg:grid lg:grid-cols-2 overflow-hidden">
+    <>
+      {/* Approval Modal */}
+      {showApprovalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-8 animate-in fade-in zoom-in duration-300">
+            <div className="flex flex-col items-center text-center space-y-4">
+              {/* Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl"></div>
+                <div className="relative bg-primary/10 p-4 rounded-full">
+                  <Clock className="h-12 w-12 text-primary" />
+                </div>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl font-bold text-foreground">Account Pending Approval</h2>
+
+              {/* Message */}
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {approvalMessage}
+              </p>
+
+              {/* Info Box */}
+              <div className="w-full bg-muted/50 border border-border rounded-lg p-4 space-y-2">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">What happens next?</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      An administrator will review your registration and approve your account. You'll receive an email once your account is activated.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col w-full gap-2 pt-2">
+                <Link href="/login" className="w-full">
+                  <Button className="w-full">
+                    Go to Login
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowApprovalModal(false)}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed left-0 right-0 bottom-0 top-16 lg:grid lg:grid-cols-2 overflow-hidden">
       {/* Left side: Image Panel */}
       <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
@@ -160,5 +223,6 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
