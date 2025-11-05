@@ -15,6 +15,7 @@ import {
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { updateGalleryAccess, getAllowedClients } from '../controllers/galleryController'
 import { auditMiddleware } from '../middleware/auditMiddleware'
+import { galleryPasswordLimiter } from '../middleware/rateLimiter'
 
 const router = Router()
 
@@ -33,7 +34,7 @@ router.get('/client/accessible', authenticateToken, requireRole('CLIENT'), getCl
 
 // Public routes (for clients to access galleries)
 router.get('/:id', getGallery)
-router.post('/:id/verify-password', verifyGalleryPassword)
+router.post('/:id/verify-password', galleryPasswordLimiter, verifyGalleryPassword)
 
 // Routes for liking and favoriting galleries
 router.post('/:id/like', authenticateToken, likeGallery)

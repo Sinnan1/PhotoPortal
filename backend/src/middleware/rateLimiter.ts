@@ -190,6 +190,30 @@ export const adminLoginLimiter = createRateLimiter({
   message: 'Too many login attempts, please try again later'
 })
 
+// User login attempts - 10 attempts per 15 minutes per IP
+export const userLoginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 10,
+  keyGenerator: (req) => `user-login:${req.ip}`,
+  message: 'Too many login attempts, please try again later'
+})
+
+// User registration - 3 registrations per hour per IP
+export const userRegistrationLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 3,
+  keyGenerator: (req) => `user-register:${req.ip}`,
+  message: 'Too many registration attempts, please try again later'
+})
+
+// Gallery password verification - 5 attempts per 15 minutes per IP per gallery
+export const galleryPasswordLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 5,
+  keyGenerator: (req) => `gallery-password:${req.params.id}:${req.ip}`,
+  message: 'Too many password attempts, please try again later'
+})
+
 // User creation/management - 50 operations per hour
 export const userManagementLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
