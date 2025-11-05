@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { logAdminAction } from '../middleware/auditMiddleware'
+import { cacheService } from '../services/cacheService'
 import { 
   validateUserCreation, 
   validateEmail, 
@@ -450,6 +451,9 @@ export const updateUserRole = async (req: AdminAuthRequest, res: Response) => {
             }
         })
 
+        // Invalidate user cache
+        cacheService.invalidateUser(userId)
+
         // Log admin action
         await logAdminAction(
             req,
@@ -548,6 +552,9 @@ export const suspendUser = async (req: AdminAuthRequest, res: Response) => {
             }
         })
 
+        // Invalidate user cache
+        cacheService.invalidateUser(userId)
+
         // Log admin action
         await logAdminAction(
             req,
@@ -627,6 +634,9 @@ export const activateUser = async (req: AdminAuthRequest, res: Response) => {
                 suspendedAt: true
             }
         })
+
+        // Invalidate user cache
+        cacheService.invalidateUser(userId)
 
         // Log admin action
         await logAdminAction(
@@ -1087,6 +1097,9 @@ export const approvePendingUser = async (req: AdminAuthRequest, res: Response) =
                 suspendedAt: true
             }
         })
+
+        // Invalidate user cache
+        cacheService.invalidateUser(userId)
 
         // Log admin action
         await logAdminAction(

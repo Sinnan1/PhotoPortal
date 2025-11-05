@@ -87,6 +87,26 @@ router.get('/csrf-status', authenticateAdmin, requireAdmin, adminGeneralLimiter,
 // Rate limit status endpoint
 router.get('/rate-limit-status', authenticateAdmin, requireAdmin, getRateLimitStatus)
 
+// Cache management endpoints
+router.get('/cache-status', authenticateAdmin, requireAdmin, adminGeneralLimiter, (req, res) => {
+	const { cacheService } = require('../services/cacheService')
+	const stats = cacheService.getStats()
+	res.json({ success: true, data: stats })
+})
+
+router.post('/cache-clear', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, (req, res) => {
+	const { cacheService } = require('../services/cacheService')
+	const { pattern } = req.body
+	
+	if (pattern) {
+		cacheService.deletePattern(pattern)
+		res.json({ success: true, message: `Cache cleared for pattern: ${pattern}` })
+	} else {
+		cacheService.clear()
+		res.json({ success: true, message: 'All cache cleared' })
+	}
+})
+
 // Protected admin routes (require admin authentication + CSRF protection + rate limiting)
 router.post('/logout', authenticateAdmin, requireAdmin, adminGeneralLimiter, validateCSRFToken, revokeCSRFToken, adminLogout)
 router.get('/profile', authenticateAdmin, requireAdmin, adminGeneralLimiter, addCSRFTokenToResponse, getAdminProfile)

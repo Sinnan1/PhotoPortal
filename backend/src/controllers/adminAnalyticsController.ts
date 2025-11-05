@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { logAdminAction } from '../middleware/auditMiddleware'
+import { cacheService } from '../services/cacheService'
 
 const prisma = new PrismaClient()
 
@@ -143,12 +144,10 @@ export const getSystemStats = async (req: AdminAuthRequest, res: Response) => {
     // Calculate system uptime
     const systemUptime = Math.floor(process.uptime())
 
-    // Get storage limit from system config (default 100GB if not set)
-    const storageConfig = await prisma.systemConfig.findUnique({
-      where: { configKey: 'storage_limit' }
-    })
+    // Get storage limit from system config (cached)
+    const storageConfig = await cacheService.getSystemConfig('storage_limit')
     const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+      (storageConfig as any).bytes : 
       100 * 1024 * 1024 * 1024 // 100GB default
 
     // Calculate error rate (from recent audit logs)
@@ -562,11 +561,9 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
     ` as any[]
 
     const totalStorage = Number(storageStats[0]?.total_storage || 0)
-    const storageConfig = await prisma.systemConfig.findUnique({
-      where: { configKey: 'storage_limit' }
-    })
+    const storageConfig = await cacheService.getSystemConfig('storage_limit')
     const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+      (storageConfig as any).bytes : 
       100 * 1024 * 1024 * 1024 // 100GB default
 
     const storageUtilization = (totalStorage / storageLimit) * 100
@@ -1037,11 +1034,9 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
     ` as any[]
 
     const totalStorage = Number(storageStats[0]?.total_storage || 0)
-    const storageConfig = await prisma.systemConfig.findUnique({
-      where: { configKey: 'storage_limit' }
-    })
+    const storageConfig = await cacheService.getSystemConfig('storage_limit')
     const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+      (storageConfig as any).bytes : 
       100 * 1024 * 1024 * 1024 // 100GB default
 
     const storageUtilization = (totalStorage / storageLimit) * 100
@@ -1072,11 +1067,9 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
 
     // Check user limit alerts
     const userCount = await prisma.user.count()
-    const userLimitConfig = await prisma.systemConfig.findUnique({
-      where: { configKey: 'user_limit' }
-    })
+    const userLimitConfig = await cacheService.getSystemConfig('user_limit')
     const userLimit = userLimitConfig ? 
-      (userLimitConfig.configValue as any).limit : 
+      (userLimitConfig as any).limit : 
       1000 // Default limit
 
     if (userCount > userLimit * 0.9) {

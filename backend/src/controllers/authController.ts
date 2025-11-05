@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
+import { cacheService } from '../services/cacheService'
 
 const prisma = new PrismaClient()
 
@@ -34,12 +35,10 @@ export const register = async (req: Request, res: Response) => {
 			})
 		}
 
-		// Check if registration is enabled
-		const registrationConfig = await prisma.systemConfig.findUnique({
-			where: { configKey: 'registration.enabled' }
-		})
+		// Check if registration is enabled (cached)
+		const registrationEnabled = await cacheService.getSystemConfig('registration.enabled')
 
-		if (registrationConfig && !registrationConfig.configValue) {
+		if (registrationEnabled === false) {
 			return res.status(403).json({
 				success: false,
 				error: 'Registration is currently disabled'
@@ -58,13 +57,11 @@ export const register = async (req: Request, res: Response) => {
 			})
 		}
 
-		// Check if approval is required for this role
-		const requireApprovalConfig = await prisma.systemConfig.findUnique({
-			where: { configKey: 'registration.requireApproval' }
-		})
+		// Check if approval is required for this role (cached)
+		const requireApproval = await cacheService.getSystemConfig('registration.requireApproval')
 
 		// Require approval for both CLIENT and PHOTOGRAPHER roles
-		const requiresApproval = requireApprovalConfig?.configValue === true && 
+		const requiresApproval = requireApproval === true && 
 			(role.toUpperCase() === 'CLIENT' || role.toUpperCase() === 'PHOTOGRAPHER')
 
 		// Hash password

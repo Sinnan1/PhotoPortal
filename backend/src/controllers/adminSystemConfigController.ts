@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { logAdminAction } from '../middleware/auditMiddleware'
+import { cacheService } from '../services/cacheService'
 
 // Allow dependency injection for testing
 let prisma: PrismaClient
@@ -506,6 +507,9 @@ export const updateConfiguration = async (req: AdminAuthRequest, res: Response) 
             }
         })
 
+        // Invalidate cache for this config
+        cacheService.invalidateSystemConfig(configKey)
+
         // Log admin action
         await logAdminAction(
             req,
@@ -624,6 +628,9 @@ export const updateMultipleConfigurations = async (req: AdminAuthRequest, res: R
                 })
             )
         )
+
+        // Invalidate cache for all updated configs
+        configKeys.forEach(key => cacheService.invalidateSystemConfig(key))
 
         // Log admin action
         await logAdminAction(
