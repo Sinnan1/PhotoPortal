@@ -162,17 +162,33 @@ export const revokeCSRFToken = (req: AdminAuthRequest, res: Response, next: Next
 }
 
 /**
- * Middleware to add CSRF token to response headers for admin routes
+ * Middleware to add CSRF token to response headers and cookies for admin routes
  */
 export const addCSRFTokenToResponse = (req: AdminAuthRequest, res: Response, next: NextFunction) => {
   try {
     if (req.admin?.id) {
       const sessionKey = req.admin.sessionId || req.admin.id
-      const storedToken = csrfTokens.get(sessionKey)
+      let storedToken = csrfTokens.get(sessionKey)
       
-      if (storedToken && storedToken.expiresAt > new Date()) {
-        res.setHeader('X-CSRF-Token', storedToken.token)
+      // Generate new token if none exists or expired
+      if (!storedToken || storedToken.expiresAt < new Date()) {
+        const token = crypto.randomBytes(32).toString('hex')
+        storedToken = {
+          token,
+          expiresAt: new Date(Date.now() + TOKEN_EXPIRATION),
+          adminId: req.admin.id
+        }
+        csrfTokens.set(sessionKey, storedToken)
       }
+      
+      // Set token in both header and cookie
+      res.setHeader('X-CSRF-Token', storedToken.token)
+      res.cookie('csrf-token', storedToken.token, {
+        httpOnly: false, // Allow JavaScript to read it
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: TOKEN_EXPIRATION
+      })
     }
     next()
   } catch (error) {
