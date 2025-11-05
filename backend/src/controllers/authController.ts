@@ -63,7 +63,9 @@ export const register = async (req: Request, res: Response) => {
 			where: { configKey: 'registration.requireApproval' }
 		})
 
-		const requiresApproval = requireApprovalConfig?.configValue === true && role.toUpperCase() === 'CLIENT'
+		// Require approval for both CLIENT and PHOTOGRAPHER roles
+		const requiresApproval = requireApprovalConfig?.configValue === true && 
+			(role.toUpperCase() === 'CLIENT' || role.toUpperCase() === 'PHOTOGRAPHER')
 
 		// Hash password
 		const hashedPassword = await bcrypt.hash(password, 12)
