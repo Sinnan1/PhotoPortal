@@ -471,6 +471,8 @@ export const api = {
     if (partNumber) url.searchParams.append('part', partNumber.toString());
     if (photosPerPart) url.searchParams.append('photosPerPart', photosPerPart.toString());
 
+    console.log(`🌐 Fetching: ${url.toString()}`);
+
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
@@ -478,6 +480,9 @@ export const api = {
         ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
       },
     });
+
+    console.log(`📡 Response status: ${response.status}`);
+    console.log(`📡 Content-Type: ${response.headers.get('Content-Type')}`);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -487,13 +492,21 @@ export const api = {
     // Check if response is JSON (multi-part info) or blob (actual zip)
     const contentType = response.headers.get('Content-Type');
     if (contentType?.includes('application/json')) {
-      return await response.json(); // Return multi-part info
+      const jsonData = await response.json();
+      console.log(`📋 Multi-part info received:`, jsonData);
+      return jsonData; // Return multi-part info
     }
 
+    const blob = await response.blob();
+    console.log(`💾 Blob created, size: ${blob.size} bytes, type: ${blob.type}`);
+    
+    const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip';
+    console.log(`📁 Filename: ${filename}`);
+
     return {
-      blob: await response.blob(),
+      blob,
       downloadId: response.headers.get('X-Download-ID'),
-      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'all_photos.zip'
+      filename
     };
   },
 
@@ -565,52 +578,106 @@ export const api = {
     downloadFn: (partNumber?: number, photosPerPart?: number) => Promise<any>,
     onProgress?: (current: number, total: number) => void
   ) => {
-    // First call to check if multi-part is needed
-    const result = await downloadFn();
-    
-    // If not multi-part, download directly
-    if (!result.multipart) {
-      const url = window.URL.createObjectURL(result.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      return;
-    }
-    
-    // Multi-part download - download each part sequentially
-    console.log(`📦 Multi-part download: ${result.totalParts} parts, ${result.totalPhotos} photos`);
-    
-    for (let i = 0; i < result.totalParts; i++) {
-      const partInfo = result.parts[i];
-      console.log(`📥 Downloading part ${partInfo.part}/${result.totalParts}: ${partInfo.filename}`);
+    try {
+      // First call to check if multi-part is needed
+      console.log('🔍 Checking if multi-part download is needed...');
+      const result = await downloadFn();
+      console.log('📋 Result:', result);
       
-      if (onProgress) {
-        onProgress(i + 1, result.totalParts);
+      // If not multi-part, download directly
+      if (!result.multipart) {
+        console.log('📦 Single file download');
+        if (!result.blob) {
+          throw new Error('No blob received from server');
+        }
+        
+        const url = window.URL.createObjectURL(result.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        // Use setTimeout to ensure browser processes the click
+        setTimeout(() => {
+          a.click();
+          console.log('✅ Download triggered:', result.filename);
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 100);
+        }, 0);
+        
+        return;
       }
       
-      // Download this part
-      const partResult = await downloadFn(partInfo.part, result.photosPerPart);
+      // Multi-part download - download each part sequentially
+      console.log(`📦 Multi-part download: ${result.totalParts} parts, ${result.totalPhotos} photos`);
       
-      // Trigger download
-      const url = window.URL.createObjectURL(partResult.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = partInfo.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      // Small delay between downloads to prevent browser blocking
-      if (i < result.totalParts - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      for (let i = 0; i < result.totalParts; i++) {
+        const partInfo = result.parts[i];
+        console.log(`📥 Downloading part ${partInfo.part}/${result.totalParts}: ${partInfo.filename}`);
+        
+        if (onProgress) {
+          onProgress(i + 1, result.totalParts);
+        }
+        
+        try {
+          // Download this part with timeout
+          console.log(`🔄 Fetching part ${partInfo.part}...`);
+          
+          const partResult = await Promise.race([
+            downloadFn(partInfo.part, result.photosPerPart),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error(`Timeout fetching part ${partInfo.part}`)), 600000) // 10 min timeout
+            )
+          ]) as any;
+          
+          console.log(`📦 Part ${partInfo.part} result:`, partResult);
+          
+          if (!partResult.blob) {
+            console.error(`❌ No blob for part ${partInfo.part}`);
+            throw new Error(`No blob received for part ${partInfo.part}`);
+          }
+          
+          console.log(`💾 Blob size: ${partResult.blob.size} bytes`);
+          
+          // Trigger download with better browser compatibility
+          const url = window.URL.createObjectURL(partResult.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = partInfo.filename;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          
+          // Use setTimeout to ensure browser processes each download
+          await new Promise<void>((resolve) => {
+            setTimeout(() => {
+              a.click();
+              console.log(`✅ Part ${partInfo.part} download triggered`);
+              setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                resolve();
+              }, 100);
+            }, 0);
+          });
+          
+          // Longer delay between downloads to ensure browser shows each one
+          if (i < result.totalParts - 1) {
+            console.log(`⏸️  Waiting 2 seconds before next part...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds between parts
+          }
+        } catch (partError) {
+          console.error(`❌ Error downloading part ${partInfo.part}:`, partError);
+          throw partError;
+        }
       }
+      
+      console.log(`✅ All ${result.totalParts} parts downloaded successfully`);
+    } catch (error) {
+      console.error('❌ Multi-part download error:', error);
+      throw error;
     }
-    
-    console.log(`✅ All ${result.totalParts} parts downloaded successfully`);
   },
 }
