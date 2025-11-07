@@ -591,22 +591,20 @@ export const api = {
           throw new Error('No blob received from server');
         }
         
+        // Create download link and trigger immediately
         const url = window.URL.createObjectURL(result.blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = result.filename;
-        a.style.display = 'none';
         document.body.appendChild(a);
+        a.click();
+        console.log('✅ Download triggered:', result.filename);
         
-        // Use setTimeout to ensure browser processes the click
+        // Clean up after a delay
         setTimeout(() => {
-          a.click();
-          console.log('✅ Download triggered:', result.filename);
-          setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          }, 100);
-        }, 0);
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        }, 100);
         
         return;
       }
@@ -642,28 +640,22 @@ export const api = {
           
           console.log(`💾 Blob size: ${partResult.blob.size} bytes`);
           
-          // Trigger download with better browser compatibility
+          // Trigger download immediately
           const url = window.URL.createObjectURL(partResult.blob);
           const a = document.createElement('a');
           a.href = url;
           a.download = partInfo.filename;
-          a.style.display = 'none';
           document.body.appendChild(a);
+          a.click();
+          console.log(`✅ Part ${partInfo.part} download triggered`);
           
-          // Use setTimeout to ensure browser processes each download
-          await new Promise<void>((resolve) => {
-            setTimeout(() => {
-              a.click();
-              console.log(`✅ Part ${partInfo.part} download triggered`);
-              setTimeout(() => {
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                resolve();
-              }, 100);
-            }, 0);
-          });
+          // Clean up after a delay
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 100);
           
-          // Longer delay between downloads to ensure browser shows each one
+          // Delay between downloads to ensure browser processes each one
           if (i < result.totalParts - 1) {
             console.log(`⏸️  Waiting 2 seconds before next part...`);
             await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds between parts

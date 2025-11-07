@@ -295,24 +295,12 @@ export class DownloadService {
                     // Add to archive with original filename
                     archive.append(stream, { name: photo.filename })
                     
-                    // CRITICAL: Wait for stream to be consumed before adding next photo
-                    await new Promise<void>((resolve) => {
-                        stream.on('end', () => resolve())
-                        stream.on('error', () => resolve()) // Continue even on error
-                    })
-                    
                     processedCount++
                     
                     // Update progress
                     this.updateProgress(downloadId, {
                         processedPhotos: processedCount
                     })
-                    
-                    // Add delay every 50 photos to prevent memory buildup
-                    if (processedCount % 50 === 0) {
-                        console.log(`⏸️  Pausing after ${processedCount} photos to prevent memory issues...`)
-                        await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second pause
-                    }
                     
                 } catch (error) {
                     console.error(`Failed to add photo ${photo.filename}:`, error)
