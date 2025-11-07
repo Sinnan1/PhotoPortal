@@ -38,6 +38,7 @@ import { DownloadProgress } from "@/components/ui/download-progress";
 import { useDownloadProgress } from "@/hooks/use-download-progress";
 import { SelectionCounter } from "@/components/ui/selection-counter";
 import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summary";
+import { DownloadWarningModal } from "@/components/ui/download-warning-modal";
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -131,6 +132,8 @@ function GalleryPage() {
   const [showFolderTree, setShowFolderTree] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
+  const [showDownloadWarning, setShowDownloadWarning] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState<{ type: 'all' | 'folder'; photoCount: number } | null>(null);
 
   // Download progress hooks
   const downloadAllProgress = useDownloadProgress();
@@ -369,24 +372,55 @@ function GalleryPage() {
     }
   };
 
-  const handleDownloadCurrentFolder = async () => {
+  const handleDownloadCurrentFolder = () => {
     if (!currentFolder) return;
-    try {
-      const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
-      window.location.href = response.downloadUrl;
-    } catch (error) {
-      console.error("Failed to start download:", error);
-      showToast("Failed to start download", "error");
-    }
+    const photoCount = currentFolder.photos?.length || 0;
+    setPendingDownload({ type: 'folder', photoCount });
+    setShowDownloadWarning(true);
   };
 
-  const handleDownloadAll = async () => {
+  const handleDownloadAll = () => {
+    const photoCount = gallery?.folders?.flatMap(f => f?.photos || []).length || 0;
+    setPendingDownload({ type: 'all', photoCount });
+    setShowDownloadWarning(true);
+  };
+
+  const handleConfirmDownload = async () => {
+    if (!pendingDownload) return;
+
     try {
-      const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
-      window.location.href = response.downloadUrl;
+      showToast("Starting download...", "info");
+      
+      if (pendingDownload.type === 'all') {
+        setIsDownloadingAll(true);
+        await api.handleMultiPartDownload(
+          (part, photosPerPart) => api.downloadAllPhotosUnified(galleryId, password, part, photosPerPart),
+          (current, total) => {
+            if (total > 1) {
+              showToast(`Downloading part ${current} of ${total}...`, "info");
+            }
+          }
+        );
+      } else if (pendingDownload.type === 'folder' && currentFolder) {
+        setIsDownloadingCurrent(true);
+        await api.handleMultiPartDownload(
+          (part, photosPerPart) => api.downloadFolderPhotosUnified(galleryId, currentFolder.id, password, part, photosPerPart),
+          (current, total) => {
+            if (total > 1) {
+              showToast(`Downloading part ${current} of ${total}...`, "info");
+            }
+          }
+        );
+      }
+      
+      showToast("Download complete!", "success");
     } catch (error) {
       console.error("Failed to start download:", error);
       showToast("Failed to start download", "error");
+    } finally {
+      setIsDownloadingAll(false);
+      setIsDownloadingCurrent(false);
+      setPendingDownload(null);
     }
   };
 
@@ -1241,8 +1275,17 @@ function GalleryPage() {
           dataSaverMode={dataSaverMode}
         />
       )}
+
+      {/* Download Warning Modal */}
+      <DownloadWarningModal
+        open={showDownloadWarning}
+        onOpenChange={setShowDownloadWarning}
+        onConfirm={handleConfirmDownload}
+        downloadType={pendingDownload?.type === 'all' ? 'All Gallery Photos' : 'Current Folder Photos'}
+        photoCount={pendingDownload?.photoCount || 0}
+      />
     </div>
   );
 }
 
-export default GalleryPage; 
+export default GalleryPage;

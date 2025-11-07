@@ -109,7 +109,9 @@ export class DownloadService {
         userId: string,
         downloadType: 'all' | 'folder',
         folderId?: string,
-        res?: any
+        res?: any,
+        partNumber?: number,
+        photosPerPart?: number
     ): Promise<void> {
         const gallery = await prisma.gallery.findUnique({
             where: { id: galleryId },
@@ -162,24 +164,74 @@ export class DownloadService {
             throw new Error(`No photos found for ${downloadType} download`)
         }
 
+        // Handle multi-part downloads
+        const MAX_PHOTOS_PER_ZIP = 400;
+        const totalParts = Math.ceil(photos.length / MAX_PHOTOS_PER_ZIP)
+        
+        // If this is a part request, slice the photos array
+        if (partNumber && photosPerPart) {
+            const startIdx = (partNumber - 1) * photosPerPart
+            const endIdx = Math.min(startIdx + photosPerPart, photos.length)
+            photos = photos.slice(startIdx, endIdx)
+            zipFilename = zipFilename.replace('.zip', `_part${partNumber}_of_${totalParts}.zip`)
+            console.log(`📦 Processing part ${partNumber}/${totalParts}: ${photos.length} photos`)
+        }
+        // If large download without part number, return multi-part info
+        else if (photos.length > MAX_PHOTOS_PER_ZIP && res) {
+            console.log(`📦 Large download detected: ${photos.length} photos. Returning multi-part info.`)
+            
+            res.json({
+                success: true,
+                multipart: true,
+                totalPhotos: photos.length,
+                totalParts,
+                photosPerPart: MAX_PHOTOS_PER_ZIP,
+                message: `Gallery split into ${totalParts} parts for optimal download`,
+                galleryId,
+                folderId,
+                downloadType,
+                parts: Array.from({ length: totalParts }, (_, i) => ({
+                    part: i + 1,
+                    photosInPart: Math.min(MAX_PHOTOS_PER_ZIP, photos.length - (i * MAX_PHOTOS_PER_ZIP)),
+                    filename: `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_part${i + 1}_of_${totalParts}.zip`
+                }))
+            })
+            return
+        }
+
         // Create download tracking
         const downloadId = this.createDownload(zipFilename, photos.length)
 
         console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos)`)
 
         try {
+            // Track if client disconnected
+            let clientDisconnected = false;
+
             // Set response headers for zip download
             if (res) {
                 res.setHeader('Content-Type', 'application/zip')
                 res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
                 res.setHeader('X-Download-ID', downloadId)
                 res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
+
+                // Monitor client connection - abort if client disconnects
+                res.on('close', () => {
+                    if (!res.writableEnded) {
+                        clientDisconnected = true;
+                        console.log(`🚫 Client disconnected during download: ${downloadId}`);
+                        this.updateProgress(downloadId, {
+                            status: 'error',
+                            error: 'Client disconnected'
+                        });
+                    }
+                });
             }
 
-            // Create zip archive with optimized settings for streaming
+            // Create zip archive with NO COMPRESSION to save CPU and memory
             const archive = archiver('zip', {
-                zlib: { level: 1 }, // Faster compression for large downloads
-                store: false // Enable compression
+                zlib: { level: 0 }, // NO compression = much faster, less memory
+                store: true // Store mode - no compression
             })
 
             // Handle archive events
@@ -212,51 +264,60 @@ export class DownloadService {
                 archive.pipe(res)
             }
 
-            // Add photos to archive with better error handling and batching
+            // Add photos ONE AT A TIME with backpressure control
             let processedCount = 0
-            const batchSize = 5 // Process photos in smaller batches to prevent memory issues
             
-            for (let i = 0; i < photos.length; i += batchSize) {
-                const batch = photos.slice(i, i + batchSize)
-                
-                for (const photo of batch) {
-                    try {
-                        console.log(`📁 Adding photo ${processedCount + 1}/${photos.length}: ${photo.filename}`)
-
-                        // Extract S3 key from URL
-                        const originalUrl = new URL(photo.originalUrl)
-                        const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
-                        const bucketName = pathParts[0]
-                        const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
-
-                        // Get photo stream from S3 with timeout
-                        const { stream } = await Promise.race([
-                            getObjectStreamFromS3(s3Key, bucketName),
-                            new Promise((_, reject) => 
-                                setTimeout(() => reject(new Error('S3 stream timeout')), 30000)
-                            )
-                        ]) as any
-                        
-                        // Add to archive with original filename
-                        archive.append(stream, { name: photo.filename })
-                        
-                        processedCount++
-                        
-                        // Update progress
-                        this.updateProgress(downloadId, {
-                            processedPhotos: processedCount
-                        })
-                        
-                    } catch (error) {
-                        console.error(`Failed to add photo ${photo.filename}:`, error)
-                        processedCount++ // Still count as processed to continue
-                        // Continue with other photos
-                    }
+            for (const photo of photos) {
+                // Check if client disconnected - abort if so
+                if (clientDisconnected) {
+                    console.log(`🛑 Aborting download due to client disconnect: ${downloadId}`);
+                    archive.abort();
+                    return;
                 }
-                
-                // Small delay between batches to prevent overwhelming the system
-                if (i + batchSize < photos.length) {
-                    await new Promise(resolve => setTimeout(resolve, 100))
+
+                try {
+                    console.log(`📁 Adding photo ${processedCount + 1}/${photos.length}: ${photo.filename}`)
+
+                    // Extract S3 key from URL
+                    const originalUrl = new URL(photo.originalUrl)
+                    const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
+                    const bucketName = pathParts[0]
+                    const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
+
+                    // Get photo stream from S3 with timeout
+                    const { stream } = await Promise.race([
+                        getObjectStreamFromS3(s3Key, bucketName),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('S3 stream timeout')), 30000)
+                        )
+                    ]) as any
+                    
+                    // Add to archive with original filename
+                    archive.append(stream, { name: photo.filename })
+                    
+                    // CRITICAL: Wait for stream to be consumed before adding next photo
+                    await new Promise<void>((resolve) => {
+                        stream.on('end', () => resolve())
+                        stream.on('error', () => resolve()) // Continue even on error
+                    })
+                    
+                    processedCount++
+                    
+                    // Update progress
+                    this.updateProgress(downloadId, {
+                        processedPhotos: processedCount
+                    })
+                    
+                    // Add delay every 50 photos to prevent memory buildup
+                    if (processedCount % 50 === 0) {
+                        console.log(`⏸️  Pausing after ${processedCount} photos to prevent memory issues...`)
+                        await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second pause
+                    }
+                    
+                } catch (error) {
+                    console.error(`Failed to add photo ${photo.filename}:`, error)
+                    processedCount++ // Still count as processed to continue
+                    // Continue with other photos
                 }
             }
 
@@ -366,10 +427,26 @@ export class DownloadService {
 
         console.log(`📦 Starting ${filterType} photos download: ${downloadId}`)
 
+        // Track if client disconnected
+        let clientDisconnected = false;
+
         // Set response headers for zip download
         res.setHeader('Content-Type', 'application/zip')
         res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
         res.setHeader('X-Download-ID', downloadId)
+        res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
+
+        // Monitor client connection - abort if client disconnects
+        res.on('close', () => {
+            if (!res.writableEnded) {
+                clientDisconnected = true;
+                console.log(`🚫 Client disconnected during download: ${downloadId}`);
+                this.updateProgress(downloadId, {
+                    status: 'error',
+                    error: 'Client disconnected'
+                });
+            }
+        });
 
         // Create zip archive
         const archive = archiver('zip', {
@@ -406,6 +483,13 @@ export class DownloadService {
         // Add photos to archive
         let processedCount = 0
         for (const filteredPhoto of filteredPhotos) {
+            // Check if client disconnected - abort if so
+            if (clientDisconnected) {
+                console.log(`🛑 Aborting download due to client disconnect: ${downloadId}`);
+                archive.abort();
+                return;
+            }
+
             try {
                 const photo = filteredPhoto.photo
                 console.log(`📁 Adding photo ${processedCount + 1}/${filteredPhotos.length}: ${photo.filename}`)

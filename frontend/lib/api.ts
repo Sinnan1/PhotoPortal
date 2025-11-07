@@ -461,13 +461,17 @@ export const api = {
 
   getGalleryPhotoStats: (galleryId: string) => apiRequest(`/photos/gallery/${galleryId}/stats`),
 
-  downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string) => {
+  downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string, partNumber?: number, photosPerPart?: number) => {
     const token = getAuthToken();
     if (!token) {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/all`, {
+    const url = new URL(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/all`);
+    if (partNumber) url.searchParams.append('part', partNumber.toString());
+    if (photosPerPart) url.searchParams.append('photosPerPart', photosPerPart.toString());
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -480,6 +484,12 @@ export const api = {
       throw new Error(errorData.error || "Failed to download all photos");
     }
 
+    // Check if response is JSON (multi-part info) or blob (actual zip)
+    const contentType = response.headers.get('Content-Type');
+    if (contentType?.includes('application/json')) {
+      return await response.json(); // Return multi-part info
+    }
+
     return {
       blob: await response.blob(),
       downloadId: response.headers.get('X-Download-ID'),
@@ -487,13 +497,17 @@ export const api = {
     };
   },
 
-  downloadFolderPhotosUnified: async (galleryId: string, folderId: string, galleryPassword?: string) => {
+  downloadFolderPhotosUnified: async (galleryId: string, folderId: string, galleryPassword?: string, partNumber?: number, photosPerPart?: number) => {
     const token = getAuthToken();
     if (!token) {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/folder/${folderId}`, {
+    const url = new URL(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/download/folder/${folderId}`);
+    if (partNumber) url.searchParams.append('part', partNumber.toString());
+    if (photosPerPart) url.searchParams.append('photosPerPart', photosPerPart.toString());
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -504,6 +518,12 @@ export const api = {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to download folder photos");
+    }
+
+    // Check if response is JSON (multi-part info) or blob (actual zip)
+    const contentType = response.headers.get('Content-Type');
+    if (contentType?.includes('application/json')) {
+      return await response.json(); // Return multi-part info
     }
 
     return {
@@ -538,5 +558,59 @@ export const api = {
 
     const queryString = queryParams.toString()
     return apiRequest(`/analytics/photographer/selections${queryString ? `?${queryString}` : ''}`)
+  },
+
+  // Helper function to handle multi-part downloads automatically
+  handleMultiPartDownload: async (
+    downloadFn: (partNumber?: number, photosPerPart?: number) => Promise<any>,
+    onProgress?: (current: number, total: number) => void
+  ) => {
+    // First call to check if multi-part is needed
+    const result = await downloadFn();
+    
+    // If not multi-part, download directly
+    if (!result.multipart) {
+      const url = window.URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return;
+    }
+    
+    // Multi-part download - download each part sequentially
+    console.log(`📦 Multi-part download: ${result.totalParts} parts, ${result.totalPhotos} photos`);
+    
+    for (let i = 0; i < result.totalParts; i++) {
+      const partInfo = result.parts[i];
+      console.log(`📥 Downloading part ${partInfo.part}/${result.totalParts}: ${partInfo.filename}`);
+      
+      if (onProgress) {
+        onProgress(i + 1, result.totalParts);
+      }
+      
+      // Download this part
+      const partResult = await downloadFn(partInfo.part, result.photosPerPart);
+      
+      // Trigger download
+      const url = window.URL.createObjectURL(partResult.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = partInfo.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Small delay between downloads to prevent browser blocking
+      if (i < result.totalParts - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    console.log(`✅ All ${result.totalParts} parts downloaded successfully`);
   },
 }

@@ -1354,6 +1354,8 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 	try {
 		const { galleryId } = req.params;
 		const userId = req.user?.id;
+		const partNumber = req.query.part ? parseInt(req.query.part as string) : undefined;
+		const photosPerPart = req.query.photosPerPart ? parseInt(req.query.photosPerPart as string) : undefined;
 
 		if (!userId) {
 			return res.status(401).json({
@@ -1363,12 +1365,12 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 		}
 
 		console.log(
-			`📦 Starting all photos download for gallery ${galleryId} by user ${userId}`
+			`📦 Starting all photos download for gallery ${galleryId} by user ${userId}${partNumber ? ` (part ${partNumber})` : ''}`
 		);
 
-		// Set timeout to 30 minutes for large downloads
-		req.setTimeout(30 * 60 * 1000); // 30 minutes
-		res.setTimeout(30 * 60 * 1000); // 30 minutes
+		// Set timeout to 10 minutes for downloads (reduced to prevent hanging)
+		req.setTimeout(10 * 60 * 1000); // 10 minutes
+		res.setTimeout(10 * 60 * 1000); // 10 minutes
 
 		// Verify gallery access
 		const hasAccess = await DownloadService.verifyGalleryAccess(
@@ -1385,10 +1387,12 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
-		// Set headers for streaming download before starting
-		res.setHeader("Cache-Control", "no-cache");
-		res.setHeader("Connection", "keep-alive");
-		res.setHeader("Transfer-Encoding", "chunked");
+		// Set headers for streaming download before starting (only if downloading a part)
+		if (partNumber) {
+			res.setHeader("Cache-Control", "no-cache");
+			res.setHeader("Connection", "keep-alive");
+			res.setHeader("Transfer-Encoding", "chunked");
+		}
 
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
@@ -1396,7 +1400,9 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 			userId,
 			"all",
 			undefined,
-			res
+			res,
+			partNumber,
+			photosPerPart
 		);
 	} catch (error) {
 		console.error("Download all photos error:", error);
@@ -1421,6 +1427,8 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 	try {
 		const { galleryId, folderId } = req.params;
 		const userId = req.user?.id;
+		const partNumber = req.query.part ? parseInt(req.query.part as string) : undefined;
+		const photosPerPart = req.query.photosPerPart ? parseInt(req.query.photosPerPart as string) : undefined;
 
 		if (!userId) {
 			return res.status(401).json({
@@ -1430,12 +1438,12 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 		}
 
 		console.log(
-			`📦 Starting folder photos download for gallery ${galleryId}, folder ${folderId} by user ${userId}`
+			`📦 Starting folder photos download for gallery ${galleryId}, folder ${folderId} by user ${userId}${partNumber ? ` (part ${partNumber})` : ''}`
 		);
 
-		// Set timeout to 30 minutes for large downloads
-		req.setTimeout(30 * 60 * 1000); // 30 minutes
-		res.setTimeout(30 * 60 * 1000); // 30 minutes
+		// Set timeout to 10 minutes for downloads (reduced to prevent hanging)
+		req.setTimeout(10 * 60 * 1000); // 10 minutes
+		res.setTimeout(10 * 60 * 1000); // 10 minutes
 
 		// Verify gallery access
 		const hasAccess = await DownloadService.verifyGalleryAccess(
@@ -1452,10 +1460,12 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
-		// Set headers for streaming download before starting
-		res.setHeader("Cache-Control", "no-cache");
-		res.setHeader("Connection", "keep-alive");
-		res.setHeader("Transfer-Encoding", "chunked");
+		// Set headers for streaming download before starting (only if downloading a part)
+		if (partNumber) {
+			res.setHeader("Cache-Control", "no-cache");
+			res.setHeader("Connection", "keep-alive");
+			res.setHeader("Transfer-Encoding", "chunked");
+		}
 
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
@@ -1463,7 +1473,9 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 			userId,
 			"folder",
 			folderId,
-			res
+			res,
+			partNumber,
+			photosPerPart
 		);
 	} catch (error) {
 		console.error("Download folder photos error:", error);
