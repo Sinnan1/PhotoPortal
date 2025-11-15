@@ -48,6 +48,8 @@ import {
   UserPlus,
   TrendingUp,
   CheckCircle,
+  Download,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -57,6 +59,7 @@ interface Client {
   name: string;
   role: string;
   createdAt: string;
+  canDownload: boolean;
 }
 
 export default function ClientsPage() {
@@ -103,6 +106,23 @@ export default function ClientsPage() {
       showToast("Failed to create client", "error");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleToggleDownload = async (clientId: string, currentStatus: boolean) => {
+    try {
+      await api.toggleClientDownload(clientId, !currentStatus);
+      setClients(clients.map((client) => 
+        client.id === clientId 
+          ? { ...client, canDownload: !currentStatus }
+          : client
+      ));
+      showToast(
+        `Download ${!currentStatus ? "enabled" : "disabled"} for client`,
+        "success"
+      );
+    } catch (error) {
+      showToast("Failed to update download permission", "error");
     }
   };
 
@@ -316,6 +336,7 @@ export default function ClientsPage() {
                     <TableHead className="h-14 text-sm font-semibold">Email</TableHead>
                     <TableHead className="h-14 text-sm font-semibold">Role</TableHead>
                     <TableHead className="h-14 text-sm font-semibold">Joined</TableHead>
+                    <TableHead className="h-14 text-sm font-semibold">Downloads</TableHead>
                     <TableHead className="text-right h-14 text-sm font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -340,6 +361,26 @@ export default function ClientsPage() {
                           month: 'short',
                           day: 'numeric'
                         })}
+                      </TableCell>
+                      <TableCell className="py-5">
+                        <Button
+                          variant={client.canDownload ? "outline" : "secondary"}
+                          size="sm"
+                          onClick={() => handleToggleDownload(client.id, client.canDownload)}
+                          className="gap-2"
+                        >
+                          {client.canDownload ? (
+                            <>
+                              <Download className="h-4 w-4" />
+                              Enabled
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4" />
+                              Disabled
+                            </>
+                          )}
+                        </Button>
                       </TableCell>
                       <TableCell className="text-right py-5">
                         <DropdownMenu>

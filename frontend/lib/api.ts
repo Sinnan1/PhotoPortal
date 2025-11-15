@@ -284,6 +284,12 @@ export const api = {
 
   getClients: () => apiRequest("/photographers/clients"),
 
+  toggleClientDownload: (clientId: string, canDownload: boolean) =>
+    apiRequest(`/photographers/clients/${clientId}/download`, {
+      method: "PATCH",
+      body: JSON.stringify({ canDownload }),
+    }),
+
   removeClient: (clientId: string) =>
     apiRequest(`/photographers/clients/${clientId}`, {
       method: "DELETE",

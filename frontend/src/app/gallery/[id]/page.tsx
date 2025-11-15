@@ -104,6 +104,7 @@ interface Gallery {
   downloadLimit: number | null;
   downloadCount: number;
   isExpired: boolean;
+  canDownload?: boolean;
   photographer: {
     name: string;
   };
@@ -846,15 +847,16 @@ function GalleryPage() {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight truncate">{gallery.title}</h1>
           </div>
 
-          {/* Download Actions - Grouped in Dropdown */}
-          <DropdownMenu modal={true}>
-            <DropdownMenuTrigger asChild>
-              <Button className="shadow-sm flex-shrink-0 h-9 px-3 sm:h-10 sm:px-4">
-                <Download className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Download</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 z-[60]">
+          {/* Download Actions - Grouped in Dropdown (only show if user has download permission) */}
+          {(gallery.canDownload !== false) && (
+            <DropdownMenu modal={true}>
+              <DropdownMenuTrigger asChild>
+                <Button className="shadow-sm flex-shrink-0 h-9 px-3 sm:h-10 sm:px-4">
+                  <Download className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 z-[60]">
               {/* Show message if no photos available */}
               {(!currentFolder?.photos || currentFolder.photos.length === 0) && 
                (!gallery.folders?.flatMap(f => f?.photos || []).length) && (
@@ -907,8 +909,9 @@ function GalleryPage() {
                   Favorited Photos ({galleryPhotoCounts.favorited})
                 </DropdownMenuItem>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Description (if exists) */}
@@ -1239,6 +1242,7 @@ function GalleryPage() {
           onDownload={() => handleDownload(selectedPhoto.id)}
           onPhotoStatusChange={handlePhotoStatusChange}
           dataSaverMode={dataSaverMode}
+          canDownload={gallery.canDownload !== false}
         />
       )}
     </div>

@@ -29,9 +29,10 @@ interface PhotoLightboxProps {
   onUnpost?: () => void
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
   dataSaverMode?: boolean
+  canDownload?: boolean
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false, canDownload = true }: PhotoLightboxProps) {
   const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
@@ -458,16 +459,18 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         </Button>
       )}
 
-      {/* Download Button - Mobile Responsive */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-4 right-20 md:top-4 md:right-20 sm:top-3 sm:right-16 text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl z-10 transition-all duration-300 hover:scale-105 sm:w-10 sm:h-10"
-        onClick={onDownload}
-        aria-label="Download photo"
-      >
-        <Download className="h-5 w-5 sm:h-4 sm:w-4" />
-      </Button>
+      {/* Download Button - Mobile Responsive (only show if user has download permission) */}
+      {canDownload && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-4 right-20 md:top-4 md:right-20 sm:top-3 sm:right-16 text-white backdrop-blur-md bg-white/10 hover:bg-olive-green/30 border border-white/20 rounded-xl z-10 transition-all duration-300 hover:scale-105 sm:w-10 sm:h-10"
+          onClick={onDownload}
+          aria-label="Download photo"
+        >
+          <Download className="h-5 w-5 sm:h-4 sm:w-4" />
+        </Button>
+      )}
 
       {/* Quality Control Buttons - Mobile: Bottom, Desktop: Top */}
       <div className="absolute bottom-20 left-1/2 -translate-x-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:top-4 md:right-36 flex gap-2 z-10">

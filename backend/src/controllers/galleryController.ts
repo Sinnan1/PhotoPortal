@@ -269,13 +269,35 @@ export const getGallery = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Check user's download permission
+		let canDownload = true
+		const authHeader = req.headers['authorization']
+		const token = authHeader && (authHeader as string).split(' ')[1]
+		if (token) {
+			try {
+				const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+				const userId = decoded.userId as string
+				
+				// Get user's download permission
+				const user = await prisma.user.findUnique({
+					where: { id: userId },
+					select: { canDownload: true, role: true }
+				})
+				
+				// Only restrict downloads for clients, not photographers
+				if (user && user.role === 'CLIENT') {
+					canDownload = user.canDownload
+				}
+			} catch {
+				// ignore token errors
+			}
+		}
+
 		// If gallery is password-protected, enforce access rules
 		if (gallery.password) {
 			let isAuthorized = false
 
 			// 1) If user is authenticated, allow if photographer owner or client with access
-			const authHeader = req.headers['authorization']
-			const token = authHeader && (authHeader as string).split(' ')[1]
 			if (token) {
 				try {
 					const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
@@ -315,7 +337,7 @@ export const getGallery = async (req: Request, res: Response) => {
 
 		res.json({
 			success: true,
-			data: gallery
+			data: { ...gallery, canDownload }
 		})
 	} catch (error) {
 		console.error('Get gallery error:', error)
