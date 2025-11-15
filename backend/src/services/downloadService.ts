@@ -254,110 +254,47 @@ export class DownloadService {
                 archive.pipe(res)
             }
 
-            // Add photos to archive with better error handling and batching
+            // Add photos to archive - process all at once and let archiver handle backpressure
             let processedCount = 0
-            // Reduce batch size to 1 for large galleries to prevent memory issues
-            // Process one photo at a time to minimize memory footprint
-            const batchSize = photos.length > 500 ? 1 : 3
             
-            console.log(`📦 Processing ${photos.length} photos with batch size ${batchSize}`)
+            console.log(`📦 Processing ${photos.length} photos with archiver managing backpressure`)
             
-            for (let i = 0; i < photos.length; i += batchSize) {
-                const batch = photos.slice(i, i + batchSize)
+            // Track entry completion
+            let entriesProcessed = 0
+            const totalEntries = photos.length
+            
+            // Listen to archive entry events to track progress
+            archive.on('entry', (entry: any) => {
+                entriesProcessed++
+                console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
                 
-                for (const photo of batch) {
-                    let streamToDestroy: any = null
-                    try {
-                        console.log(`📁 Adding photo ${processedCount + 1}/${photos.length}: ${photo.filename}`)
+                this.updateProgress(downloadId, {
+                    processedPhotos: entriesProcessed
+                })
+            })
+            
+            // Add all photos to archive - archiver will handle backpressure internally
+            for (const photo of photos) {
+                try {
+                    console.log(`📁 Queuing photo ${processedCount + 1}/${photos.length}: ${photo.filename}`)
 
-                        // Extract S3 key from URL
-                        const originalUrl = new URL(photo.originalUrl)
-                        const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
-                        const bucketName = pathParts[0]
-                        const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
+                    // Extract S3 key from URL
+                    const originalUrl = new URL(photo.originalUrl)
+                    const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
+                    const bucketName = pathParts[0]
+                    const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
 
-                        // Get photo stream from S3 with timeout and proper cleanup
-                        const streamPromise = getObjectStreamFromS3(s3Key, bucketName)
-                        const timeoutPromise = new Promise<never>((_, reject) => 
-                            setTimeout(() => reject(new Error('S3 stream timeout')), 30000)
-                        )
-                        
-                        let result: any
-                        try {
-                            result = await Promise.race([streamPromise, timeoutPromise])
-                        } catch (error) {
-                            // If timeout occurred, we need to destroy the stream from the losing promise
-                            try {
-                                const streamResult = await Promise.race([
-                                    streamPromise,
-                                    new Promise(resolve => setTimeout(() => resolve(null), 100))
-                                ])
-                                if (streamResult && (streamResult as any).stream) {
-                                    const lostStream = (streamResult as any).stream
-                                    if (lostStream && typeof lostStream.destroy === 'function') {
-                                        lostStream.destroy()
-                                        console.log(`🧹 Destroyed orphaned stream for ${photo.filename}`)
-                                    }
-                                }
-                            } catch (cleanupError) {
-                                // Ignore cleanup errors
-                            }
-                            throw error
-                        }
-                        
-                        const { stream } = result
-                        streamToDestroy = stream
-                        
-                        // Add to archive with original filename
-                        archive.append(stream, { name: photo.filename })
-                        
-                        // Wait for archive to drain if it's getting full (backpressure)
-                        // This prevents memory buildup when processing large galleries
-                        if (archive.pointer() > 10 * 1024 * 1024) { // If archive buffer > 10MB
-                            await new Promise<void>((resolve) => {
-                                const checkDrain = () => {
-                                    if (archive.pointer() < 5 * 1024 * 1024) { // Wait until < 5MB
-                                        resolve()
-                                    } else {
-                                        setTimeout(checkDrain, 100)
-                                    }
-                                }
-                                checkDrain()
-                            })
-                        }
-                        
-                        // Clear reference after successful append
-                        streamToDestroy = null
-                        
-                        processedCount++
-                        
-                        // Update progress
-                        this.updateProgress(downloadId, {
-                            processedPhotos: processedCount
-                        })
-                        
-                    } catch (error) {
-                        console.error(`Failed to add photo ${photo.filename}:`, error)
-                        
-                        // Clean up stream if it exists
-                        if (streamToDestroy && typeof streamToDestroy.destroy === 'function') {
-                            try {
-                                streamToDestroy.destroy()
-                                console.log(`🧹 Destroyed stream after error for ${photo.filename}`)
-                            } catch (destroyError) {
-                                console.warn(`Failed to destroy stream:`, destroyError)
-                            }
-                        }
-                        
-                        processedCount++ // Still count as processed to continue
-                        // Continue with other photos
-                    }
-                }
-                
-                // Small delay between batches to prevent overwhelming the system
-                // No delay needed for single-photo batches (large galleries)
-                if (i + batchSize < photos.length && batchSize > 1) {
-                    await new Promise(resolve => setTimeout(resolve, 50))
+                    // Get photo stream from S3
+                    const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
+                    
+                    // Add to archive - archiver will manage the stream
+                    archive.append(stream, { name: photo.filename })
+                    
+                    processedCount++
+                    
+                } catch (error) {
+                    console.error(`Failed to queue photo ${photo.filename}:`, error)
+                    processedCount++ // Still count as processed to continue
                 }
             }
 
@@ -542,13 +479,30 @@ export class DownloadService {
         // Pipe archive to response
         archive.pipe(res)
 
-        // Add photos to archive
+        // Add photos to archive - let archiver handle backpressure
         let processedCount = 0
+        
+        console.log(`📦 Processing ${filteredPhotos.length} photos with archiver managing backpressure`)
+        
+        // Track entry completion
+        let entriesProcessed = 0
+        const totalEntries = filteredPhotos.length
+        
+        // Listen to archive entry events to track progress
+        archive.on('entry', (entry: any) => {
+            entriesProcessed++
+            console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
+            
+            this.updateProgress(downloadId, {
+                processedPhotos: entriesProcessed
+            })
+        })
+        
+        // Add all photos to archive - archiver will handle backpressure internally
         for (const filteredPhoto of filteredPhotos) {
-            let streamToDestroy: any = null
             try {
                 const photo = filteredPhoto.photo
-                console.log(`📁 Adding photo ${processedCount + 1}/${filteredPhotos.length}: ${photo.filename}`)
+                console.log(`📁 Queuing photo ${processedCount + 1}/${filteredPhotos.length}: ${photo.filename}`)
 
                 // Extract S3 key from URL
                 const originalUrl = new URL(photo.originalUrl)
@@ -556,79 +510,17 @@ export class DownloadService {
                 const bucketName = pathParts[0]
                 const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
 
-                // Get photo stream from S3 with timeout and proper cleanup
-                const streamPromise = getObjectStreamFromS3(s3Key, bucketName)
-                const timeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error('S3 stream timeout')), 30000)
-                )
+                // Get photo stream from S3
+                const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
                 
-                let result: any
-                try {
-                    result = await Promise.race([streamPromise, timeoutPromise])
-                } catch (error) {
-                    // If timeout occurred, destroy the stream from the losing promise
-                    try {
-                        const streamResult = await Promise.race([
-                            streamPromise,
-                            new Promise(resolve => setTimeout(() => resolve(null), 100))
-                        ])
-                        if (streamResult && (streamResult as any).stream) {
-                            const lostStream = (streamResult as any).stream
-                            if (lostStream && typeof lostStream.destroy === 'function') {
-                                lostStream.destroy()
-                                console.log(`🧹 Destroyed orphaned stream for ${photo.filename}`)
-                            }
-                        }
-                    } catch (cleanupError) {
-                        // Ignore cleanup errors
-                    }
-                    throw error
-                }
-                
-                const { stream } = result
-                streamToDestroy = stream
-                
-                // Add to archive with original filename
+                // Add to archive - archiver will manage the stream
                 archive.append(stream, { name: photo.filename })
-                
-                // Wait for archive to drain if it's getting full (backpressure)
-                if (archive.pointer() > 10 * 1024 * 1024) { // If archive buffer > 10MB
-                    await new Promise<void>((resolve) => {
-                        const checkDrain = () => {
-                            if (archive.pointer() < 5 * 1024 * 1024) { // Wait until < 5MB
-                                resolve()
-                            } else {
-                                setTimeout(checkDrain, 100)
-                            }
-                        }
-                        checkDrain()
-                    })
-                }
-                
-                // Clear reference after successful append
-                streamToDestroy = null
                 
                 processedCount++
                 
-                // Update progress
-                this.updateProgress(downloadId, {
-                    processedPhotos: processedCount
-                })
-                
             } catch (error) {
-                console.error(`Failed to add photo ${filteredPhoto.photo.filename}:`, error)
-                
-                // Clean up stream if it exists
-                if (streamToDestroy && typeof streamToDestroy.destroy === 'function') {
-                    try {
-                        streamToDestroy.destroy()
-                        console.log(`🧹 Destroyed stream after error for ${filteredPhoto.photo.filename}`)
-                    } catch (destroyError) {
-                        console.warn(`Failed to destroy stream:`, destroyError)
-                    }
-                }
-                
-                // Continue with other photos
+                console.error(`Failed to queue photo ${filteredPhoto.photo.filename}:`, error)
+                processedCount++ // Continue with next photo
             }
         }
 
