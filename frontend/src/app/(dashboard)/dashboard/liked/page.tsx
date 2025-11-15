@@ -57,6 +57,7 @@ export default function LikedPhotosPage() {
   };
 
   const handleDownload = async (photoId: string) => {
+    let blobUrl: string | null = null;
     try {
       const response = await api.downloadPhoto(photoId);
       const { downloadUrl, filename } = response.data;
@@ -66,8 +67,9 @@ export default function LikedPhotosPage() {
       const imageBlob = await imageResponse.blob();
 
       // Create a temporary link to trigger the download
+      blobUrl = URL.createObjectURL(imageBlob);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(imageBlob);
+      link.href = blobUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
@@ -84,6 +86,11 @@ export default function LikedPhotosPage() {
         description: "Failed to download photo",
         variant: "destructive",
       });
+    } finally {
+      // Always revoke the blob URL to prevent memory leak
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     }
   };
 

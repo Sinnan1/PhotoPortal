@@ -500,16 +500,43 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 		stream.pipe(res);
 
 		// Handle stream errors
-		stream.on("error", (error: any) => {
+		const errorHandler = (error: any) => {
 			console.error("❌ Stream error:", error);
 			if (!res.headersSent) {
 				res.status(500).json({ success: false, error: `Download failed: ${error.message}` });
 			}
-		});
+			cleanup();
+		};
 
-		stream.on("end", () => {
+		const endHandler = () => {
 			console.log("✅ Stream completed successfully");
-		});
+			cleanup();
+		};
+
+		const closeHandler = () => {
+			console.log("⚠️ Client disconnected during download");
+			cleanup();
+		};
+
+		// Cleanup function to remove all listeners and destroy stream
+		const cleanup = () => {
+			try {
+				stream.removeListener("error", errorHandler);
+				stream.removeListener("end", endHandler);
+				res.removeListener("close", closeHandler);
+				
+				if (stream && typeof stream.destroy === 'function' && !stream.destroyed) {
+					stream.destroy();
+					console.log("🧹 Stream destroyed and cleaned up");
+				}
+			} catch (cleanupError) {
+				console.warn("Cleanup error:", cleanupError);
+			}
+		};
+
+		stream.on("error", errorHandler);
+		stream.on("end", endHandler);
+		res.on("close", closeHandler);
 	} catch (error) {
 		console.error("❌ Download photo error for ID:", req.params.id);
 		console.error("Error details:", error);
