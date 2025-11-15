@@ -34,13 +34,45 @@ class UploadManager {
   private listeners: Set<UploadListener> = new Set()
   private activeUploads: Map<string, XMLHttpRequest> = new Map()
   private maxConcurrent = 3  // Reduced from 10 to 3 for better reliability
-  private maxRetries = 3
+  private maxRetries = 3  // For server errors only
+  private isOnline = true
+  private activeWorkers = new Map<string, number>()  // Track active workers per batch
 
   constructor() {
     // Load persisted batches from localStorage
     if (typeof window !== 'undefined') {
       this.loadFromStorage()
+      this.setupNetworkMonitoring()
     }
+  }
+
+  private setupNetworkMonitoring() {
+    // Monitor network status
+    this.isOnline = navigator.onLine
+
+    window.addEventListener('online', () => {
+      console.log('🌐 Network reconnected - resuming uploads')
+      this.isOnline = true
+      this.resumeAllBatches()
+    })
+
+    window.addEventListener('offline', () => {
+      console.log('📡 Network disconnected - pausing uploads')
+      this.isOnline = false
+    })
+  }
+
+  private resumeAllBatches() {
+    // Resume all batches that have queued files
+    this.batches.forEach((batch, batchId) => {
+      const hasQueuedFiles = batch.files.some(f => f.status === 'queued')
+      const activeWorkerCount = this.activeWorkers.get(batchId) || 0
+      
+      if (hasQueuedFiles && activeWorkerCount === 0) {
+        console.log(`🔄 Restarting workers for batch ${batchId}`)
+        this.processBatch(batchId)
+      }
+    })
   }
 
   subscribe(listener: UploadListener) {
@@ -143,22 +175,43 @@ class UploadManager {
     if (!batch) return
 
     const queuedFiles = batch.files.filter(f => f.status === 'queued')
+    if (queuedFiles.length === 0) return
+
+    // Initialize worker count for this batch
+    const workerCount = Math.min(this.maxConcurrent, queuedFiles.length)
+    this.activeWorkers.set(batchId, workerCount)
+
+    console.log(`🚀 Starting ${workerCount} workers for batch ${batchId}`)
 
     // Process files with concurrency limit
-    const workers = Array.from({ length: Math.min(this.maxConcurrent, queuedFiles.length) },
+    const workers = Array.from({ length: workerCount },
       () => this.processNextFile(batchId)
     )
 
     await Promise.all(workers)
+
+    // All workers finished
+    this.activeWorkers.set(batchId, 0)
+    console.log(`✅ All workers completed for batch ${batchId}`)
   }
 
   private async processNextFile(batchId: string): Promise<void> {
     while (true) {
       const batch = this.batches.get(batchId)
-      if (!batch) return
+      if (!batch) {
+        // Decrement worker count before exiting
+        const count = this.activeWorkers.get(batchId) || 0
+        this.activeWorkers.set(batchId, Math.max(0, count - 1))
+        return
+      }
 
       const nextFile = batch.files.find(f => f.status === 'queued')
-      if (!nextFile) return
+      if (!nextFile) {
+        // Decrement worker count before exiting
+        const count = this.activeWorkers.get(batchId) || 0
+        this.activeWorkers.set(batchId, Math.max(0, count - 1))
+        return
+      }
 
       await this.uploadFile(batchId, nextFile.id)
     }
@@ -171,16 +224,32 @@ class UploadManager {
     const uploadFile = batch.files.find(f => f.id === fileId)
     if (!uploadFile || !uploadFile.file) return
 
-    const attemptUpload = async (attempt: number): Promise<boolean> => {
+    const attemptUpload = async (attempt: number, isNetworkRetry: boolean = false): Promise<boolean> => {
       try {
+        // Wait if offline
+        if (!this.isOnline) {
+          console.log(`⏸️ Pausing upload (offline): ${uploadFile.file?.name}`)
+          uploadFile.status = 'queued'
+          uploadFile.error = 'Waiting for network...'
+          this.notify()
+          
+          // Wait for network to come back
+          await this.waitForOnline()
+          
+          console.log(`▶️ Resuming upload (online): ${uploadFile.file?.name}`)
+          // Don't count this as a retry attempt
+          return attemptUpload(attempt, true)
+        }
+
         uploadFile.status = 'uploading'
-        uploadFile.attempts = attempt
+        uploadFile.attempts = isNetworkRetry ? attempt : attempt
+        uploadFile.error = undefined
         this.notify()
 
         let fileToUpload = uploadFile.file
 
-        // Compress if requested
-        if (batch.compress && attempt === 1) {
+        // Compress if requested (only on first attempt)
+        if (batch.compress && attempt === 1 && !isNetworkRetry) {
           fileToUpload = await this.compressImage(uploadFile.file)
         }
 
@@ -221,10 +290,10 @@ class UploadManager {
       } catch (error) {
         console.error(`Upload attempt ${attempt} failed:`, error)
 
-        // Don't retry duplicate errors
         const errorMessage = error instanceof Error ? error.message : 'Upload failed'
+        
+        // Don't retry duplicate errors
         const isDuplicate = errorMessage.includes('already exists')
-
         if (isDuplicate) {
           uploadFile.status = 'failed'
           uploadFile.error = errorMessage
@@ -233,11 +302,34 @@ class UploadManager {
           return false
         }
 
+        // Check if it's a network error
+        const isNetworkError = errorMessage.includes('Network error') || 
+                               errorMessage.includes('Failed to fetch') ||
+                               errorMessage.includes('timeout') ||
+                               !this.isOnline
+
+        if (isNetworkError) {
+          console.log(`🌐 Network error detected for ${uploadFile.file?.name}, will retry when online`)
+          
+          // Don't count network errors against retry limit
+          // Just wait for network and retry
+          uploadFile.status = 'queued'
+          uploadFile.error = 'Network error - will retry'
+          this.notify()
+          
+          // Wait a bit before checking network again
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          // Retry without incrementing attempt counter for network errors
+          return attemptUpload(attempt, true)
+        }
+
+        // Server error - use exponential backoff
         if (attempt < this.maxRetries) {
-          // Exponential backoff with jitter
           const delay = 1000 * Math.pow(2, attempt - 1) + Math.random() * 1000
+          console.log(`⏳ Retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${this.maxRetries})`)
           await new Promise(resolve => setTimeout(resolve, delay))
-          return attemptUpload(attempt + 1)
+          return attemptUpload(attempt + 1, false)
         } else {
           uploadFile.status = 'failed'
           uploadFile.error = errorMessage
@@ -249,6 +341,24 @@ class UploadManager {
     }
 
     await attemptUpload(1)
+  }
+
+  private waitForOnline(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.isOnline) {
+        resolve()
+        return
+      }
+
+      const checkOnline = () => {
+        if (this.isOnline) {
+          window.removeEventListener('online', checkOnline)
+          resolve()
+        }
+      }
+
+      window.addEventListener('online', checkOnline)
+    })
   }
 
   private async compressImage(file: File): Promise<File> {
@@ -322,6 +432,9 @@ class UploadManager {
 
       const xhr = new XMLHttpRequest()
 
+      // Set timeout to 60 seconds
+      xhr.timeout = 60000
+
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const percent = (e.loaded / e.total) * 100
@@ -330,6 +443,8 @@ class UploadManager {
       })
 
       xhr.addEventListener('load', () => {
+        this.activeUploads.delete(file.name)
+        
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText)
@@ -355,10 +470,17 @@ class UploadManager {
       })
 
       xhr.addEventListener('error', () => {
+        this.activeUploads.delete(file.name)
         reject(new Error('Network error during upload'))
       })
 
+      xhr.addEventListener('timeout', () => {
+        this.activeUploads.delete(file.name)
+        reject(new Error('Network error: Upload timeout'))
+      })
+
       xhr.addEventListener('abort', () => {
+        this.activeUploads.delete(file.name)
         reject(new Error('Upload cancelled'))
       })
 
