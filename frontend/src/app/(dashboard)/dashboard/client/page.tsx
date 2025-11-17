@@ -85,12 +85,6 @@ export default function ClientDashboardPage() {
     if (user?.role === "CLIENT") {
       fetchAccessibleGalleries();
       checkFeedbackRequest();
-      
-      // Check if user has seen the welcome modal
-      const hasSeenModal = localStorage.getItem("clientWelcomeModalSeen");
-      if (!hasSeenModal) {
-        setShowWelcomeModal(true);
-      }
     }
   }, [user]);
 
@@ -103,11 +97,24 @@ export default function ClientDashboardPage() {
         const hasSubmitted = localStorage.getItem(feedbackKey);
         
         if (!hasSubmitted) {
+          // Show feedback modal instead of welcome modal
           setShowFeedbackModal(true);
+          return; // Don't show welcome modal
         }
+      }
+      
+      // Only show welcome modal if no feedback is requested
+      const hasSeenModal = localStorage.getItem("clientWelcomeModalSeen");
+      if (!hasSeenModal) {
+        setShowWelcomeModal(true);
       }
     } catch (error) {
       // Silently fail - feedback is optional
+      // Still show welcome modal if feedback check fails
+      const hasSeenModal = localStorage.getItem("clientWelcomeModalSeen");
+      if (!hasSeenModal) {
+        setShowWelcomeModal(true);
+      }
     }
   };
 

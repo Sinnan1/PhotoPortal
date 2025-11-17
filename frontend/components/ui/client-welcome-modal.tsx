@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,48 +39,50 @@ export function ClientWelcomeModal({
           <AlertDialogTitle className="text-2xl text-center">
             Welcome to Your Gallery
           </AlertDialogTitle>
-          <AlertDialogDescription className="text-base space-y-4 pt-2">
-            <p className="text-center">
-              For the best experience viewing and downloading your photos:
-            </p>
-            
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Monitor className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Use a Computer</p>
-                  <p className="text-sm">
-                    Laptops, MacBooks, or desktops provide the best experience for viewing and downloading photos.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Cable className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Wired Connection Recommended</p>
-                  <p className="text-sm">
-                    Use a wired ethernet connection or stable Wi-Fi to avoid interruptions during downloads.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Clock className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Be Patient</p>
-                  <p className="text-sm">
-                    Photos are high-resolution and large in size. Downloads may take several minutes depending on your connection.
-                  </p>
+        </AlertDialogHeader>
+        
+        <div className="space-y-4 px-6">
+          <div className="text-center text-muted-foreground">
+            For the best experience viewing and downloading your photos:
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+              <Monitor className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-foreground">Use a Computer</div>
+                <div className="text-sm text-muted-foreground">
+                  Laptops, MacBooks, or desktops provide the best experience for viewing and downloading photos.
                 </div>
               </div>
             </div>
 
-            <p className="text-sm text-center text-muted-foreground pt-2">
-              Following these tips will ensure smooth downloads and the best viewing experience.
-            </p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+            <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+              <Cable className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-foreground">Wired Connection Recommended</div>
+                <div className="text-sm text-muted-foreground">
+                  Use a wired ethernet connection or stable Wi-Fi to avoid interruptions during downloads.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+              <Clock className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-foreground">Be Patient</div>
+                <div className="text-sm text-muted-foreground">
+                  Photos are high-resolution and large in size. Downloads may take several minutes depending on your connection.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-sm text-center text-muted-foreground pt-2">
+            Following these tips will ensure smooth downloads and the best viewing experience.
+          </div>
+        </div>
+        
         <AlertDialogFooter>
           <AlertDialogAction onClick={handleDismiss} className="w-full">
             Got it, thanks!
