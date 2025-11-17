@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Smartphone, Wifi, CheckCircle2 } from "lucide-react";
+import { Monitor, Cable, Clock, CheckCircle2 } from "lucide-react";
 
 interface ClientWelcomeModalProps {
   open: boolean;
@@ -46,28 +46,38 @@ export function ClientWelcomeModal({
             
             <div className="space-y-3">
               <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Smartphone className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <Monitor className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-foreground">Use Your Phone</p>
+                  <p className="font-semibold text-foreground">Use a Computer</p>
                   <p className="text-sm">
-                    Mobile devices provide the best experience for viewing and downloading photos.
+                    Laptops, MacBooks, or desktops provide the best experience for viewing and downloading photos.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Wifi className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <Cable className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-foreground">Stable Internet Connection</p>
+                  <p className="font-semibold text-foreground">Wired Connection Recommended</p>
                   <p className="text-sm">
-                    Ensure you have a reliable Wi-Fi or cellular connection to avoid interruptions.
+                    Use a wired ethernet connection or stable Wi-Fi to avoid interruptions during downloads.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                <Clock className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-foreground">Be Patient</p>
+                  <p className="text-sm">
+                    Photos are high-resolution and large in size. Downloads may take several minutes depending on your connection.
                   </p>
                 </div>
               </div>
             </div>
 
             <p className="text-sm text-center text-muted-foreground pt-2">
-              This will help ensure smooth downloads and the best viewing experience.
+              Following these tips will ensure smooth downloads and the best viewing experience.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
