@@ -545,4 +545,28 @@ export const api = {
     const queryString = queryParams.toString()
     return apiRequest(`/analytics/photographer/selections${queryString ? `?${queryString}` : ''}`)
   },
+
+  // Feedback APIs
+  submitFeedback: (feedback: {
+    overallRating: number;
+    selectionProcessRating: number;
+    portalExperienceRating: number;
+    comments?: string;
+    wouldRecommend: boolean;
+  }) =>
+    apiRequest(`/feedback`, {
+      method: "POST",
+      body: JSON.stringify(feedback),
+    }),
+
+  requestClientFeedback: (clientId: string) =>
+    apiRequest(`/clients/${clientId}/request-feedback`, {
+      method: "POST",
+    }),
+
+  getAllFeedback: () =>
+    apiRequest(`/feedback`),
+
+  checkFeedbackStatus: () =>
+    apiRequest(`/feedback/status`),
 }

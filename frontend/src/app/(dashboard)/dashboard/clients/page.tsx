@@ -50,8 +50,11 @@ import {
   CheckCircle,
   Download,
   XCircle,
+  MessageSquare,
+  Eye,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 interface Client {
   id: string;
@@ -60,6 +63,8 @@ interface Client {
   role: string;
   createdAt: string;
   canDownload: boolean;
+  feedbackRequestActive?: boolean;
+  feedbackRequestedAt?: string;
 }
 
 export default function ClientsPage() {
@@ -135,6 +140,16 @@ export default function ClientsPage() {
       showToast("Client removed successfully", "success");
     } catch (error) {
       showToast("Failed to remove client", "error");
+    }
+  };
+
+  const handleRequestFeedback = async (clientId: string, clientName: string) => {
+    try {
+      await api.requestClientFeedback(clientId);
+      showToast(`Feedback request sent to ${clientName}`, "success");
+      fetchClients(); // Refresh to update feedback status
+    } catch (error) {
+      showToast("Failed to request feedback", "error");
     }
   };
 
@@ -383,22 +398,34 @@ export default function ClientsPage() {
                         </Button>
                       </TableCell>
                       <TableCell className="text-right py-5">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
-                              onClick={() => handleRemoveClient(client.id)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Remove Client
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant={client.feedbackRequestActive ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => handleRequestFeedback(client.id, client.name)}
+                            disabled={client.feedbackRequestActive}
+                            className="gap-2"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            {client.feedbackRequestActive ? "Requested" : "Request Feedback"}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-9 w-9">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={() => handleRemoveClient(client.id)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove Client
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

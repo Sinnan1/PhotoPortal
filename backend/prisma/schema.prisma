@@ -20,6 +20,8 @@ model User {
   suspendedAt         DateTime?
   suspendedBy         String?
   suspensionReason    String?
+  feedbackRequestedAt DateTime?
+  feedbackRequestActive Boolean          @default(false)
   adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
   adminSessions       AdminSession[]     @relation("AdminSessions")
   favoritedGalleries  FavoritedGallery[]
@@ -34,6 +36,7 @@ model User {
   uploadSessions      UploadSession[]    @relation("UploadSessions")
   photographer        User?              @relation("PhotographerClients", fields: [photographerId], references: [id])
   clients             User[]             @relation("PhotographerClients")
+  feedbackGiven       ClientFeedback[]   @relation("ClientFeedbackGiven")
 
   @@map("users")
 }
@@ -284,4 +287,22 @@ model UploadSession {
   @@index([galleryId])
   @@index([status, lastActivityAt])
   @@map("upload_sessions")
+}
+
+model ClientFeedback {
+  id                    String   @id @default(cuid())
+  clientId              String
+  photographerId        String
+  overallRating         Int
+  selectionProcessRating Int
+  portalExperienceRating Int
+  comments              String?
+  wouldRecommend        Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  client                User     @relation("ClientFeedbackGiven", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, photographerId])
+  @@index([photographerId])
+  @@index([createdAt])
+  @@map("client_feedback")
 }

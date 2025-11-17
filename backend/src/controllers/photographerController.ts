@@ -87,7 +87,9 @@ export const getClients = async (req: AuthRequest, res: Response) => {
 				name: true,
 				role: true,
 				createdAt: true,
-				canDownload: true
+				canDownload: true,
+				feedbackRequestActive: true,
+				feedbackRequestedAt: true
 			}
 		})
 

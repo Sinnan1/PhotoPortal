@@ -21,6 +21,7 @@ import photographersRoutes from './routes/photographers'
 import uploadsRoutes from './routes/uploads'
 import folderRoutes from './routes/folders'
 import selectionAnalyticsRoutes from './routes/selectionAnalytics'
+import feedbackRoutes from './routes/feedback'
 
 // Import admin session manager
 import { adminSessionManager } from './utils/adminSessionManager'
@@ -105,6 +106,7 @@ app.use('/api/photographers', photographersRoutes)
 app.use('/api/uploads', uploadsRoutes)
 app.use('/api/folders', folderRoutes)
 app.use('/api/analytics', selectionAnalyticsRoutes)
+app.use('/api', feedbackRoutes)
 
 // Upload configuration endpoint for frontend - using unified config
 app.get('/api/upload-config', (req, res) => {

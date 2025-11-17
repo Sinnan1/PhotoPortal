@@ -86,6 +86,12 @@ export function Navigation() {
                         Posts
                       </Button>
                     </Link>
+                    <Link href="/dashboard/reviews">
+                      <Button variant="ghost" className="flex items-center gap-2 hover:bg-white/10 text-white hover:text-white transition-all duration-300 cursor-pointer">
+                        <Star className="h-4 w-4" />
+                        Reviews
+                      </Button>
+                    </Link>
                   </div>
                 )}
 

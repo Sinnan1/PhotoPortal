@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClientWelcomeModal } from "@/components/ui/client-welcome-modal";
+import { FeedbackModal } from "@/components/ui/feedback-modal";
 
 interface Photo {
   id: string;
@@ -77,10 +78,13 @@ export default function ClientDashboardPage() {
   const [accessibleGalleries, setAccessibleGalleries] = useState<Gallery[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [photographerName, setPhotographerName] = useState<string>("");
 
   useEffect(() => {
     if (user?.role === "CLIENT") {
       fetchAccessibleGalleries();
+      checkFeedbackRequest();
       
       // Check if user has seen the welcome modal
       const hasSeenModal = localStorage.getItem("clientWelcomeModalSeen");
@@ -90,10 +94,32 @@ export default function ClientDashboardPage() {
     }
   }, [user]);
 
+  const checkFeedbackRequest = async () => {
+    try {
+      const response = await api.checkFeedbackStatus();
+      if (response.data.feedbackRequested) {
+        // Check if user has already submitted feedback
+        const feedbackKey = `feedback_submitted_${user?.id}`;
+        const hasSubmitted = localStorage.getItem(feedbackKey);
+        
+        if (!hasSubmitted) {
+          setShowFeedbackModal(true);
+        }
+      }
+    } catch (error) {
+      // Silently fail - feedback is optional
+    }
+  };
+
   const fetchAccessibleGalleries = async () => {
     try {
       const response = await api.getClientGalleries();
       setAccessibleGalleries(response.data);
+      
+      // Get photographer name from first gallery
+      if (response.data.length > 0) {
+        setPhotographerName(response.data[0].photographer.name);
+      }
     } catch (error) {
       showToast("Failed to load accessible galleries", "error");
     } finally {
@@ -154,11 +180,29 @@ export default function ClientDashboardPage() {
     );
   }
 
+  const handleFeedbackSubmit = () => {
+    if (user) {
+      localStorage.setItem(`feedback_submitted_${user.id}`, "true");
+      setShowFeedbackModal(false);
+    }
+  };
+
   return (
     <>
       <ClientWelcomeModal
         open={showWelcomeModal}
         onOpenChange={setShowWelcomeModal}
+      />
+      
+      <FeedbackModal
+        open={showFeedbackModal}
+        onOpenChange={(open) => {
+          setShowFeedbackModal(open);
+          if (!open) {
+            handleFeedbackSubmit();
+          }
+        }}
+        photographerName={photographerName}
       />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
