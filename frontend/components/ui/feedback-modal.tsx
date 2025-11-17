@@ -1,16 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Star, MessageSquare, ThumbsUp, Loader2 } from "lucide-react";
+import { Star, MessageSquare, ThumbsUp, Loader2, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 
@@ -112,13 +104,24 @@ export function FeedbackModal({
     </div>
   );
 
+  if (!open) return null;
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-6xl w-[90vw] h-[85vh] p-0 gap-0 bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm">
+      <div className="w-full h-full overflow-hidden">
         {/* Full Page Layout with Two Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-5 h-full bg-gradient-to-br from-background via-background to-muted/20">
           {/* Left Side - Beautiful Hero Section */}
           <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 flex flex-col justify-center items-center lg:col-span-2">
+            {/* Close Button */}
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-background/50 transition-colors z-10"
+              aria-label="Close"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
             
@@ -130,13 +133,13 @@ export function FeedbackModal({
               </div>
               
               <div className="space-y-3">
-                <AlertDialogTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
                   We'd Love Your Feedback!
-                </AlertDialogTitle>
-                <AlertDialogDescription className="text-base leading-relaxed text-muted-foreground px-4">
+                </h2>
+                <p className="text-base leading-relaxed text-muted-foreground px-4">
                   Your thoughts help us improve. Share your experience working with{" "}
                   <span className="font-semibold text-foreground">{photographerName}</span>
-                </AlertDialogDescription>
+                </p>
               </div>
 
               <div className="pt-6 space-y-3">
@@ -268,7 +271,7 @@ export function FeedbackModal({
             </div>
           </div>
         </div>
-      </AlertDialogContent>
-    </AlertDialog>
+      </div>
+    </div>
   );
 }
