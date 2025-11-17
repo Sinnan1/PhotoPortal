@@ -114,48 +114,48 @@ export function FeedbackModal({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-gradient-to-br from-background via-background to-muted/20">
+      <AlertDialogContent className="max-w-6xl w-[90vw] h-[85vh] p-0 gap-0 bg-gradient-to-br from-background via-background to-muted/20">
         {/* Full Page Layout with Two Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-5 h-full">
           {/* Left Side - Beautiful Hero Section */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-12 flex flex-col justify-center items-center">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-72 h-72 bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 flex flex-col justify-center items-center lg:col-span-2">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
             
-            <div className="relative z-10 max-w-lg text-center space-y-8">
-              <div className="flex items-center justify-center mb-8">
-                <div className="p-6 bg-gradient-to-br from-primary/20 to-primary/10 rounded-3xl shadow-2xl backdrop-blur-sm">
-                  <MessageSquare className="h-16 w-16 text-primary" />
+            <div className="relative z-10 text-center space-y-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="p-5 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-2xl backdrop-blur-sm">
+                  <MessageSquare className="h-12 w-12 text-primary" />
                 </div>
               </div>
               
-              <div className="space-y-4">
-                <AlertDialogTitle className="text-5xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              <div className="space-y-3">
+                <AlertDialogTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
                   We'd Love Your Feedback!
                 </AlertDialogTitle>
-                <AlertDialogDescription className="text-xl leading-relaxed text-muted-foreground">
+                <AlertDialogDescription className="text-base leading-relaxed text-muted-foreground px-4">
                   Your thoughts help us improve. Share your experience working with{" "}
                   <span className="font-semibold text-foreground">{photographerName}</span>
                 </AlertDialogDescription>
               </div>
 
-              <div className="pt-8 space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
+              <div className="pt-6 space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
                   <div className="p-2 bg-primary/10 rounded-lg">
-                    <Star className="h-6 w-6 text-primary" />
+                    <Star className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">Quick & Easy</p>
-                    <p className="text-sm text-muted-foreground">Takes less than 2 minutes</p>
+                    <p className="font-semibold text-sm">Quick & Easy</p>
+                    <p className="text-xs text-muted-foreground">Takes less than 2 minutes</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 p-4 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
+                <div className="flex items-center gap-3 p-3 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
                   <div className="p-2 bg-primary/10 rounded-lg">
-                    <ThumbsUp className="h-6 w-6 text-primary" />
+                    <ThumbsUp className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">Your Voice Matters</p>
-                    <p className="text-sm text-muted-foreground">Help us serve you better</p>
+                    <p className="font-semibold text-sm">Your Voice Matters</p>
+                    <p className="text-xs text-muted-foreground">Help us serve you better</p>
                   </div>
                 </div>
               </div>
@@ -163,11 +163,11 @@ export function FeedbackModal({
           </div>
 
           {/* Right Side - Feedback Form */}
-          <div className="flex flex-col h-full overflow-y-auto">
-            <div className="flex-1 p-12 space-y-8">
+          <div className="flex flex-col h-full overflow-y-auto lg:col-span-3">
+            <div className="flex-1 p-8 space-y-6">
               {/* Rating Sections in Grid */}
-              <div className="grid grid-cols-1 gap-6">
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+              <div className="grid grid-cols-1 gap-5">
+                <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
                   <StarRating
                     value={overallRating}
                     onChange={setOverallRating}
@@ -175,7 +175,7 @@ export function FeedbackModal({
                   />
                 </div>
 
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+                <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
                   <StarRating
                     value={selectionRating}
                     onChange={setSelectionRating}
@@ -183,7 +183,7 @@ export function FeedbackModal({
                   />
                 </div>
 
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+                <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
                   <StarRating
                     value={portalRating}
                     onChange={setPortalRating}
@@ -193,27 +193,25 @@ export function FeedbackModal({
               </div>
 
               {/* Recommendation Section */}
-              <div className="space-y-4">
-                <label className="text-lg font-semibold block">
+              <div className="space-y-3">
+                <label className="text-base font-semibold block">
                   Would you recommend our service?
                 </label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <Button
                     type="button"
                     variant={wouldRecommend === true ? "default" : "outline"}
                     onClick={() => setWouldRecommend(true)}
-                    className="h-16 text-base font-medium transition-all duration-300 hover:scale-105"
-                    size="lg"
+                    className="h-12 text-sm font-medium transition-all duration-300 hover:scale-105"
                   >
-                    <ThumbsUp className="h-5 w-5 mr-2" />
+                    <ThumbsUp className="h-4 w-4 mr-2" />
                     Yes, Absolutely!
                   </Button>
                   <Button
                     type="button"
                     variant={wouldRecommend === false ? "default" : "outline"}
                     onClick={() => setWouldRecommend(false)}
-                    className="h-16 text-base font-medium transition-all duration-300 hover:scale-105"
-                    size="lg"
+                    className="h-12 text-sm font-medium transition-all duration-300 hover:scale-105"
                   >
                     Not Really
                   </Button>
@@ -221,19 +219,19 @@ export function FeedbackModal({
               </div>
 
               {/* Comments Section */}
-              <div className="space-y-4">
-                <label className="text-lg font-semibold block">
-                  Share Your Thoughts <span className="text-muted-foreground font-normal text-base">(Optional)</span>
+              <div className="space-y-3">
+                <label className="text-base font-semibold block">
+                  Share Your Thoughts <span className="text-muted-foreground font-normal text-sm">(Optional)</span>
                 </label>
                 <div className="relative">
                   <textarea
                     value={comments}
                     onChange={(e) => setComments(e.target.value)}
                     placeholder="What did you love? What could be better? Your feedback helps us grow..."
-                    className="w-full min-h-[140px] p-4 border-2 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 bg-background/50 backdrop-blur-sm text-base"
+                    className="w-full min-h-[100px] p-3 border-2 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 bg-background/50 backdrop-blur-sm text-sm"
                     maxLength={1000}
                   />
-                  <p className="text-xs text-muted-foreground text-right mt-2">
+                  <p className="text-xs text-muted-foreground text-right mt-1">
                     {comments.length}/1000 characters
                   </p>
                 </div>
@@ -241,30 +239,28 @@ export function FeedbackModal({
             </div>
 
             {/* Footer with Actions */}
-            <div className="px-12 py-6 bg-muted/30 border-t flex items-center justify-between gap-4">
+            <div className="px-8 py-4 bg-muted/30 border-t flex items-center justify-between gap-4">
               <Button
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
                 disabled={submitting}
-                className="text-muted-foreground hover:text-foreground text-base"
-                size="lg"
+                className="text-muted-foreground hover:text-foreground"
               >
                 Maybe Later
               </Button>
               <Button 
                 onClick={handleSubmit} 
                 disabled={submitting}
-                size="lg"
-                className="px-10 py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                className="px-6 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Submitting...
                   </>
                 ) : (
                   <>
-                    <MessageSquare className="h-5 w-5 mr-2" />
+                    <MessageSquare className="h-4 w-4 mr-2" />
                     Submit Feedback
                   </>
                 )}
