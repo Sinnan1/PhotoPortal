@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ClientWelcomeModal } from "@/components/ui/client-welcome-modal";
 
 interface Photo {
   id: string;
@@ -75,10 +76,17 @@ export default function ClientDashboardPage() {
   const { showToast } = useToast();
   const [accessibleGalleries, setAccessibleGalleries] = useState<Gallery[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     if (user?.role === "CLIENT") {
       fetchAccessibleGalleries();
+      
+      // Check if user has seen the welcome modal
+      const hasSeenModal = localStorage.getItem("clientWelcomeModalSeen");
+      if (!hasSeenModal) {
+        setShowWelcomeModal(true);
+      }
     }
   }, [user]);
 
@@ -147,9 +155,15 @@ export default function ClientDashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-12">
+    <>
+      <ClientWelcomeModal
+        open={showWelcomeModal}
+        onOpenChange={setShowWelcomeModal}
+      />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-12">
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 font-audrey">Dashboard</h1>
           <p className="text-muted-foreground text-base sm:text-lg">View galleries shared with you</p>
@@ -351,6 +365,7 @@ export default function ClientDashboardPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

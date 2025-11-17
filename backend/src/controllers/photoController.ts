@@ -562,6 +562,8 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 		const { id } = req.params;
 		const photographerId = req.user!.id;
 
+		console.log(`🗑️ Delete request for photo ${id} by photographer ${photographerId}`);
+
 		// Find photo and verify ownership
 		const photo = await prisma.photo.findUnique({
 			where: { id },
@@ -576,42 +578,61 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 			},
 		});
 
-		if (!photo || photo.folder.gallery.photographerId !== photographerId) {
+		if (!photo) {
+			console.log(`❌ Photo ${id} not found`);
 			return res.status(404).json({
 				success: false,
-				error: "Photo not found or access denied",
+				error: "Photo not found",
+			});
+		}
+
+		if (photo.folder.gallery.photographerId !== photographerId) {
+			console.log(`❌ Access denied for photo ${id}`);
+			return res.status(403).json({
+				success: false,
+				error: "Access denied",
 			});
 		}
 
 		// Delete from S3 storage with better error handling
 		try {
-			const originalKey = new URL(photo.originalUrl).pathname
-				.split("/")
-				.slice(2)
-				.join("/");
+			// Parse S3 key from URL: https://s3.region.backblazeb2.com/bucket/path/to/file
+			// pathname will be: /bucket/path/to/file
+			// We need to remove the leading slash and bucket name
+			const originalUrl = new URL(photo.originalUrl);
+			const pathParts = originalUrl.pathname.split("/").filter(p => p.length > 0);
+			const originalKey = pathParts.slice(1).join("/"); // Skip bucket name
+			
+			console.log(`🗑️ Deleting photo ${id}: ${originalKey}`);
+			
 			const deletePromises = [
-				deleteFromS3(originalKey).catch((err) =>
-					console.warn("Failed to delete original:", err)
-				),
+				deleteFromS3(originalKey).catch((err) => {
+					console.warn("Failed to delete original:", err);
+					return null;
+				}),
 			];
 
 			// Only delete thumbnail if it exists (may be null for pending thumbnails)
 			if (photo.thumbnailUrl) {
-				const thumbnailKey = new URL(photo.thumbnailUrl).pathname
-					.split("/")
-					.slice(2)
-					.join("/");
+				const thumbnailUrl = new URL(photo.thumbnailUrl);
+				const thumbnailPathParts = thumbnailUrl.pathname.split("/").filter(p => p.length > 0);
+				const thumbnailKey = thumbnailPathParts.slice(1).join("/"); // Skip bucket name
+				
+				console.log(`🗑️ Deleting thumbnail: ${thumbnailKey}`);
+				
 				deletePromises.push(
-					deleteFromS3(thumbnailKey).catch((err) =>
-						console.warn("Failed to delete thumbnail:", err)
-					)
+					deleteFromS3(thumbnailKey).catch((err) => {
+						console.warn("Failed to delete thumbnail:", err);
+						return null;
+					})
 				);
 			}
 
 			await Promise.all(deletePromises);
+			console.log(`✅ Storage deletion completed for photo ${id}`);
 		} catch (storageError) {
 			console.error("Storage deletion error:", storageError);
-			// Continue with database deletion
+			// Continue with database deletion even if storage deletion fails
 		}
 
 		// Delete from database

@@ -188,7 +188,7 @@ export function getContentType(extension: string): string {
 	return contentTypes[extension.toLowerCase()] || 'application/octet-stream'
 }
 
-// Enhanced delete function with better error handling
+// Enhanced delete function with better error handling and timeout
 export const deleteFromS3 = async (filename: string): Promise<void> => {
 	try {
 		const deleteCommand = new DeleteObjectCommand({
@@ -196,8 +196,14 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 			Key: filename
 		})
 
-		await s3Client.send(deleteCommand)
-		console.log(`Successfully deleted: ${filename}`)
+		// Add timeout to prevent hanging
+		const deletePromise = s3Client.send(deleteCommand)
+		const timeoutPromise = new Promise((_, reject) => 
+			setTimeout(() => reject(new Error('Delete operation timed out after 30 seconds')), 30000)
+		)
+
+		await Promise.race([deletePromise, timeoutPromise])
+		console.log(`✅ Successfully deleted: ${filename}`)
 	} catch (error) {
 		console.error('S3 delete error:', {
 			message: (error as Error)?.message,
@@ -205,10 +211,17 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 			code: (error as any)?.$metadata?.httpStatusCode
 		})
 
-		// Don't throw error if file doesn't exist (404)
-		if ((error as any)?.$metadata?.httpStatusCode !== 404) {
-			throw new Error(`Failed to delete ${filename} from storage`)
+		// Don't throw error if file doesn't exist (404) or NoSuchKey
+		const httpCode = (error as any)?.$metadata?.httpStatusCode
+		const errorCode = (error as any)?.Code
+		
+		if (httpCode === 404 || errorCode === 'NoSuchKey') {
+			console.log(`ℹ️ File not found (already deleted): ${filename}`)
+			return
 		}
+
+		// For timeout or other errors, log but don't throw to prevent blocking deletion
+		console.warn(`⚠️ Failed to delete ${filename}, continuing anyway`)
 	}
 }
 
