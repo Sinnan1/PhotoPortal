@@ -134,7 +134,7 @@ export function FeedbackModal({
               
               <div className="space-y-3">
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  We'd Love Your Feedback!
+                  Portal Review & Feedback
                 </h2>
                 <p className="text-base leading-relaxed text-muted-foreground px-4">
                   Your thoughts help us improve. Share your experience working with{" "}
@@ -172,14 +172,6 @@ export function FeedbackModal({
               <div className="grid grid-cols-1 gap-5">
                 <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
                   <StarRating
-                    value={overallRating}
-                    onChange={setOverallRating}
-                    label="Overall Experience"
-                  />
-                </div>
-
-                <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
-                  <StarRating
                     value={selectionRating}
                     onChange={setSelectionRating}
                     label="Image Selection Process"
@@ -191,6 +183,14 @@ export function FeedbackModal({
                     value={portalRating}
                     onChange={setPortalRating}
                     label="Portal Experience"
+                  />
+                </div>
+
+                <div className="p-5 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+                  <StarRating
+                    value={overallRating}
+                    onChange={setOverallRating}
+                    label="Overall Experience"
                   />
                 </div>
               </div>

@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import {
   Card,
   CardContent,
@@ -131,8 +132,7 @@ export default function ClientLoginPage() {
                         </Link>
                       </div>
                       <FormControl>
-                        <Input
-                          type="password"
+                        <PasswordInput
                           placeholder="••••••••"
                           {...field}
                           className="bg-white/20 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-[#d1b98b]"

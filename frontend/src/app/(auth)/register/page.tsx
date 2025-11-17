@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Camera, CheckCircle, Clock } from "lucide-react"
 
@@ -171,9 +172,8 @@ export default function RegisterPage() {
 
             <div className="grid gap-1">
               <Label htmlFor="password" className="text-sm">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -185,9 +185,8 @@ export default function RegisterPage() {
 
             <div className="grid gap-1">
               <Label htmlFor="confirmPassword" className="text-sm">Confirm Password</Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
                 placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}

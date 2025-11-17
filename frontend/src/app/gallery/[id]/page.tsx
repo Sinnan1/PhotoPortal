@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Card,
   CardContent,
@@ -595,8 +596,7 @@ function GalleryPage() {
           </CardHeader>
           <form onSubmit={handlePasswordSubmit}>
             <CardContent className="space-y-4">
-              <Input
-                type="password"
+              <PasswordInput
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter gallery password"

@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -225,9 +226,8 @@ export default function ClientsPage() {
                   <Label htmlFor="password" className="text-sm font-medium mb-2 block">
                     Password
                   </Label>
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     value={newClient.password}
                     onChange={(e) =>
                       setNewClient({ ...newClient, password: e.target.value })
