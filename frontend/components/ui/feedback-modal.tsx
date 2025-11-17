@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Star, MessageSquare, ThumbsUp } from "lucide-react";
+import { Star, MessageSquare, ThumbsUp, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 
@@ -72,119 +72,175 @@ export function FeedbackModal({
     onChange: (val: number) => void;
     label: string;
   }) => (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
-      <div className="flex gap-2">
+    <div className="space-y-4">
+      <label className="text-base font-semibold block">{label}</label>
+      <div className="flex gap-3 justify-center">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
             onClick={() => onChange(star)}
-            className="transition-transform hover:scale-110"
+            onMouseEnter={(e) => {
+              const btn = e.currentTarget;
+              btn.style.transform = "scale(1.2) rotate(5deg)";
+            }}
+            onMouseLeave={(e) => {
+              const btn = e.currentTarget;
+              btn.style.transform = "scale(1) rotate(0deg)";
+            }}
+            className="transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-full p-1"
           >
             <Star
-              className={`h-8 w-8 ${
+              className={`h-10 w-10 transition-all duration-200 ${
                 star <= value
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "text-gray-300"
+                  ? "fill-yellow-400 text-yellow-400 drop-shadow-lg"
+                  : "text-gray-300 hover:text-gray-400"
               }`}
             />
           </button>
         ))}
       </div>
+      {value > 0 && (
+        <p className="text-center text-sm text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {value === 5 && "⭐ Excellent!"}
+          {value === 4 && "😊 Great!"}
+          {value === 3 && "👍 Good"}
+          {value === 2 && "😐 Fair"}
+          {value === 1 && "😞 Needs Improvement"}
+        </p>
+      )}
     </div>
   );
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <AlertDialogHeader>
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <MessageSquare className="h-8 w-8 text-primary" />
+      <AlertDialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 bg-gradient-to-br from-background via-background to-muted/20">
+        {/* Beautiful Header with Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 pb-12">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          
+          <div className="relative">
+            <div className="flex items-center justify-center mb-6">
+              <div className="p-4 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-lg backdrop-blur-sm">
+                <MessageSquare className="h-10 w-10 text-primary" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-3xl font-bold text-center mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              We'd Love Your Feedback!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-center max-w-md mx-auto leading-relaxed">
+              Your thoughts help us improve. Share your experience working with <span className="font-semibold text-foreground">{photographerName}</span>
+            </AlertDialogDescription>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="px-8 py-6 space-y-8">
+          {/* Rating Sections with Cards */}
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+              <StarRating
+                value={overallRating}
+                onChange={setOverallRating}
+                label="Overall Experience"
+              />
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+              <StarRating
+                value={selectionRating}
+                onChange={setSelectionRating}
+                label="Image Selection Process"
+              />
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50 hover:border-primary/30 transition-all duration-300">
+              <StarRating
+                value={portalRating}
+                onChange={setPortalRating}
+                label="Portal Experience"
+              />
             </div>
           </div>
-          <AlertDialogTitle className="text-2xl text-center">
-            We'd Love Your Feedback!
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-base text-center">
-            Help us improve by sharing your experience working with {photographerName}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
 
-        <div className="space-y-6 py-4">
-          <StarRating
-            value={overallRating}
-            onChange={setOverallRating}
-            label="Overall Experience"
-          />
-
-          <StarRating
-            value={selectionRating}
-            onChange={setSelectionRating}
-            label="Image Selection Process"
-          />
-
-          <StarRating
-            value={portalRating}
-            onChange={setPortalRating}
-            label="Portal Experience"
-          />
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
+          {/* Recommendation Section */}
+          <div className="space-y-3">
+            <label className="text-base font-semibold block">
               Would you recommend our service?
             </label>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <Button
                 type="button"
                 variant={wouldRecommend === true ? "default" : "outline"}
                 onClick={() => setWouldRecommend(true)}
-                className="flex-1"
+                className="h-14 text-base font-medium transition-all duration-300 hover:scale-105"
+                size="lg"
               >
-                <ThumbsUp className="h-4 w-4 mr-2" />
-                Yes
+                <ThumbsUp className="h-5 w-5 mr-2" />
+                Yes, Absolutely!
               </Button>
               <Button
                 type="button"
                 variant={wouldRecommend === false ? "default" : "outline"}
                 onClick={() => setWouldRecommend(false)}
-                className="flex-1"
+                className="h-14 text-base font-medium transition-all duration-300 hover:scale-105"
+                size="lg"
               >
-                No
+                Not Really
               </Button>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Additional Comments (Optional)
+          {/* Comments Section */}
+          <div className="space-y-3">
+            <label className="text-base font-semibold block">
+              Share Your Thoughts <span className="text-muted-foreground font-normal">(Optional)</span>
             </label>
-            <textarea
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              placeholder="Tell us more about your experience..."
-              className="w-full min-h-[100px] p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-              maxLength={1000}
-            />
-            <p className="text-xs text-muted-foreground text-right">
-              {comments.length}/1000
-            </p>
+            <div className="relative">
+              <textarea
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="What did you love? What could be better? Your feedback helps us grow..."
+                className="w-full min-h-[120px] p-4 border-2 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 bg-background/50 backdrop-blur-sm"
+                maxLength={1000}
+              />
+              <p className="text-xs text-muted-foreground text-right mt-2">
+                {comments.length}/1000 characters
+              </p>
+            </div>
           </div>
         </div>
 
-        <AlertDialogFooter>
+        {/* Footer with Actions */}
+        <div className="px-8 py-6 bg-muted/30 border-t flex items-center justify-between gap-4">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={submitting}
+            className="text-muted-foreground hover:text-foreground"
           >
-            Skip for Now
+            Maybe Later
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Feedback"}
+          <Button 
+            onClick={handleSubmit} 
+            disabled={submitting}
+            size="lg"
+            className="px-8 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Submit Feedback
+              </>
+            )}
           </Button>
-        </AlertDialogFooter>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   );
