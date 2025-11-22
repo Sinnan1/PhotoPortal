@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Yarrow Weddings & Co.',
+    title: 'YarrowWeddings',
   },
   formatDetection: {
     telephone: false,
