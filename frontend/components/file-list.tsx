@@ -80,16 +80,16 @@ export function FileList({
       {(folder.children || []).map((subfolder) => (
         <div
           key={`folder-${subfolder.id}`}
-          className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors cursor-pointer group"
+          className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors cursor-pointer group"
           onClick={() => onFolderSelect(subfolder.id)}
         >
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <Folder className="h-5 w-5 text-[#425146] flex-shrink-0" />
+            <Folder className="h-5 w-5 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {subfolder.name}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {subfolder._count.photos} photos • {subfolder._count.children} subfolders
               </p>
             </div>
@@ -116,7 +116,7 @@ export function FileList({
                   e.stopPropagation()
                   handleFolderDelete(subfolder.id, subfolder.name)
                 }}
-                className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -129,15 +129,15 @@ export function FileList({
       {(folder.photos || []).map((photo) => (
         <div
           key={`photo-${photo.id}`}
-          className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors group"
+          className="flex items-center justify-between p-3 bg-card hover:bg-muted/50 rounded-lg border border-border transition-colors group"
         >
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <FileImage className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            <FileImage className="h-5 w-5 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {photo.filename}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formatBytes(photo.fileSize)} • {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true })}
               </p>
             </div>
@@ -148,7 +148,7 @@ export function FileList({
                 size="sm"
                 variant="ghost"
                 onClick={() => handleDelete(photo.id, photo.filename)}
-                className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
                 Delete
@@ -161,11 +161,11 @@ export function FileList({
       {/* Empty State */}
       {(folder.photos?.length || 0) === 0 && (folder.children?.length || 0) === 0 && (
         <div className="text-center py-12">
-          <FileImage className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <FileImage className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-sm font-medium text-foreground">
             This folder is empty
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Upload photos or create subfolders to get started.
           </p>
         </div>

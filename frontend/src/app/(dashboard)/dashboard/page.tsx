@@ -1,4 +1,3 @@
-// If you want to update your dashboard to use PhotoGrid for gallery previews
 "use client";
 
 import { useState, useEffect } from "react";
@@ -25,12 +24,13 @@ import {
   Star,
   Trash2,
   Users,
-  HardDrive,
+  Share2,
+  Copy,
+  Edit,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { CreateGalleryModal } from "@/components/create-gallery-modal";
-import { formatBytes } from "@/lib/utils";
 import { GalleryAccessModal } from "@/components/gallery-access-modal";
 import {
   DropdownMenu,
@@ -46,7 +46,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Share2, Copy } from 'lucide-react';
 
 interface Photo {
   id: string;
@@ -77,12 +76,23 @@ interface Gallery {
   createdAt: string;
   isExpired: boolean;
   folders?: Folder[];
-  totalSize: number;
-  _count: {
+  likedBy: { userId: string }[];
+  favoritedBy: { userId: string }[];
+  totalSize?: number;
+  _count?: {
     likedBy: number;
     favoritedBy: number;
   };
 }
+
+// Helper function to format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -123,9 +133,49 @@ export default function DashboardPage() {
     }
   };
 
+  const handleLikeGallery = async (galleryId: string) => {
+    try {
+      const gallery = galleries.find((g) => g.id === galleryId);
+      if (!gallery) return;
+
+      const isLiked = gallery.likedBy.some((like) => like.userId === user?.id);
+
+      if (isLiked) {
+        await api.unlikeGallery(galleryId);
+      } else {
+        await api.likeGallery(galleryId);
+      }
+
+      fetchGalleries();
+    } catch (error) {
+      showToast("Failed to update like status", "error");
+    }
+  };
+
   const handleShareGallery = (gallery: Gallery) => {
     setSelectedGallery(gallery);
     setShowShareModal(true);
+  };
+
+  const handleFavoriteGallery = async (galleryId: string) => {
+    try {
+      const gallery = galleries.find((g) => g.id === galleryId);
+      if (!gallery) return;
+
+      const isFavorited = gallery.favoritedBy.some(
+        (favorite) => favorite.userId === user?.id
+      );
+
+      if (isFavorited) {
+        await api.unfavoriteGallery(galleryId);
+      } else {
+        await api.favoriteGallery(galleryId);
+      }
+
+      fetchGalleries();
+    } catch (error) {
+      showToast("Failed to update favorite status", "error");
+    }
   };
 
   const handleManageAccess = (gallery: Gallery) => {
@@ -133,13 +183,12 @@ export default function DashboardPage() {
     setShowAccessModal(true);
   };
 
-
   if (user?.role !== "PHOTOGRAPHER") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground mt-2">
             This page is only available to photographers.
           </p>
         </div>
@@ -148,62 +197,63 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-12">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Manage your photo galleries</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 font-audrey">Dashboard</h1>
+          <p className="text-muted-foreground text-base sm:text-lg">Manage your photo galleries</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setShowCreateModal(true)} size="lg" className="shadow-sm w-full sm:w-auto">
+          <Plus className="mr-2 h-5 w-5" />
           Create Gallery
         </Button>
       </div>
 
-      {/* Quick Access Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Link href="/dashboard/liked">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
+      {/* Quick Access Cards - More refined */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+        <Link href="/dashboard/liked" className="group">
+          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-primary/20">
+            <CardContent className="p-3">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-red-100 rounded-full">
-                  <Heart className="h-6 w-6 text-red-600" />
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                  <Heart className="h-5 w-5 text-red-600 dark:text-red-500" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Liked Photos</h3>
-                  <p className="text-gray-600">View your liked photos</p>
+                  <h3 className="text-base font-semibold mb-0.5">Liked Photos</h3>
+                  <p className="text-muted-foreground text-xs">View your liked photos</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Link href="/dashboard/favorites">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
+        <Link href="/dashboard/favorites" className="group">
+          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-primary/20">
+            <CardContent className="p-3">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <Star className="h-6 w-6 text-yellow-600" />
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                  <Star className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Favorites</h3>
-                  <p className="text-gray-600">View your favorited photos</p>
+                  <h3 className="text-base font-semibold mb-0.5">Favorites</h3>
+                  <p className="text-muted-foreground text-xs">View your favorited photos</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Link href="/dashboard/posts">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
+        <Link href="/dashboard/posts" className="group">
+          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-primary/20">
+            <CardContent className="p-3">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <Share2 className="h-6 w-6 text-purple-600" />
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                  <Share2 className="h-5 w-5 text-purple-600 dark:text-purple-500" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">For Posts</h3>
-                  <p className="text-gray-600">Photos for social media</p>
+                  <h3 className="text-base font-semibold mb-0.5">For Posts</h3>
+                  <p className="text-muted-foreground text-xs">Photos for social media</p>
                 </div>
               </div>
             </CardContent>
@@ -212,167 +262,187 @@ export default function DashboardPage() {
       </div>
 
       {/* Galleries Section */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Galleries</h2>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold tracking-tight font-audrey">Your Galleries</h2>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-20 bg-gray-200 rounded"></div>
+              <div className="aspect-[4/3] bg-muted rounded-t-xl"></div>
+              <CardContent className="p-6">
+                <div className="h-6 bg-muted rounded w-3/4 mb-3"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : galleries.length === 0 ? (
-        <div className="text-center py-12">
-          <Images className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-medium">
-            No galleries
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Get started by creating a new gallery.
-          </p>
-          <div className="mt-6">
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Gallery
-            </Button>
+        <div className="text-center py-20">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/50 mb-6">
+            <Images className="h-10 w-10 text-muted-foreground" />
           </div>
+          <h3 className="text-xl font-semibold mb-2">No galleries yet</h3>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+            Get started by creating your first gallery to organize and share your photos.
+          </p>
+          <Button onClick={() => setShowCreateModal(true)} size="lg">
+            <Plus className="mr-2 h-5 w-5" />
+            Create Gallery
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {galleries.map((gallery, index) => (
             <Card
               key={gallery.id}
-              className="hover:shadow-lg transition-shadow duration-200 border border-gray-200 bg-white dark:bg-gray-900"
+              className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <div className="flex-1">
-                  <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">{gallery.title}</CardTitle>
-                  <CardDescription className="line-clamp-1 text-gray-600 dark:text-gray-300 mt-1 text-sm">
-                    {gallery.description}
-                  </CardDescription>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/gallery/${gallery.id}`}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Gallery
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/galleries/${gallery.id}/manage`}>
-                        Edit Gallery
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleShareGallery(gallery)}
-                    >
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleManageAccess(gallery)}
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      Manage Access
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteGallery(gallery.id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Gallery
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent className="pt-2 pb-3">
-                {/* Gallery preview - show cover photo */}
-                {gallery.folders && gallery.folders.length > 0 && (
-                  <div className="mb-3">
-                    <div className="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden shadow-sm ring-1 ring-gray-200/50">
-                      {gallery.folders[0].coverPhoto ? (
-                        <Image
-                          src={gallery.folders[0].coverPhoto.largeUrl || gallery.folders[0].coverPhoto.mediumUrl || gallery.folders[0].coverPhoto.thumbnailUrl || "/placeholder.svg"}
-                          alt={gallery.folders[0].coverPhoto.filename}
-                          fill
-                          className="object-cover"
-                          priority={index === 0}
-                          sizes="(max-width: 1024px) 50vw, 25vw"
-                          unoptimized
-                        />
-                      ) : gallery.folders[0]._count?.photos > 0 ? (
-                        // If no cover photo but folder has photos, show a placeholder with photo count
-                        <div className="w-full h-full bg-gradient-to-br from-[#425146]/20 to-[#425146]/10 flex items-center justify-center">
-                          <div className="text-center">
-                            <Images className="w-8 h-8 text-[#425146] mx-auto mb-1" />
-                            <p className="text-xs font-medium text-[#425146]">{gallery.folders[0]._count.photos} photos</p>
-                          </div>
-                        </div>
-                      ) : (
-                        // Empty folder placeholder
-                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                          <Images className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
+              {/* Cover Image */}
+              <Link href={`/gallery/${gallery.id}`}>
+                <div className="relative aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted overflow-hidden">
+                  {gallery.folders && gallery.folders.length > 0 && gallery.folders[0].coverPhoto ? (
+                    <Image
+                      src={
+                        gallery.folders[0].coverPhoto.largeUrl ||
+                        gallery.folders[0].coverPhoto.mediumUrl ||
+                        gallery.folders[0].coverPhoto.thumbnailUrl ||
+                        "/placeholder.svg"
+                      }
+                      alt={gallery.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      priority={index < 3}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Images className="w-16 h-16 text-muted-foreground/30" />
                     </div>
+                  )}
+
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+
+                  {/* Quick actions on hover */}
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-9 w-9 rounded-full shadow-lg backdrop-blur-sm bg-background/90"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/gallery/${gallery.id}`}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Gallery
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/galleries/${gallery.id}/manage`}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Gallery
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShareGallery(gallery);
+                          }}
+                        >
+                          <Share2 className="mr-2 h-4 w-4" />
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleManageAccess(gallery);
+                          }}
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          Manage Access
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteGallery(gallery.id);
+                          }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Gallery
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
+
+                  {/* Expired badge */}
+                  {gallery.isExpired && (
+                    <div className="absolute top-4 left-4">
+                      <Badge variant="destructive" className="shadow-lg">
+                        Expired
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </Link>
+
+              {/* Card Content */}
+              <CardContent className="p-6">
+                <Link href={`/gallery/${gallery.id}`}>
+                  <h3 className="text-xl font-bold mb-2 line-clamp-1 group-hover:text-primary transition-colors">
+                    {gallery.title}
+                  </h3>
+                </Link>
+
+                {gallery.description && (
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                    {gallery.description}
+                  </p>
                 )}
 
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
-                      <Images className="mr-1 h-3 w-3 text-[#425146]" />
-                      <span className="font-medium">{gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}</span>
-                    </div>
-                    <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
-                      <HardDrive className="mr-1 h-3 w-3 text-[#425146]" />
-                      <span className="font-medium">{formatBytes(gallery.totalSize)}</span>
-                    </div>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
+                    <Images className="h-4 w-4 text-primary mb-1" />
+                    <span className="text-lg font-semibold">
+                      {gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Photos</span>
                   </div>
-                  <div className="flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-full px-2 py-0.5">
-                    <Download className="mr-1 h-3 w-3 text-[#425146]" />
-                    <span className="font-medium">{gallery.downloadCount}</span>
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
+                    <Heart className="h-4 w-4 text-red-500 mb-1" />
+                    <span className="text-lg font-semibold">{gallery._count?.likedBy ?? 0}</span>
+                    <span className="text-xs text-muted-foreground">Liked</span>
+                  </div>
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
+                    <Star className="h-4 w-4 text-yellow-500 mb-1" />
+                    <span className="text-lg font-semibold">{gallery._count?.favoritedBy ?? 0}</span>
+                    <span className="text-xs text-muted-foreground">Favorited</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="mr-1 h-3 w-3" />
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5" />
                     {gallery.expiresAt ? (
                       <span>Expires {new Date(gallery.expiresAt).toLocaleDateString()}</span>
                     ) : (
                       <span>No expiry</span>
                     )}
                   </div>
-
-                  {gallery.isExpired && (
-                    <Badge variant="destructive" className="text-xs py-0 px-1">Expired</Badge>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end gap-2 mt-2 px-1">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Heart className="mr-1 h-3 w-3 text-red-500" />
-                    <span>{gallery._count.likedBy}</span>
-                  </div>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Star className="mr-1 h-3 w-3 text-yellow-500" />
-                    <span>{gallery._count.favoritedBy}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>{formatFileSize(gallery.totalSize || 0)}</span>
                   </div>
                 </div>
               </CardContent>

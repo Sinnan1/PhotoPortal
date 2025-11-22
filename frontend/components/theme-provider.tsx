@@ -237,7 +237,7 @@ interface CompatibleThemeProviderProps {
 export function ThemeProvider({
   children,
   attribute = "class",
-  defaultTheme = "system",
+  defaultTheme = "dark",
   enableSystem = true
 }: CompatibleThemeProviderProps) {
   return (

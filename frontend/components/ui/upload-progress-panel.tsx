@@ -47,12 +47,12 @@ export function UploadProgressPanel() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-w-md bg-white rounded-lg shadow-2xl border border-gray-200 z-50">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-w-md bg-card rounded-lg shadow-2xl border border-border z-50">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center space-x-2">
-          <Loader2 className={`h-4 w-4 ${activeBatches.length > 0 ? 'animate-spin text-[#425146]' : 'text-gray-400'}`} />
-          <h3 className="font-semibold text-gray-900">
+          <Loader2 className={`h-4 w-4 ${activeBatches.length > 0 ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
+          <h3 className="font-semibold text-foreground">
             {activeBatches.length > 0 ? 'Uploading...' : 'Upload Complete'}
           </h3>
         </div>
@@ -89,7 +89,7 @@ export function UploadProgressPanel() {
             const isExpanded = expandedBatches.has(batch.id)
             
             return (
-              <div key={batch.id} className="p-4 border-b border-gray-100 last:border-b-0">
+              <div key={batch.id} className="p-4 border-b border-border last:border-b-0">
                 {/* Batch Summary */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -103,11 +103,11 @@ export function UploadProgressPanel() {
                         }
                         setExpandedBatches(newExpanded)
                       }}
-                      className="text-sm font-medium text-gray-900 hover:text-[#425146] flex items-center space-x-2"
+                      className="text-sm font-medium text-foreground hover:text-primary flex items-center space-x-2"
                     >
                       <span>{isActive ? 'Uploading' : 'Upload Complete'}</span>
-                      <span className="text-xs text-gray-500">({totalFiles} files)</span>
-                      <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
+                      <span className="text-xs text-muted-foreground">({totalFiles} files)</span>
+                      <span className="text-muted-foreground">{isExpanded ? '▼' : '▶'}</span>
                     </button>
                     <div className="flex items-center space-x-2">
                       {failed > 0 && (
@@ -125,7 +125,7 @@ export function UploadProgressPanel() {
                         variant="ghost"
                         size="sm"
                         onClick={() => uploadManager.cancelBatch(batch.id)}
-                        className="h-7 text-xs text-red-600 hover:text-red-700"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -134,13 +134,13 @@ export function UploadProgressPanel() {
 
                   {/* Progress Bar */}
                   <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-600">
+                    <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{completed + failed}/{totalFiles} files</span>
                       <span>{formatBytes(batch.uploadedBytes)} / {formatBytes(batch.totalBytes)}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-muted rounded-full h-2">
                       <div
-                        className="bg-[#425146] h-2 rounded-full transition-all duration-300"
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${batch.totalBytes > 0 ? (batch.uploadedBytes / batch.totalBytes) * 100 : 0}%`
                         }}
@@ -161,7 +161,7 @@ export function UploadProgressPanel() {
                       </div>
                     )}
                     {remaining > 0 && (
-                      <div className="flex items-center space-x-1 text-gray-600">
+                      <div className="flex items-center space-x-1 text-muted-foreground">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         <span>{remaining}</span>
                       </div>
@@ -169,7 +169,7 @@ export function UploadProgressPanel() {
                   </div>
 
                   {isActive && (
-                    <div className="flex justify-between text-xs text-gray-500">
+                    <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{formatBytes(batch.averageSpeed)}/s</span>
                       <span>ETA: {calculateETA(batch)}</span>
                     </div>
@@ -177,32 +177,32 @@ export function UploadProgressPanel() {
 
                   {/* Individual Files - Show all with scrolling when expanded */}
                   {isExpanded && (
-                    <div className="space-y-2 mt-3 max-h-48 overflow-y-auto border-t border-gray-100 pt-3">
+                    <div className="space-y-2 mt-3 max-h-48 overflow-y-auto border-t border-border pt-3">
                       {batch.files.map(file => (
                       <div key={file.id} className="flex items-center space-x-2 text-xs min-w-0">
                         {file.status === 'success' && (
-                          <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+                          <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-500 flex-shrink-0" />
                         )}
                         {file.status === 'failed' && (
-                          <XCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
+                          <XCircle className="h-3 w-3 text-red-600 dark:text-red-500 flex-shrink-0" />
                         )}
                         {(file.status === 'uploading' || file.status === 'processing') && (
-                          <Loader2 className="h-3 w-3 text-[#425146] animate-spin flex-shrink-0" />
+                          <Loader2 className="h-3 w-3 text-primary animate-spin flex-shrink-0" />
                         )}
                         {file.status === 'queued' && (
-                          <div className="h-3 w-3 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                          <div className="h-3 w-3 rounded-full border-2 border-muted-foreground flex-shrink-0" />
                         )}
-                        <span className="truncate flex-1 text-gray-700 min-w-0 overflow-hidden text-ellipsis" title={file.file?.name}>
+                        <span className="truncate flex-1 text-foreground min-w-0 overflow-hidden text-ellipsis" title={file.file?.name}>
                           {file.file?.name || 'Unknown file'}
                         </span>
                         {file.status === 'uploading' && (
-                          <span className="text-gray-500 flex-shrink-0 whitespace-nowrap">{file.progress}%</span>
+                          <span className="text-muted-foreground flex-shrink-0 whitespace-nowrap">{file.progress}%</span>
                         )}
                         {file.status === 'processing' && (
-                          <span className="text-gray-500 flex-shrink-0 whitespace-nowrap text-[10px]">Processing</span>
+                          <span className="text-muted-foreground flex-shrink-0 whitespace-nowrap text-[10px]">Processing</span>
                         )}
                         {file.attempts > 1 && file.status !== 'success' && (
-                          <span className="text-gray-400 flex-shrink-0">({file.attempts}/3)</span>
+                          <span className="text-muted-foreground flex-shrink-0">({file.attempts}/3)</span>
                         )}
                       </div>
                       ))}

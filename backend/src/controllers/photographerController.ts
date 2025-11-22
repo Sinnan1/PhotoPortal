@@ -86,7 +86,10 @@ export const getClients = async (req: AuthRequest, res: Response) => {
 				email: true,
 				name: true,
 				role: true,
-				createdAt: true
+				createdAt: true,
+				canDownload: true,
+				feedbackRequestActive: true,
+				feedbackRequestedAt: true
 			}
 		})
 
@@ -96,6 +99,51 @@ export const getClients = async (req: AuthRequest, res: Response) => {
 		})
 	} catch (error) {
 		console.error('Get clients error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
+
+export const toggleClientDownload = async (req: AuthRequest, res: Response) => {
+	try {
+		const { id } = req.params
+		const { canDownload } = req.body
+		const photographerId = (req.user as any).id
+
+		// Verify the client belongs to this photographer
+		const client = await prisma.user.findFirst({
+			where: { id, photographerId, role: 'CLIENT' }
+		})
+
+		if (!client) {
+			return res.status(404).json({
+				success: false,
+				error: 'Client not found or access denied'
+			})
+		}
+
+		// Update the canDownload permission
+		const updatedClient = await prisma.user.update({
+			where: { id },
+			data: { canDownload },
+			select: {
+				id: true,
+				email: true,
+				name: true,
+				role: true,
+				createdAt: true,
+				canDownload: true
+			}
+		})
+
+		res.json({
+			success: true,
+			data: { client: updatedClient }
+		})
+	} catch (error) {
+		console.error('Toggle client download error:', error)
 		res.status(500).json({
 			success: false,
 			error: 'Internal server error'

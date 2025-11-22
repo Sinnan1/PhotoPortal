@@ -15,7 +15,7 @@ interface AuthRequest extends Request {
 
 export const register = async (req: Request, res: Response) => {
 	try {
-		const { email, password, name, role = 'CLIENT' } = req.body
+		const { email, password, name, role = 'PHOTOGRAPHER' } = req.body
 
 		// Validate input
 		if (!email || !password || !name) {
@@ -63,7 +63,9 @@ export const register = async (req: Request, res: Response) => {
 			where: { configKey: 'registration.requireApproval' }
 		})
 
-		const requiresApproval = requireApprovalConfig?.configValue === true && role.toUpperCase() === 'PHOTOGRAPHER'
+		// Require approval for both CLIENT and PHOTOGRAPHER roles
+		const requiresApproval = requireApprovalConfig?.configValue === true && 
+			(role.toUpperCase() === 'CLIENT' || role.toUpperCase() === 'PHOTOGRAPHER')
 
 		// Hash password
 		const hashedPassword = await bcrypt.hash(password, 12)
@@ -76,7 +78,7 @@ export const register = async (req: Request, res: Response) => {
 			role: role.toUpperCase(),
 			...(requiresApproval && {
 				suspendedAt: new Date(),
-				suspensionReason: 'Pending admin approval for photographer account'
+				suspensionReason: 'Pending admin approval'
 			})
 		}
 
@@ -99,7 +101,7 @@ export const register = async (req: Request, res: Response) => {
 				success: true,
 				data: {
 					user,
-					message: 'Account created successfully. Your photographer account is pending admin approval.',
+					message: 'Account created successfully. Your account is pending admin approval.',
 					requiresApproval: true
 				}
 			})

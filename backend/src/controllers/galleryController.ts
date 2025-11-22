@@ -94,8 +94,8 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				photographer:
 					userRole === 'ADMIN'
 						? {
-								select: { id: true, name: true, email: true }
-						  }
+							select: { id: true, name: true, email: true }
+						}
 						: undefined,
 				folders: {
 					include: {
@@ -134,13 +134,18 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 		})
 
 		const galleriesWithStats = galleries.map((gallery) => {
-			let totalLikes = 0;
-			let totalFavorites = 0;
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
 
 			const totalSize = gallery.folders.reduce((acc, folder) => {
 				const folderSize = folder.photos.reduce((photoAcc, photo) => {
-					totalLikes += photo._count.likedBy;
-					totalFavorites += photo._count.favoritedBy;
+					// Count unique photos that have at least one like/favorite
+					if (photo._count.likedBy > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo._count.favoritedBy > 0) {
+						uniqueFavoritedPhotos++;
+					}
 					return photoAcc + (photo.fileSize || 0);
 				}, 0);
 				return acc + folderSize;
@@ -157,8 +162,8 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 				totalSize,
 				_count: {
 					...gallery._count,
-					likedBy: totalLikes,
-					favoritedBy: totalFavorites,
+					likedBy: uniqueLikedPhotos,
+					favoritedBy: uniqueFavoritedPhotos,
 				},
 			};
 		});
@@ -192,7 +197,10 @@ export const getGallery = async (req: Request, res: Response) => {
 								favoritedBy: true,
 								postBy: true
 							},
-							orderBy: { createdAt: 'desc' }
+							orderBy: [
+								{ capturedAt: 'asc' },
+								{ createdAt: 'asc' }
+							]
 						},
 						children: {
 							include: {
@@ -202,7 +210,10 @@ export const getGallery = async (req: Request, res: Response) => {
 										favoritedBy: true,
 										postBy: true
 									},
-									orderBy: { createdAt: 'desc' }
+									orderBy: [
+										{ capturedAt: 'asc' },
+										{ createdAt: 'asc' }
+									]
 								},
 								children: true, // For deeper nesting
 								coverPhoto: {
@@ -258,13 +269,35 @@ export const getGallery = async (req: Request, res: Response) => {
 			})
 		}
 
+		// Check user's download permission
+		let canDownload = true
+		const authHeader = req.headers['authorization']
+		const token = authHeader && (authHeader as string).split(' ')[1]
+		if (token) {
+			try {
+				const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+				const userId = decoded.userId as string
+				
+				// Get user's download permission
+				const user = await prisma.user.findUnique({
+					where: { id: userId },
+					select: { canDownload: true, role: true }
+				})
+				
+				// Only restrict downloads for clients, not photographers
+				if (user && user.role === 'CLIENT') {
+					canDownload = user.canDownload
+				}
+			} catch {
+				// ignore token errors
+			}
+		}
+
 		// If gallery is password-protected, enforce access rules
 		if (gallery.password) {
 			let isAuthorized = false
 
 			// 1) If user is authenticated, allow if photographer owner or client with access
-			const authHeader = req.headers['authorization']
-			const token = authHeader && (authHeader as string).split(' ')[1]
 			if (token) {
 				try {
 					const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
@@ -304,7 +337,7 @@ export const getGallery = async (req: Request, res: Response) => {
 
 		res.json({
 			success: true,
-			data: gallery
+			data: { ...gallery, canDownload }
 		})
 	} catch (error) {
 		console.error('Get gallery error:', error)
@@ -755,13 +788,38 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 
 		// Transform the data to match the expected format
 		const galleries = accessibleGalleries.map((access) => {
-			// Calculate total photo count from all folders
-			const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => sum + folder._count.photos, 0)
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
+
+			// Calculate total photo count and count unique photos with likes/favorites
+			const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => {
+				folder.photos.forEach(photo => {
+					// Count unique photos that have at least one like/favorite
+					if (photo.likedBy.length > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo.favoritedBy.length > 0) {
+						uniqueFavoritedPhotos++;
+					}
+				});
+				return sum + folder._count.photos;
+			}, 0);
+
+			// Remove photos from response to keep payload light
+			access.gallery.folders.forEach(f => {
+				// @ts-ignore
+				delete f.photos;
+			});
 
 			return {
 				...access.gallery,
 				photoCount: totalPhotoCount,
-				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false
+				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false,
+				_count: {
+					...access.gallery._count,
+					likedBy: uniqueLikedPhotos,
+					favoritedBy: uniqueFavoritedPhotos,
+				}
 			}
 		})
 

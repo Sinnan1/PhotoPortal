@@ -16,3 +16,6 @@ node_modules
 # Temp uploads directory
 temp-uploads/*
 !temp-uploads/.gitkeep
+
+# Build output
+dist

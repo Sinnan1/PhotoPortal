@@ -3,6 +3,7 @@ import { Router } from 'express'
 import {
 	createClient,
 	getClients,
+	toggleClientDownload,
 	// updateClientAccess,
 	removeClient
 } from '../controllers/photographerController'
@@ -17,7 +18,7 @@ router.use(authenticateToken, requireRole('PHOTOGRAPHER'))
 // Routes for managing clients
 router.post('/clients', createClient)
 router.get('/clients', getClients)
-
+router.patch('/clients/:id/download', toggleClientDownload)
 router.delete('/clients/:id', removeClient)
 
 // Dashboard stats

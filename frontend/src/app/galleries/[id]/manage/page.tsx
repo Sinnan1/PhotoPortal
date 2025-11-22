@@ -9,12 +9,13 @@ import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder, FileSpreadsheet, Heart, Star } from "lucide-react"
+import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder, FileSpreadsheet, Heart, Star, Eye, FolderPlus, Search, Calendar, Lock, Download as DownloadIcon } from "lucide-react"
 import Link from "next/link"
 import { FolderTree } from "@/components/folder-tree"
 import { FileList } from "@/components/file-list"
@@ -349,15 +350,15 @@ export default function ManageGalleryPage() {
 
   const handleExportToExcel = async (filterType: 'liked' | 'favorited') => {
     const setExporting = filterType === 'liked' ? setIsExportingLiked : setIsExportingFavorited
-    
+
     setExporting(true)
     try {
-      const exportFunc = filterType === 'liked' 
-        ? api.exportLikedPhotosToExcel 
+      const exportFunc = filterType === 'liked'
+        ? api.exportLikedPhotosToExcel
         : api.exportFavoritedPhotosToExcel
-      
+
       const { blob, filename } = await exportFunc(galleryId)
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -367,7 +368,7 @@ export default function ManageGalleryPage() {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
+
       showToast(`Excel file downloaded: ${filename}`, "success")
     } catch (error) {
       console.error("Failed to export to Excel:", error)
@@ -383,8 +384,8 @@ export default function ManageGalleryPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="text-gray-600 mt-2">This page is only available to photographers.</p>
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground mt-2">This page is only available to photographers.</p>
         </div>
       </div>
     )
@@ -402,8 +403,8 @@ export default function ManageGalleryPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Gallery Not Found</h1>
-          <p className="text-gray-600 mt-2">The gallery you're looking for doesn't exist.</p>
+          <h1 className="text-2xl font-bold">Gallery Not Found</h1>
+          <p className="text-muted-foreground mt-2">The gallery you're looking for doesn't exist.</p>
         </div>
       </div>
     )
@@ -411,110 +412,77 @@ export default function ManageGalleryPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Manage Gallery</h1>
-              <p className="text-gray-600 text-sm sm:text-base">{gallery?.title || 'Loading...'}</p>
-            </div>
+      {/* Modern Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight mb-1">Manage Gallery</h1>
+            <p className="text-muted-foreground text-lg">{gallery?.title}</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="whitespace-nowrap">
-              {gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos
-            </Badge>
-            {gallery?.id && (
-              <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
-                <Button variant="outline" size="sm" className="whitespace-nowrap">
-                  View Gallery
-                </Button>
-              </Link>
-            )}
-          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="text-sm px-4 py-2">
+            <Images className="h-4 w-4 mr-2" />
+            {gallery?.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0} photos
+          </Badge>
+          <Link href={`/gallery/${gallery.id}?refresh=${Date.now()}`}>
+            <Button variant="outline" size="lg">
+              <Eye className="h-4 w-4 mr-2" />
+              View Gallery
+            </Button>
+          </Link>
         </div>
       </div>
 
-      <Tabs defaultValue="photos" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="photos" className="flex items-center space-x-2">
-            <Images className="h-4 w-4" />
-            <span>Photos</span>
+      {/* Modern Tabs */}
+      <Tabs defaultValue="photos" className="space-y-8">
+        <TabsList className="bg-card border p-1">
+          <TabsTrigger value="photos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 py-2.5">
+            <Images className="h-4 w-4 mr-2" />
+            Photos
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
+          <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 py-2.5">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="photos" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Folder Tree Sidebar */}
-            <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Folders</CardTitle>
-                  <CardDescription>Organize your photos</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {gallery && (
-                    <FolderTree
-                      galleryId={galleryId}
-                      onFolderSelect={handleFolderSelect}
-                      selectedFolderId={selectedFolderId || undefined}
-                      onFolderCreate={handleCreateFolder}
-                      onFolderRename={handleRenameFolder}
-                      onFolderDelete={handleDeleteFolder}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            {/* Modern Sidebar - Folders */}
+            <Card className="lg:col-span-1 h-fit">
+              <CardContent className="p-0">
+                {gallery && (
+                  <FolderTree
+                    galleryId={galleryId}
+                    onFolderSelect={handleFolderSelect}
+                    selectedFolderId={selectedFolderId || undefined}
+                    onFolderCreate={handleCreateFolder}
+                    onFolderRename={handleRenameFolder}
+                    onFolderDelete={handleDeleteFolder}
+                  />
+                )}
+              </CardContent>
+            </Card>
 
-            {/* Main Content Area */}
+            {/* Main Content - Upload & Photos */}
             <div className="lg:col-span-3 space-y-6">
-              {/* Upload Section */}
+              {/* Modern Upload Area */}
               {selectedFolder && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Upload to "{selectedFolder.name}"</CardTitle>
-                    <CardDescription>Add new photos to this folder. Supported formats: JPG, PNG, WEBP</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Compression Option */}
-                    <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <Checkbox
-                        id="compress"
-                        checked={compressBeforeUpload}
-                        onCheckedChange={(checked) => setCompressBeforeUpload(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="compress"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        Compress photos before upload (faster upload, 90% quality)
-                      </label>
+                  <CardContent className="p-8">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold mb-1">Upload to "{selectedFolder.name}"</h3>
+                      <p className="text-sm text-muted-foreground">Add new photos to this folder. Supported formats: JPG, PNG, WEBP</p>
                     </div>
 
-                    {/* Upload Drop Zone */}
-                    <div
-                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#425146] transition-colors cursor-pointer"
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Upload photos by clicking or dragging files here"
-                      onClick={() => fileInputRef.current?.click()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          fileInputRef.current?.click()
-                        }
-                      }}
+                    <label
+                      className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-xl p-12 cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-all group"
                       onDrop={async (e) => {
                         e.preventDefault()
                         const dt = e.dataTransfer
@@ -530,95 +498,97 @@ export default function ManageGalleryPage() {
                       }}
                       onDragOver={(e) => e.preventDefault()}
                     >
-                      <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <p className="text-lg font-medium text-gray-900 mb-2">Drop photos here or click to browse</p>
-                      <p className="text-sm text-gray-500">You can upload multiple photos at once</p>
-                      <p className="text-xs text-gray-400 mt-2">Uploads continue in background - you can navigate away</p>
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4 group-hover:bg-primary/10 transition-colors">
+                        <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </div>
+                      <p className="text-lg font-medium mb-2">Drop photos here or click to browse</p>
+                      <p className="text-sm text-muted-foreground mb-1">You can upload multiple photos at once</p>
+                      <p className="text-xs text-muted-foreground">Uploads continue in background - you can navigate away</p>
                       <input
                         ref={fileInputRef}
                         type="file"
+                        className="hidden"
                         multiple
                         accept="image/*"
-                        className="hidden"
                         onChange={(e) => {
                           if (e.target.files) {
                             handleFileUpload(e.target.files)
                           }
                         }}
                       />
+                    </label>
+
+                    <div className="mt-4 flex items-center gap-2 text-sm">
+                      <Checkbox
+                        id="compress"
+                        checked={compressBeforeUpload}
+                        onCheckedChange={(checked) => setCompressBeforeUpload(checked as boolean)}
+                      />
+                      <label htmlFor="compress" className="text-muted-foreground cursor-pointer">
+                        Compress photos before upload (faster upload, 90% quality)
+                      </label>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Folder Content */}
+              {/* Modern Photos List */}
               {selectedFolder ? (
                 <Card>
-                  <CardHeader>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle>{selectedFolder?.name || 'Loading...'}</CardTitle>
-                          <CardDescription>
-                            {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
-                          </CardDescription>
-                        </div>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1">Photos</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedFolder?._count?.photos ?? 0} photos • {selectedFolder?._count?.children ?? 0} subfolders
+                        </p>
                       </div>
-                      
-                      {/* Search and Export Controls */}
-                      <div className="flex items-center justify-center gap-3">
-                        {/* Search Input - Centered */}
-                        <div className="flex-1 max-w-md">
-                          <Input
-                            type="text"
-                            placeholder="Search photos..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9"
-                          />
-                        </div>
-                        
-                        {/* Excel Export Buttons */}
-                        {photoStats && (photoStats.likedCount > 0 || photoStats.favoritedCount > 0) && (
-                          <div className="flex items-center gap-2">
-                            {photoStats.likedCount > 0 && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleExportToExcel('liked')}
-                                disabled={isExportingLiked}
-                                className="whitespace-nowrap"
-                              >
-                                {isExportingLiked ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                  <Heart className="h-4 w-4 mr-2 text-red-500" />
-                                )}
-                                Export Liked ({photoStats.likedCount})
-                              </Button>
+                      <div className="flex items-center gap-3">
+                        {photoStats && photoStats.likedCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportToExcel('liked')}
+                            disabled={isExportingLiked}
+                          >
+                            {isExportingLiked ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Heart className="h-4 w-4 mr-2 text-red-500" />
                             )}
-                            {photoStats.favoritedCount > 0 && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleExportToExcel('favorited')}
-                                disabled={isExportingFavorited}
-                                className="whitespace-nowrap"
-                              >
-                                {isExportingFavorited ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                  <Star className="h-4 w-4 mr-2 text-yellow-500" />
-                                )}
-                                Export Starred ({photoStats.favoritedCount})
-                              </Button>
+                            Export Liked ({photoStats.likedCount})
+                          </Button>
+                        )}
+                        {photoStats && photoStats.favoritedCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportToExcel('favorited')}
+                            disabled={isExportingFavorited}
+                          >
+                            {isExportingFavorited ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Star className="h-4 w-4 mr-2 text-yellow-500" />
                             )}
-                          </div>
+                            Export Starred ({photoStats.favoritedCount})
+                          </Button>
                         )}
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+
+                    {/* Search */}
+                    <div className="relative mb-6">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search photos..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 h-11"
+                      />
+                    </div>
+
+                    {/* File List */}
                     <FileList
                       folder={{
                         ...selectedFolder,
@@ -636,7 +606,7 @@ export default function ManageGalleryPage() {
                     {searchQuery && selectedFolder.photos.filter(photo =>
                       photo.filename.toLowerCase().includes(searchQuery.toLowerCase())
                     ).length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-muted-foreground">
                           No photos found matching "{searchQuery}"
                         </div>
                       )}
@@ -644,10 +614,14 @@ export default function ManageGalleryPage() {
                 </Card>
               ) : (
                 <Card>
-                  <CardContent className="text-center py-12">
-                    <Folder className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Folder</h3>
-                    <p className="text-gray-500">Choose a folder from the sidebar to view and manage its contents.</p>
+                  <CardContent className="text-center py-20">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/50 mb-6">
+                      <Folder className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">Select a Folder</h3>
+                    <p className="text-muted-foreground max-w-sm mx-auto">
+                      Choose a folder from the sidebar to view and manage its contents.
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -655,82 +629,105 @@ export default function ManageGalleryPage() {
           </div>
         </TabsContent>
 
+        {/* Modern Settings Tab */}
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gallery Settings</CardTitle>
-              <CardDescription>Update gallery information and access settings</CardDescription>
-            </CardHeader>
-            <form onSubmit={handleSaveSettings}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Gallery Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Enter gallery title"
-                    required
-                  />
+          <div className="max-w-3xl mx-auto">
+            <Card>
+              <CardContent className="p-8">
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold mb-2">Gallery Settings</h2>
+                  <p className="text-muted-foreground">Update gallery information and access settings</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Enter gallery description"
-                    rows={3}
-                  />
-                </div>
+                <form onSubmit={handleSaveSettings} className="space-y-6">
+                  {/* Gallery Title */}
+                  <div>
+                    <Label htmlFor="title" className="block text-sm font-medium mb-2">Gallery Title</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="h-11"
+                      required
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Set a password for this gallery (optional)"
-                  />
-                  <p className="text-sm text-gray-500">Leave empty to make gallery publicly accessible</p>
-                </div>
+                  {/* Description */}
+                  <div>
+                    <Label htmlFor="description" className="block text-sm font-medium mb-2">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Enter gallery description"
+                      className="min-h-[120px] resize-none"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="expiresAt">Expiry Date</Label>
-                  <Input
-                    id="expiresAt"
-                    type="datetime-local"
-                    value={formData.expiresAt}
-                    onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                  />
-                  <p className="text-sm text-gray-500">Leave empty for no expiry date</p>
-                </div>
+                  {/* Password */}
+                  <div>
+                    <Label htmlFor="password" className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Password Protection
+                    </Label>
+                    <PasswordInput
+                      id="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Set a password for this gallery (optional)"
+                      className="h-11"
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">Leave empty to make gallery publicly accessible</p>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="downloadLimit">Download Limit</Label>
-                  <Input
-                    id="downloadLimit"
-                    type="number"
-                    value={formData.downloadLimit}
-                    onChange={(e) => setFormData({ ...formData, downloadLimit: e.target.value })}
-                    placeholder="Maximum number of downloads (optional)"
-                    min="1"
-                  />
-                  <p className="text-sm text-gray-500">Current downloads: {gallery?.downloadCount ?? 0}</p>
-                </div>
+                  {/* Expiry Date */}
+                  <div>
+                    <Label htmlFor="expiresAt" className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Expiry Date
+                    </Label>
+                    <Input
+                      id="expiresAt"
+                      type="datetime-local"
+                      value={formData.expiresAt}
+                      onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                      className="h-11"
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">Leave empty for no expiry date</p>
+                  </div>
+
+                  {/* Download Limit */}
+                  <div>
+                    <Label htmlFor="downloadLimit" className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <DownloadIcon className="h-4 w-4" />
+                      Download Limit
+                    </Label>
+                    <Input
+                      id="downloadLimit"
+                      type="number"
+                      value={formData.downloadLimit}
+                      onChange={(e) => setFormData({ ...formData, downloadLimit: e.target.value })}
+                      className="h-11"
+                      min="0"
+                    />
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-sm text-muted-foreground">Set maximum number of downloads (0 = unlimited)</p>
+                      <p className="text-sm text-muted-foreground">Current: <span className="font-medium">{gallery?.downloadCount ?? 0}</span></p>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-4">
+                    <Button type="submit" size="lg" disabled={saving} className="w-full sm:w-auto">
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Settings
+                    </Button>
+                  </div>
+                </form>
               </CardContent>
-
-              <div className="px-6 pb-6">
-                <Button type="submit" disabled={saving}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Settings
-                </Button>
-              </div>
-            </form>
-          </Card>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

@@ -36,14 +36,28 @@ export enum AdminErrorType {
   AUDIT_LOG_FAILURE = 'AUDIT_LOG_FAILURE'
 }
 
+// Get CSRF token from cookie
+function getCSRFToken() {
+  if (typeof document === "undefined") return null
+  
+  const csrfToken = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("csrf-token="))
+    ?.split("=")[1]
+  
+  return csrfToken
+}
+
 async function adminApiRequest(endpoint: string, options: RequestInit = {}) {
   const token = getAuthToken()
+  const csrfToken = getCSRFToken()
 
   const config: RequestInit = {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
+      ...(csrfToken && { "x-csrf-token": csrfToken }),
       ...options.headers,
     },
   }

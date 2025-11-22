@@ -21,12 +21,18 @@ export enum AdminErrorType {
   AUDIT_LOG_FAILURE = 'AUDIT_LOG_FAILURE'
 }
 
+interface RegisterResponse {
+  requiresApproval: boolean;
+  message?: string;
+  user?: any;
+}
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   clientLogin: (email: string, password: string) => Promise<void>;
   adminLogin: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<RegisterResponse>;
   logout: () => void;
   adminLogout: () => Promise<void>;
   extendAdminSession: () => Promise<boolean>;
@@ -186,6 +192,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(data.error || "Registration failed");
     }
 
+    // Check if approval is required
+    if (data.data.requiresApproval) {
+      // Return the response data so the component can show approval modal
+      return { requiresApproval: true, message: data.data.message, user: data.data.user };
+    }
+
     // Your backend response structure: { success: true, data: { user: {...}, token: "..." } }
     const { user: userData, token } = data.data;
 
@@ -194,6 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
     router.push("/dashboard");
+    
+    return { requiresApproval: false };
   };
 
   const adminLogin = async (email: string, password: string) => {

@@ -576,6 +576,24 @@ export const uploadDirect = async (req: Request, res: Response) => {
       const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`;
       const originalUrl = `${endpoint}/${bucketName}/${b2Key}`;
 
+      // Extract EXIF capture date if available
+      let capturedAt: Date | null = null;
+      try {
+        const exifParser = require('exif-parser');
+        const parser = exifParser.create(file.buffer);
+        const result = parser.parse();
+        
+        if (result.tags && result.tags.DateTimeOriginal) {
+          capturedAt = new Date(result.tags.DateTimeOriginal * 1000);
+          console.log(`📅 EXIF date extracted: ${capturedAt.toISOString()}`);
+        } else if (result.tags && result.tags.CreateDate) {
+          capturedAt = new Date(result.tags.CreateDate * 1000);
+          console.log(`📅 EXIF create date extracted: ${capturedAt.toISOString()}`);
+        }
+      } catch (exifError) {
+        console.log(`⚠️ No EXIF date found for ${file.originalname}`);
+      }
+
       // Create photo record
       const photo = await prisma.photo.create({
         data: {
@@ -584,6 +602,7 @@ export const uploadDirect = async (req: Request, res: Response) => {
           thumbnailUrl: '', // Empty string initially, will be updated by thumbnail queue
           fileSize: file.size,
           folderId,
+          capturedAt,
         },
       });
 

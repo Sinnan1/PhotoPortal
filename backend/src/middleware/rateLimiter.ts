@@ -190,10 +190,10 @@ export const adminLoginLimiter = createRateLimiter({
   message: 'Too many login attempts, please try again later'
 })
 
-// User creation/management - 20 operations per hour
+// User creation/management - 50 operations per hour
 export const userManagementLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
-  maxRequests: 20,
+  maxRequests: 50,
   message: 'Too many user management operations, please slow down'
 })
 

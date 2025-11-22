@@ -1,171 +1,191 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
+import { motion } from "framer-motion"
 import { useAuth } from "@/lib/auth-context"
-import { useToast } from "@/components/ui/toast"
+import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { PasswordInput } from "@/components/ui/password-input"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 import { Loader2, Download, Heart, ShieldCheck } from "lucide-react"
 
+// 1. Validation Schema
+const formSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(1, { message: "Password is required." }),
+})
+
 export default function ClientLoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
   const { clientLogin } = useAuth()
-  const { showToast } = useToast()
+  const { toast } = useToast()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: "", password: "" },
+  })
 
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await clientLogin(email, password)
-      showToast("Successfully logged in!", "success")
+      await clientLogin(values.email, values.password)
+      toast({ title: "Success!", description: "Welcome to your gallery." })
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Login failed", "error")
-    } finally {
-      setLoading(false)
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please check your credentials.",
+      })
     }
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[hsl(var(--primary))] via-[hsl(var(--primary)/0.97)] to-[hsl(var(--primary)/0.90)] text-primary-foreground flex items-center justify-center px-4 py-10">
-      {/* Olive depth gradient (translucent so olive base shows through) */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-20 bg-gradient-to-b from-primary/30 via-primary/15 to-transparent"
-      />
-      {/* Subtle radial accent */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20 opacity-30"
-        style={{
-          backgroundImage: "radial-gradient(60% 50% at 20% 10%, hsl(var(--primary) / 0.18) 0%, transparent 60%)",
-        }}
-      />
-      {/* Soft dotted pattern for depth */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, hsl(var(--primary) / 0.25) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      {/* Oversized brand icon watermark (Source URL) */}
-      <img
-        aria-hidden
-        src="/ICON-01.png"
-        alt=""
-        className="pointer-events-none absolute -z-10 right-[-5%] top-1/2 -translate-y-1/2 w-[440px] md:w-[560px] lg:w-[640px] opacity-10"
+    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center p-6 bg-black/40">
+      {/* Background Image */}
+      <Image
+        src="/Client-Login.jpg"
+        alt="Client Login Background"
+        fill
+        className="object-cover -z-20 brightness-[0.55]"
+        priority
       />
 
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Brand */}
-        <div className="text-center">
-          {/* Provided Source URL per your instruction */}
-          <img
-            src="/LOGO-02.png"
-            alt="Yarrow Weddings & Co"
-            className="mx-auto h-20 md:h-24"
-          />
-          <h2 className="mt-4 text-3xl md:text-4xl font-bold text-balance">Client Lounge</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Access your private galleries</p>
-        </div>
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/40 via-black/30 to-black/60" />
 
-        {/* Mini gallery strip to differentiate client page */}
-        <div className="grid grid-cols-3 gap-3">
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 1"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 2"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-          <img
-            src="/placeholder.svg"
-            alt="Gallery preview 3"
-            className="h-24 w-full rounded-xl object-cover ring-1 ring-primary/20"
-          />
-        </div>
-
-        {/* Glassmorphism card */}
-        <Card className="rounded-3xl border border-primary/30 bg-background/8 supports-[backdrop-filter]:bg-background/5 backdrop-blur-3xl backdrop-saturate-200 bg-clip-padding shadow-2xl ring-1 ring-primary/25">
-          <CardHeader>
-            <CardTitle className="text-2xl text-primary">Welcome Back</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Enter your client credentials to access your galleries
+      {/* Glassmorphism Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-md"
+      >
+        <Card className="border border-white/20 bg-white/15 backdrop-blur-2xl shadow-2xl rounded-2xl">
+          <CardHeader className="text-center space-y-2">
+            <CardTitle className="text-3xl font-semibold tracking-tight text-white drop-shadow">
+              Client Lounge
+            </CardTitle>
+            <CardDescription className="text-gray-200">
+              Welcome. Sign in to access your private gallery.
             </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-5">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <CardContent className="grid gap-4">
+                {/* Email */}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-100">Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="name@example.com"
+                          {...field}
+                          className="bg-white/20 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-[#d1b98b]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="mt-1 mb-2"
+                {/* Password */}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center">
+                        <FormLabel className="text-gray-100">
+                          Password
+                        </FormLabel>
+                        <Link
+                          href="/forgot-password-client"
+                          className="ml-auto text-sm text-gray-300 underline hover:text-white transition"
+                        >
+                          Forgot?
+                        </Link>
+                      </div>
+                      <FormControl>
+                        <PasswordInput
+                          placeholder="••••••••"
+                          {...field}
+                          className="bg-white/20 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-[#d1b98b]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-            </CardContent>
 
-            <CardFooter className="flex flex-col space-y-5">
-              <Button type="submit" className="w-full rounded-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In as Client
-              </Button>
+                {/* Icons */}
+                <ul className="grid grid-cols-3 gap-3 pt-4 text-center text-xs text-gray-200">
+                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
+                    <Download className="h-4 w-4" />
+                    <span>Download</span>
+                  </li>
+                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
+                    <Heart className="h-4 w-4" />
+                    <span>Favorites</span>
+                  </li>
+                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>Secure</span>
+                  </li>
+                </ul>
+              </CardContent>
 
-              {/* Benefits row for the client experience */}
-              <ul className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <Download className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Download originals
-                </li>
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <Heart className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Favorites
-                </li>
-                <li className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-3 py-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Secure access
-                </li>
-              </ul>
+              <CardFooter className="flex flex-col gap-4 pb-6">
+                <Button
+                  type="submit"
+                  className="w-full bg-[#b19b75] hover:bg-[#a18c67] text-white"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Access Your Gallery
+                </Button>
 
-              <div className="text-center text-sm text-muted-foreground">
-                <p>Are you a photographer?</p>
-                <Link href="/login" className="text-primary font-medium hover:underline">
-                  Sign in as photographer
-                </Link>
-              </div>
-            </CardFooter>
-          </form>
+                <p className="text-center text-sm text-gray-300">
+                  Are you a photographer?{" "}
+                  <Link
+                    href="/login"
+                    className="font-semibold text-[#d1b98b] underline hover:text-[#f1d8a2] transition"
+                  >
+                    Sign in here
+                  </Link>
+                </p>
+              </CardFooter>
+            </form>
+          </Form>
         </Card>
-      </div>
+      </motion.div>
     </div>
   )
 }
