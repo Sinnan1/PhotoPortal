@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
+import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 
@@ -420,7 +420,7 @@ function GalleryPage() {
     try {
       await api.setFolderCover(folderId, photoId || undefined);
       showToast(photoId ? "Cover photo set successfully" : "Cover photo removed", "success");
-      
+
       // Refresh the gallery to update cover photos
       await fetchGallery();
     } catch (error) {
@@ -857,58 +857,58 @@ function GalleryPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[60]">
-              {/* Show message if no photos available */}
-              {(!currentFolder?.photos || currentFolder.photos.length === 0) && 
-               (!gallery.folders?.flatMap(f => f?.photos || []).length) && (
-                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  No photos available to download
-                </div>
-              )}
-
-              {/* Current Folder Download */}
-              {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
-                <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
-                  {isDownloadingCurrent ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Folder className="mr-2 h-4 w-4" />
+                {/* Show message if no photos available */}
+                {(!currentFolder?.photos || currentFolder.photos.length === 0) &&
+                  (!gallery.folders?.flatMap(f => f?.photos || []).length) && (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      No photos available to download
+                    </div>
                   )}
-                  Current Folder ({currentFolder.photos.length})
-                </DropdownMenuItem>
-              )}
 
-              {/* Download All */}
-              {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
-                <DropdownMenuItem onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                  {isDownloadingAll ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Images className="mr-2 h-4 w-4" />
-                  )}
-                  All Photos ({gallery.folders?.flatMap(f => f?.photos || []).length})
-                </DropdownMenuItem>
-              )}
+                {/* Current Folder Download */}
+                {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+                  <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
+                    {isDownloadingCurrent ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Folder className="mr-2 h-4 w-4" />
+                    )}
+                    Current Folder ({currentFolder.photos.length})
+                  </DropdownMenuItem>
+                )}
 
-              {/* Divider */}
-              {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
-                <div className="my-1 h-px bg-border" />
-              )}
+                {/* Download All */}
+                {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
+                  <DropdownMenuItem onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                    {isDownloadingAll ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Images className="mr-2 h-4 w-4" />
+                    )}
+                    All Photos ({gallery.folders?.flatMap(f => f?.photos || []).length})
+                  </DropdownMenuItem>
+                )}
 
-              {/* Download Liked */}
-              {user && galleryPhotoCounts.liked > 0 && (
-                <DropdownMenuItem>
-                  <Heart className="mr-2 h-4 w-4 text-red-500" />
-                  Liked Photos ({galleryPhotoCounts.liked})
-                </DropdownMenuItem>
-              )}
+                {/* Divider */}
+                {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
+                  <div className="my-1 h-px bg-border" />
+                )}
 
-              {/* Download Favorited */}
-              {user && galleryPhotoCounts.favorited > 0 && (
-                <DropdownMenuItem>
-                  <Star className="mr-2 h-4 w-4 text-yellow-500" />
-                  Favorited Photos ({galleryPhotoCounts.favorited})
-                </DropdownMenuItem>
-              )}
+                {/* Download Liked */}
+                {user && galleryPhotoCounts.liked > 0 && (
+                  <DropdownMenuItem>
+                    <Heart className="mr-2 h-4 w-4 text-red-500" />
+                    Liked Photos ({galleryPhotoCounts.liked})
+                  </DropdownMenuItem>
+                )}
+
+                {/* Download Favorited */}
+                {user && galleryPhotoCounts.favorited > 0 && (
+                  <DropdownMenuItem>
+                    <Star className="mr-2 h-4 w-4 text-yellow-500" />
+                    Favorited Photos ({galleryPhotoCounts.favorited})
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -960,6 +960,64 @@ function GalleryPage() {
             </div>
           </label>
         </div>
+
+        {/* Folder Selector Dropdown */}
+        {gallery.folders && gallery.folders.length > 0 && (
+          <DropdownMenu modal={true}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto justify-between gap-2 h-11 px-4 bg-background border-2 hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Folder className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span className="font-medium truncate">{currentFolder?.name || "Select Folder"}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant="secondary" className="ml-1">
+                    {currentFolder?._count?.photos || 0}
+                  </Badge>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[280px] sm:w-[320px] max-h-[400px] overflow-y-auto z-[60]">
+              {/* Recursively render all folders */}
+              {(() => {
+                const renderFolderItems = (folders: Folder[], level: number = 0): React.ReactNode => {
+                  return folders.map((folder) => {
+                    const isActive = currentFolder?.id === folder.id;
+                    const indent = level * 16; // 16px indent per level
+
+                    return (
+                      <div key={folder.id}>
+                        <DropdownMenuItem
+                          onClick={() => handleFolderSelect(folder.id)}
+                          className={`cursor-pointer ${isActive ? 'bg-primary/10 font-semibold' : ''}`}
+                          style={{ paddingLeft: `${12 + indent}px` }}
+                        >
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Folder className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <span className="truncate">{folder.name}</span>
+                            </div>
+                            <Badge variant={isActive ? "default" : "secondary"} className="flex-shrink-0 text-xs">
+                              {folder._count?.photos || 0}
+                            </Badge>
+                          </div>
+                        </DropdownMenuItem>
+                        {/* Render child folders if they exist */}
+                        {folder.children && folder.children.length > 0 && renderFolderItems(folder.children, level + 1)}
+                      </div>
+                    );
+                  });
+                };
+
+                return renderFolderItems(gallery.folders);
+              })()}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {/* Control Bar: View Mode + Filters */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

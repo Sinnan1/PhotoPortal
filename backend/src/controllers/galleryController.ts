@@ -98,6 +98,7 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						}
 						: undefined,
 				folders: {
+					orderBy: { createdAt: 'asc' },
 					include: {
 						photos: {
 							select: {
@@ -190,6 +191,7 @@ export const getGallery = async (req: Request, res: Response) => {
 			include: {
 				folders: {
 					where: { parentId: null }, // Only get root folders
+					orderBy: { createdAt: 'asc' },
 					include: {
 						photos: {
 							include: {
@@ -277,13 +279,13 @@ export const getGallery = async (req: Request, res: Response) => {
 			try {
 				const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
 				const userId = decoded.userId as string
-				
+
 				// Get user's download permission
 				const user = await prisma.user.findUnique({
 					where: { id: userId },
 					select: { canDownload: true, role: true }
 				})
-				
+
 				// Only restrict downloads for clients, not photographers
 				if (user && user.role === 'CLIENT') {
 					canDownload = user.canDownload
