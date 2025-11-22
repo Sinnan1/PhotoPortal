@@ -364,7 +364,7 @@ export default function ReviewsPage() {
 
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <Select value={filterRating} onValueChange={setFilterRating}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Filter className="mr-2 h-4 w-4" />
                   <SelectValue placeholder="Filter by" />
                 </SelectTrigger>
@@ -379,7 +379,7 @@ export default function ReviewsPage() {
               </Select>
 
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <ArrowUpDown className="mr-2 h-4 w-4" />
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
