@@ -29,7 +29,7 @@ export function ClientWelcomeModal({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent className="max-w-md w-[90vw] max-h-[80vh] overflow-hidden flex flex-col">
         <AlertDialogHeader>
           <div className="flex items-center justify-center mb-4">
             <div className="p-3 bg-primary/10 rounded-full">
@@ -41,7 +41,7 @@ export function ClientWelcomeModal({
           </AlertDialogTitle>
         </AlertDialogHeader>
         
-        <div className="space-y-4 px-6">
+        <div className="space-y-4 px-6 overflow-y-auto flex-1">
           <div className="text-center text-muted-foreground">
             For the best experience viewing and downloading your photos:
           </div>
