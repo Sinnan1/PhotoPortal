@@ -465,6 +465,56 @@ export const api = {
     };
   },
 
+  exportLikedPhotosToCSV: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export-csv/liked`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export liked photos to CSV");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'liked_photos.csv'
+    };
+  },
+
+  exportFavoritedPhotosToCSV: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export-csv/favorited`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export favorited photos to CSV");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'favorited_photos.csv'
+    };
+  },
+
   getGalleryPhotoStats: (galleryId: string) => apiRequest(`/photos/gallery/${galleryId}/stats`),
 
   downloadAllPhotosUnified: async (galleryId: string, galleryPassword?: string) => {

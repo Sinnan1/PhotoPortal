@@ -23,6 +23,13 @@ import { uploadManager } from "@/lib/upload-manager"
 import { UploadProgressPanel } from "@/components/ui/upload-progress-panel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { uploadFileToB2 } from '@/lib/uploadUtils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
 
 interface Photo {
   id: string
@@ -90,6 +97,10 @@ export default function ManageGalleryPage() {
   const [photoStats, setPhotoStats] = useState<{ likedCount: number; favoritedCount: number } | null>(null)
   const [isExportingLiked, setIsExportingLiked] = useState(false)
   const [isExportingFavorited, setIsExportingFavorited] = useState(false)
+
+  // CSV export state
+  const [isExportingLikedCSV, setIsExportingLikedCSV] = useState(false)
+  const [isExportingFavoritedCSV, setIsExportingFavoritedCSV] = useState(false)
 
 
 
@@ -378,6 +389,36 @@ export default function ManageGalleryPage() {
     }
   }
 
+  const handleExportToCSV = async (filterType: 'liked' | 'favorited') => {
+    const setExporting = filterType === 'liked' ? setIsExportingLikedCSV : setIsExportingFavoritedCSV
+
+    setExporting(true)
+    try {
+      const exportFunc = filterType === 'liked'
+        ? api.exportLikedPhotosToCSV
+        : api.exportFavoritedPhotosToCSV
+
+      const { blob, filename } = await exportFunc(galleryId)
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      showToast(`CSV file downloaded: ${filename}`, "success")
+    } catch (error) {
+      console.error("Failed to export to CSV:", error)
+      showToast("Failed to export to CSV", "error")
+    } finally {
+      setExporting(false)
+    }
+  }
+
 
 
   if (user?.role !== "PHOTOGRAPHER") {
@@ -545,34 +586,62 @@ export default function ManageGalleryPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         {photoStats && photoStats.likedCount > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportToExcel('liked')}
-                            disabled={isExportingLiked}
-                          >
-                            {isExportingLiked ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Heart className="h-4 w-4 mr-2 text-red-500" />
-                            )}
-                            Export Liked ({photoStats.likedCount})
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isExportingLiked || isExportingLikedCSV}
+                              >
+                                {isExportingLiked || isExportingLikedCSV ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Heart className="h-4 w-4 mr-2 text-red-500" />
+                                )}
+                                Export Liked ({photoStats.likedCount})
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleExportToExcel('liked')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                                as Excel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportToCSV('liked')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-600" />
+                                as CSV
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         {photoStats && photoStats.favoritedCount > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportToExcel('favorited')}
-                            disabled={isExportingFavorited}
-                          >
-                            {isExportingFavorited ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Star className="h-4 w-4 mr-2 text-yellow-500" />
-                            )}
-                            Export Starred ({photoStats.favoritedCount})
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isExportingFavorited || isExportingFavoritedCSV}
+                              >
+                                {isExportingFavorited || isExportingFavoritedCSV ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Star className="h-4 w-4 mr-2 text-yellow-500" />
+                                )}
+                                Export Starred ({photoStats.favoritedCount})
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleExportToExcel('favorited')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                                as Excel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportToCSV('favorited')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-600" />
+                                as CSV
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </div>

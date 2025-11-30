@@ -1775,6 +1775,281 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 	}
 };
 
+// Helper function to convert data to CSV format
+const convertToCSV = (data: any[]): string => {
+	if (data.length === 0) return '';
+
+	// Get headers from first object
+	const headers = Object.keys(data[0]);
+
+	// Escape CSV fields (handle commas, quotes, newlines)
+	const escapeCSVField = (field: any): string => {
+		if (field === null || field === undefined) return '';
+		const str = String(field);
+		// If field contains comma, quote, or newline, wrap in quotes and escape quotes
+		if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+			return `"${str.replace(/"/g, '""')}"`;
+		}
+		return str;
+	};
+
+	// Create header row
+	const headerRow = headers.map(escapeCSVField).join(',');
+
+	// Create data rows
+	const dataRows = data.map(row =>
+		headers.map(header => escapeCSVField(row[header])).join(',')
+	);
+
+	return [headerRow, ...dataRows].join('\n');
+};
+
+// Export liked photos filenames to CSV (Photographer/Admin only)
+export const exportLikedPhotosToCSV = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Access denied. Photographers only.",
+			});
+		}
+
+		// Get gallery info and verify ownership
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				title: true,
+				photographerId: true
+			}
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL liked photos from ALL clients
+		const likedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				likedBy: {
+					some: {}  // Get all liked photos
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				},
+				likedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (likedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No liked photos found",
+			});
+		}
+
+		// Prepare data for CSV - one row per client like
+		let rowNumber = 0;
+		const csvData = likedPhotos.flatMap(photo =>
+			photo.likedBy.map((like) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Liked By': like.user.name || like.user.email,
+					'Liked Date': like.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
+
+		// Convert to CSV
+		const csv = convertToCSV(csvData);
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_liked_photos.csv`;
+		res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
+
+		// Send the file
+		res.send(csv);
+
+	} catch (error) {
+		console.error("Export liked photos to CSV error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
+		}
+	}
+};
+
+// Export favorited photos filenames to CSV (Photographer/Admin only)
+export const exportFavoritedPhotosToCSV = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Access denied. Photographers only.",
+			});
+		}
+
+		// Get gallery info and verify ownership
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				title: true,
+				photographerId: true
+			}
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL favorited photos from ALL clients
+		const favoritedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				favoritedBy: {
+					some: {}  // Get all favorited photos
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				},
+				favoritedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (favoritedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No favorited photos found",
+			});
+		}
+
+		// Prepare data for CSV - one row per client favorite
+		let rowNumber = 0;
+		const csvData = favoritedPhotos.flatMap(photo =>
+			photo.favoritedBy.map((favorite) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Favorited By': favorite.user.name || favorite.user.email,
+					'Favorited Date': favorite.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
+
+		// Convert to CSV
+		const csv = convertToCSV(csvData);
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_favorited_photos.csv`;
+		res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
+
+		// Send the file
+		res.send(csv);
+
+	} catch (error) {
+		console.error("Export favorited photos to CSV error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
+		}
+	}
+};
+
 // Get liked and favorited photo counts for a gallery (photographer only)
 export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 	try {

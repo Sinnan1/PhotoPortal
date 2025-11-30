@@ -26,6 +26,8 @@ import {
 	downloadWithTicket,
 	exportLikedPhotosToExcel,
 	exportFavoritedPhotosToExcel,
+	exportLikedPhotosToCSV,
+	exportFavoritedPhotosToCSV,
 	getGalleryPhotoStats
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
@@ -85,6 +87,10 @@ router.get('/gallery/:galleryId/download/folder/:folderId', authenticateToken, d
 // Excel export routes (photographer only)
 router.get('/gallery/:galleryId/export/liked', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), exportLikedPhotosToExcel)
 router.get('/gallery/:galleryId/export/favorited', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), exportFavoritedPhotosToExcel)
+
+// CSV export routes (photographer only)
+router.get('/gallery/:galleryId/export-csv/liked', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), exportLikedPhotosToCSV)
+router.get('/gallery/:galleryId/export-csv/favorited', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), exportFavoritedPhotosToCSV)
 
 // Gallery photo stats (photographer only)
 router.get('/gallery/:galleryId/stats', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleryPhotoStats)
