@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Playfair_Display, Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
@@ -11,6 +11,17 @@ import { QueryProvider } from "@/lib/react-query"
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#425146' },
+    { media: '(prefers-color-scheme: dark)', color: '#2a3530' }
+  ],
+}
 
 export const metadata: Metadata = {
   title: "Yarrow Weddings & Co.",
@@ -30,16 +41,6 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
   generator: 'v0.dev',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  },
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#425146' },
-    { media: '(prefers-color-scheme: dark)', color: '#2a3530' }
-  ],
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
