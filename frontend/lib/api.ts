@@ -181,28 +181,28 @@ export const api = {
   // New function for downloading photo data directly
   downloadPhotoData: async (id: string, filename: string, galleryPassword?: string) => {
     const token = getAuthToken();
-    
+
     // Create a temporary form to POST credentials (more secure than URL params)
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `${API_BASE_URL}/photos/${id}/download`;
     form.target = '_blank';
     form.style.display = 'none';
-    
+
     if (token) {
       const tokenInput = document.createElement('input');
       tokenInput.name = 'token';
       tokenInput.value = token;
       form.appendChild(tokenInput);
     }
-    
+
     if (galleryPassword) {
       const passwordInput = document.createElement('input');
       passwordInput.name = 'password';
       passwordInput.value = galleryPassword;
       form.appendChild(passwordInput);
     }
-    
+
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);

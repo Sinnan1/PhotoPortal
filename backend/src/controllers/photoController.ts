@@ -524,7 +524,7 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 				stream.removeListener("error", errorHandler);
 				stream.removeListener("end", endHandler);
 				res.removeListener("close", closeHandler);
-				
+
 				if (stream && typeof stream.destroy === 'function' && !stream.destroyed) {
 					stream.destroy();
 					console.log("🧹 Stream destroyed and cleaned up");
@@ -602,9 +602,9 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 			const originalUrl = new URL(photo.originalUrl);
 			const pathParts = originalUrl.pathname.split("/").filter(p => p.length > 0);
 			const originalKey = pathParts.slice(1).join("/"); // Skip bucket name
-			
+
 			console.log(`🗑️ Deleting photo ${id}: ${originalKey}`);
-			
+
 			const deletePromises = [
 				deleteFromS3(originalKey).catch((err) => {
 					console.warn("Failed to delete original:", err);
@@ -617,9 +617,9 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 				const thumbnailUrl = new URL(photo.thumbnailUrl);
 				const thumbnailPathParts = thumbnailUrl.pathname.split("/").filter(p => p.length > 0);
 				const thumbnailKey = thumbnailPathParts.slice(1).join("/"); // Skip bucket name
-				
+
 				console.log(`🗑️ Deleting thumbnail: ${thumbnailKey}`);
-				
+
 				deletePromises.push(
 					deleteFromS3(thumbnailKey).catch((err) => {
 						console.warn("Failed to delete thumbnail:", err);
@@ -1556,6 +1556,11 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 					}
 				},
 				likedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
 					select: {
 						user: {
 							select: {
@@ -1689,6 +1694,11 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 					}
 				},
 				favoritedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
 					select: {
 						user: {
 							select: {
