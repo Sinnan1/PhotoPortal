@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,18 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/toast"
-
-interface Folder {
-  id: string
-  name: string
-  children: Folder[]
-  photos: { id: string; filename: string; thumbnailUrl: string }[]
-  coverPhoto?: { id: string; filename: string; thumbnailUrl: string }
-  _count: {
-    photos: number
-    children: number
-  }
-}
+import type { Folder } from "@/types"
 
 interface FolderTreeProps {
   galleryId: string
@@ -115,7 +104,7 @@ export function FolderTree({
   const renderFolder = (folder: Folder, level: number = 0) => {
     const isExpanded = expandedFolders.has(folder.id)
     const isSelected = selectedFolderId === folder.id
-    const hasChildren = folder.children.length > 0
+    const hasChildren = (folder.children || []).length > 0
     const indent = level * 20
 
     return (
@@ -154,7 +143,7 @@ export function FolderTree({
             {isExpanded ? (
               <FolderOpen className="w-4 h-4 text-[#425146]" />
             ) : (
-              <Folder className="w-4 h-4 text-[#425146]" />
+              <FolderIcon className="w-4 h-4 text-[#425146]" />
             )}
           </div>
 
@@ -165,7 +154,7 @@ export function FolderTree({
 
           {/* Photo Count */}
           <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full mr-2">
-            {folder._count.photos}
+            {folder._count?.photos || 0}
           </span>
 
           {/* Actions Menu */}
@@ -203,7 +192,7 @@ export function FolderTree({
         {/* Children */}
         {isExpanded && hasChildren && (
           <div>
-            {folder.children.map((child) => renderFolder(child, level + 1))}
+            {folder.children?.map((child) => renderFolder(child, level + 1))}
           </div>
         )}
       </div>
@@ -246,7 +235,7 @@ export function FolderTree({
       <div className="space-y-1">
         {folders.length === 0 ? (
           <div className="text-center py-8 px-4">
-            <Folder className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <FolderIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-sm text-gray-500">No folders yet</p>
             <p className="text-xs text-gray-400 mt-1">Create your first folder to get started</p>
           </div>

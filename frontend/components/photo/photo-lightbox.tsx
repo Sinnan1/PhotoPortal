@@ -6,18 +6,8 @@ import { Button } from "@/components/ui/button"
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { PhotoActions } from "./photo-actions"
 import { useAuth } from "@/lib/auth-context"
-
-interface Photo {
-  id: string
-  filename: string
-  thumbnailUrl: string
-  mediumUrl?: string
-  largeUrl?: string
-  originalUrl: string
-  createdAt: string
-  likedBy: { userId: string }[]
-  favoritedBy: { userId: string }[]
-}
+import type { Photo } from "@/types"
+import { usePhotoActions } from "@/hooks/usePhotoActions"
 
 interface PhotoLightboxProps {
   photo: Photo
@@ -45,6 +35,15 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
     imageLoaded: false,
     photoId: photo.id // Track photo ID to detect actual photo changes
   })
+
+  const { handleLikePhoto, handleFavoritePhoto } = usePhotoActions({
+    photos,
+    onPhotoStatusChange
+  });
+
+  const currentPhoto = photos.find(p => p.id === photo.id) || photo;
+  const isLiked = user ? (currentPhoto.likedBy ?? []).some(like => like.userId === user.id) : false;
+  const isFavorited = user ? (currentPhoto.favoritedBy ?? []).some(fav => fav.userId === user.id) : false;
 
   // Konami Code Easter Egg - REMOVED
   // const [konamiActivated, setKonamiActivated] = useState(false)
@@ -80,19 +79,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
   const isLast = currentIndex === photos.length - 1
 
   // Calculate initial like/favorite status - memoized to prevent unnecessary re-renders
-  const initialLiked = React.useMemo(() =>
-    user ? (photo.likedBy ?? []).some(like => like.userId === user.id) : false,
-    [photo.likedBy, user?.id]
-  )
-  const initialFavorited = React.useMemo(() =>
-    user ? (photo.favoritedBy ?? []).some(fav => fav.userId === user.id) : false,
-    [photo.favoritedBy, user?.id]
-  )
 
-  // Handler for status changes
-  const handleStatusChange = (liked: boolean, favorited: boolean) => {
-    onPhotoStatusChange?.(photo.id, { liked, favorited })
-  }
 
   // Function to load high quality (2000x2000) - the default for evaluation
   const loadHighQuality = async () => {
@@ -356,12 +343,12 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         case "q":
         case "Q":
           // Trigger like action
-          document.querySelector('[data-action="like"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          handleLikePhoto(photo.id);
           break
         case "w":
         case "W":
           // Trigger favorite action
-          document.querySelector('[data-action="favorite"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          handleFavoritePhoto(photo.id);
           break
       }
     }
@@ -428,10 +415,11 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         <PhotoActions
           key={photo.id}
           photoId={photo.id}
-          initialLiked={initialLiked}
-          initialFavorited={initialFavorited}
+          liked={isLiked}
+          favorited={isFavorited}
+          onLikeToggle={() => handleLikePhoto(photo.id)}
+          onFavoriteToggle={() => handleFavoritePhoto(photo.id)}
           onUnpost={onUnpost}
-          onStatusChange={handleStatusChange}
           className="flex-col [&>button]:text-white [&>button]:backdrop-blur-md [&>button]:bg-white/10 [&>button]:hover:bg-olive-green/30 [&>button]:border [&>button]:border-white/20 [&>button]:rounded-xl [&>button]:transition-all [&>button]:duration-all [&>button]:hover:scale-105 [&>button]:sm:w-10 [&>button]:sm:h-10"
         />
       </div>

@@ -1,17 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { ChevronRight, Folder } from "lucide-react";
+import { ChevronRight, Folder as FolderIcon } from "lucide-react";
 import { SelectionCounter } from "@/components/ui/selection-counter";
-
-interface Folder {
-  id: string;
-  name: string;
-  children?: Folder[];
-  _count?: {
-    photos: number;
-  };
-}
+import type { Folder } from "@/types";
 
 interface CompactFolderTreeProps {
   folder: Folder;
@@ -125,7 +117,7 @@ export function CompactFolderTree({
               />
             )}
             {!hasChildren && <div className="w-4 flex-shrink-0" />}
-            <Folder className="h-3 w-3 mr-2 flex-shrink-0" />
+            <FolderIcon className="h-3 w-3 mr-2 flex-shrink-0" />
             <span className="truncate">{folder.name}</span>
           </div>
           <span className="text-xs opacity-60 ml-2 flex-shrink-0">

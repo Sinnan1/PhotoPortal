@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
+import { useGalleries, useDeleteGallery, useLikeGallery, useUnlikeGallery, useFavoriteGallery, useUnfavoriteGallery } from "@/hooks/queries/useGalleries";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,8 +31,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { CreateGalleryModal } from "@/components/create-gallery-modal";
-import { GalleryAccessModal } from "@/components/gallery-access-modal";
+import { CreateGalleryModal } from "@/components/gallery/create-gallery-modal";
+import { GalleryAccessModal } from "@/components/gallery/gallery-access-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,44 +47,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-
-interface Photo {
-  id: string;
-  filename: string;
-  thumbnailUrl: string;
-  originalUrl: string;
-  mediumUrl?: string;
-  largeUrl?: string;
-  createdAt: string;
-}
-
-interface Folder {
-  id: string;
-  name: string;
-  coverPhoto?: Photo;
-  _count: {
-    photos: number;
-  };
-}
-
-interface Gallery {
-  id: string;
-  title: string;
-  description: string;
-  photoCount: number;
-  downloadCount: number;
-  expiresAt: string | null;
-  createdAt: string;
-  isExpired: boolean;
-  folders?: Folder[];
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
-  totalSize?: number;
-  _count?: {
-    likedBy: number;
-    favoritedBy: number;
-  };
-}
+import type { Photo, Folder, Gallery } from "@/types";
 
 // Helper function to format file size
 const formatFileSize = (bytes: number): string => {
@@ -97,36 +61,24 @@ const formatFileSize = (bytes: number): string => {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [galleries, setGalleries] = useState<Gallery[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: galleries = [], isLoading: loading } = useGalleries();
+  const deleteGalleryMutation = useDeleteGallery();
+  const likeGalleryMutation = useLikeGallery();
+  const unlikeGalleryMutation = useUnlikeGallery();
+  const favoriteGalleryMutation = useFavoriteGallery();
+  const unfavoriteGalleryMutation = useUnfavoriteGallery();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [selectedGallery, setSelectedGallery] = useState<Gallery | null>(null);
 
-  useEffect(() => {
-    if (user?.role === "PHOTOGRAPHER") {
-      fetchGalleries();
-    }
-  }, [user]);
-
-  const fetchGalleries = async () => {
-    try {
-      const response = await api.getGalleries();
-      setGalleries(response.data);
-    } catch (error) {
-      showToast("Failed to load galleries", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteGallery = async (id: string) => {
     if (!confirm("Are you sure you want to delete this gallery?")) return;
 
     try {
-      await api.deleteGallery(id);
-      setGalleries(galleries.filter((g) => g.id !== id));
+      await deleteGalleryMutation.mutateAsync(id);
       showToast("Gallery deleted successfully", "success");
     } catch (error) {
       showToast("Failed to delete gallery", "error");
@@ -138,15 +90,13 @@ export default function DashboardPage() {
       const gallery = galleries.find((g) => g.id === galleryId);
       if (!gallery) return;
 
-      const isLiked = gallery.likedBy.some((like) => like.userId === user?.id);
+      const isLiked = gallery.likedBy.some((like: { userId: string }) => like.userId === user?.id);
 
       if (isLiked) {
-        await api.unlikeGallery(galleryId);
+        await unlikeGalleryMutation.mutateAsync(galleryId);
       } else {
-        await api.likeGallery(galleryId);
+        await likeGalleryMutation.mutateAsync(galleryId);
       }
-
-      fetchGalleries();
     } catch (error) {
       showToast("Failed to update like status", "error");
     }
@@ -163,16 +113,14 @@ export default function DashboardPage() {
       if (!gallery) return;
 
       const isFavorited = gallery.favoritedBy.some(
-        (favorite) => favorite.userId === user?.id
+        (favorite: { userId: string }) => favorite.userId === user?.id
       );
 
       if (isFavorited) {
-        await api.unfavoriteGallery(galleryId);
+        await unfavoriteGalleryMutation.mutateAsync(galleryId);
       } else {
-        await api.favoriteGallery(galleryId);
+        await favoriteGalleryMutation.mutateAsync(galleryId);
       }
-
-      fetchGalleries();
     } catch (error) {
       showToast("Failed to update favorite status", "error");
     }
@@ -455,7 +403,7 @@ export default function DashboardPage() {
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
         onSuccess={() => {
-          fetchGalleries();
+          // No need to manually fetch, React Query handles invalidation
           setShowCreateModal(false);
         }}
       />

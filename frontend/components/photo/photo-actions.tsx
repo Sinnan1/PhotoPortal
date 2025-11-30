@@ -12,6 +12,10 @@ interface PhotoActionsProps {
   initialFavorited?: boolean;
   onUnpost?: () => void;
   onStatusChange?: (liked: boolean, favorited: boolean) => void;
+  liked?: boolean;
+  favorited?: boolean;
+  onLikeToggle?: () => void;
+  onFavoriteToggle?: () => void;
   className?: string;
 }
 
@@ -21,27 +25,35 @@ export function PhotoActions({
   initialFavorited = false,
   onUnpost,
   onStatusChange,
+  liked: controlledLiked,
+  favorited: controlledFavorited,
+  onLikeToggle,
+  onFavoriteToggle,
   className = "",
 }: PhotoActionsProps) {
-  const [liked, setLiked] = useState(initialLiked);
-  const [favorited, setFavorited] = useState(initialFavorited);
+  const [internalLiked, setInternalLiked] = useState(initialLiked);
+  const [internalFavorited, setInternalFavorited] = useState(initialFavorited);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const isControlled = controlledLiked !== undefined && controlledFavorited !== undefined;
+  const isLiked = isControlled ? controlledLiked : internalLiked;
+  const isFavorited = isControlled ? controlledFavorited : internalFavorited;
+
   useEffect(() => {
-    // Fetch initial status if not provided
-    if (initialLiked === undefined || initialFavorited === undefined) {
+    // Fetch initial status if not provided and not controlled
+    if (!isControlled && (initialLiked === undefined || initialFavorited === undefined)) {
       fetchPhotoStatus();
     }
-  }, [photoId]);
+  }, [photoId, isControlled]);
 
   const fetchPhotoStatus = async () => {
     try {
       const response = await api.getPhotoStatus(photoId);
-      const { liked: isLiked, favorited: isFavorited } = response.data;
-      setLiked(isLiked);
-      setFavorited(isFavorited);
-      onStatusChange?.(isLiked, isFavorited);
+      const { liked: likedStatus, favorited: favoritedStatus } = response.data;
+      setInternalLiked(likedStatus);
+      setInternalFavorited(favoritedStatus);
+      onStatusChange?.(likedStatus, favoritedStatus);
     } catch (error) {
       console.error("Failed to fetch photo status:", error);
     }
@@ -51,21 +63,26 @@ export function PhotoActions({
     e.stopPropagation();
     if (loading) return;
 
+    if (onLikeToggle) {
+      onLikeToggle();
+      return;
+    }
+
     setLoading(true);
     try {
-      if (liked) {
+      if (isLiked) {
         await api.unlikePhoto(photoId);
-        setLiked(false);
-        onStatusChange?.(false, favorited);
+        setInternalLiked(false);
+        onStatusChange?.(false, isFavorited!);
       } else {
         await api.likePhoto(photoId);
-        setLiked(true);
-        onStatusChange?.(true, favorited);
+        setInternalLiked(true);
+        onStatusChange?.(true, isFavorited!);
       }
-      
+
       toast({
-        title: !liked ? "Photo liked!" : "Photo unliked",
-        description: !liked ? "Added to your liked photos" : "Removed from liked photos",
+        title: !isLiked ? "Photo liked!" : "Photo unliked",
+        description: !isLiked ? "Added to your liked photos" : "Removed from liked photos",
       });
     } catch (error) {
       console.error("Failed to like photo:", error);
@@ -83,21 +100,26 @@ export function PhotoActions({
     e.stopPropagation();
     if (loading) return;
 
+    if (onFavoriteToggle) {
+      onFavoriteToggle();
+      return;
+    }
+
     setLoading(true);
     try {
-      if (favorited) {
+      if (isFavorited) {
         await api.unfavoritePhoto(photoId);
-        setFavorited(false);
-        onStatusChange?.(liked, false);
+        setInternalFavorited(false);
+        onStatusChange?.(isLiked!, false);
       } else {
         await api.favoritePhoto(photoId);
-        setFavorited(true);
-        onStatusChange?.(liked, true);
+        setInternalFavorited(true);
+        onStatusChange?.(isLiked!, true);
       }
-      
+
       toast({
-        title: !favorited ? "Photo favorited!" : "Photo unfavorited",
-        description: !favorited ? "Added to your favorites" : "Removed from favorites",
+        title: !isFavorited ? "Photo favorited!" : "Photo unfavorited",
+        description: !isFavorited ? "Added to your favorites" : "Removed from favorites",
       });
     } catch (error) {
       console.error("Failed to favorite photo:", error);
@@ -115,33 +137,31 @@ export function PhotoActions({
     <div className={`flex gap-2 ${className}`}>
       <Button
         size="sm"
-        variant={liked ? "default" : "secondary"}
+        variant={isLiked ? "default" : "secondary"}
         onClick={handleLike}
         disabled={loading}
         data-action="like"
         title="Like photo (Press Q)"
-        className={`transition-all duration-200 ${
-          liked ? "bg-red-500 hover:bg-red-600" : ""
-        }`}
+        className={`transition-all duration-200 ${isLiked ? "bg-red-500 hover:bg-red-600" : ""
+          }`}
       >
-        <Heart 
-          className={`h-4 w-4 ${liked ? "fill-current" : ""}`} 
+        <Heart
+          className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
         />
       </Button>
-      
+
       <Button
         size="sm"
-        variant={favorited ? "default" : "secondary"}
+        variant={isFavorited ? "default" : "secondary"}
         onClick={handleFavorite}
         disabled={loading}
         data-action="favorite"
         title="Favorite photo (Press W)"
-        className={`transition-all duration-200 ${
-          favorited ? "bg-yellow-500 hover:bg-yellow-600" : ""
-        }`}
+        className={`transition-all duration-200 ${isFavorited ? "bg-yellow-500 hover:bg-yellow-600" : ""
+          }`}
       >
         <Star
-          className={`h-4 w-4 ${favorited ? "fill-current" : ""}`}
+          className={`h-4 w-4 ${isFavorited ? "fill-current" : ""}`}
         />
       </Button>
 
@@ -163,4 +183,4 @@ export function PhotoActions({
       )}
     </div>
   );
-} 
+}

@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { 
-  Activity, 
+import {
+  Activity,
   Zap,
   Clock,
   Server,
@@ -116,11 +116,11 @@ export default function PerformanceAnalyticsPage() {
 
   useEffect(() => {
     fetchPerformanceMetrics();
-    
+
     // Set up auto-refresh every 30 seconds
     const interval = setInterval(fetchPerformanceMetrics, 30000);
     setRefreshInterval(interval);
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -129,7 +129,7 @@ export default function PerformanceAnalyticsPage() {
   const fetchPerformanceMetrics = async () => {
     try {
       setLoading(true);
-      
+
       // Generate mock performance data (in a real app, this would come from monitoring APIs)
       const mockMetrics: PerformanceMetrics = {
         systemHealth: {
@@ -200,22 +200,22 @@ export default function PerformanceAnalyticsPage() {
         ],
         alerts: [
           {
-            type: 'warning',
+            type: 'warning' as const,
             message: 'High memory usage detected on server',
             timestamp: new Date(Date.now() - Math.random() * 60 * 60 * 1000).toISOString(),
             resolved: Math.random() > 0.3,
           },
           {
-            type: 'info',
+            type: 'info' as const,
             message: 'Database maintenance completed successfully',
             timestamp: new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000).toISOString(),
             resolved: true,
           },
         ].filter(() => Math.random() > 0.3), // Randomly show some alerts
       };
-      
+
       setMetrics(mockMetrics);
-      
+
     } catch (error: any) {
       console.error('Failed to fetch performance metrics:', error);
       toast({
@@ -430,7 +430,7 @@ export default function PerformanceAnalyticsPage() {
                   {metrics.resourceUsage.cpu > 80 ? 'High usage' : 'Normal'}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
@@ -444,7 +444,7 @@ export default function PerformanceAnalyticsPage() {
                   {metrics.resourceUsage.memory > 80 ? 'High usage' : 'Normal'}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
@@ -458,7 +458,7 @@ export default function PerformanceAnalyticsPage() {
                   {metrics.resourceUsage.disk > 80 ? 'High usage' : 'Normal'}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
@@ -531,7 +531,7 @@ export default function PerformanceAnalyticsPage() {
                       <div className="font-medium">{endpoint.errorRate}%</div>
                       <p className="text-xs text-gray-400">error rate</p>
                     </div>
-                    <Badge 
+                    <Badge
                       variant={endpoint.status === 'healthy' ? 'outline' : 'destructive'}
                       className={endpoint.status === 'healthy' ? 'text-green-600 border-green-600' : ''}
                     >
@@ -573,7 +573,7 @@ export default function PerformanceAnalyticsPage() {
                   </div>
                   <span className="text-sm font-bold">{metrics.databasePerformance.queryTime}ms</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Server className="h-4 w-4 text-green-600" />
@@ -581,7 +581,7 @@ export default function PerformanceAnalyticsPage() {
                   </div>
                   <span className="text-sm font-bold">{metrics.databasePerformance.connections}</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <AlertTriangle className="h-4 w-4 text-orange-600" />
@@ -623,13 +623,12 @@ export default function PerformanceAnalyticsPage() {
             ) : (
               <div className="space-y-3">
                 {metrics.alerts.map((alert, index) => (
-                  <div 
-                    key={index} 
-                    className={`p-3 rounded-lg ${
-                      alert.type === 'error' ? 'bg-red-50 dark:bg-red-950/20' :
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg ${alert.type === 'error' ? 'bg-red-50 dark:bg-red-950/20' :
                       alert.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-950/20' :
-                      'bg-blue-50 dark:bg-blue-950/20'
-                    }`}
+                        'bg-blue-50 dark:bg-blue-950/20'
+                      }`}
                   >
                     <div className="flex items-start space-x-3">
                       {alert.type === 'error' ? (
@@ -640,11 +639,10 @@ export default function PerformanceAnalyticsPage() {
                         <CheckCircle className="h-4 w-4 text-blue-500 mt-0.5" />
                       )}
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${
-                          alert.type === 'error' ? 'text-red-800 dark:text-red-200' :
+                        <p className={`text-sm font-medium ${alert.type === 'error' ? 'text-red-800 dark:text-red-200' :
                           alert.type === 'warning' ? 'text-yellow-800 dark:text-yellow-200' :
-                          'text-blue-800 dark:text-blue-200'
-                        }`}>
+                            'text-blue-800 dark:text-blue-200'
+                          }`}>
                           {alert.message}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">

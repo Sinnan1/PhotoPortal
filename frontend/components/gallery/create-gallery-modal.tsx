@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { api } from "@/lib/api"
+import { useCreateGallery } from "@/hooks/queries/useGalleries"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,12 +35,13 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
     expiresAt: "",
     downloadLimit: "",
   })
-  const [loading, setLoading] = useState(false)
+
+  const createGalleryMutation = useCreateGallery()
+  const loading = createGalleryMutation.isPending
   const { showToast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
 
     try {
       const galleryData = {
@@ -50,7 +52,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
       }
 
-      await api.createGallery(galleryData)
+      await createGalleryMutation.mutateAsync(galleryData)
       showToast("Gallery created successfully!", "success")
       setFormData({
         title: "",
@@ -62,8 +64,6 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
       onSuccess()
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Failed to create gallery", "error")
-    } finally {
-      setLoading(false)
     }
   }
 

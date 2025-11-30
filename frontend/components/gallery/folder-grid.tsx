@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Download, Eye, Trash2, Heart, Star, Folder, ImageIcon, MoreHorizontal, Edit, Share2 } from "lucide-react"
+import { Download, Eye, Trash2, Heart, Star, Folder as FolderIcon, ImageIcon, MoreHorizontal, Edit, Share2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/toast"
@@ -13,29 +13,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-interface Photo {
-  id: string
-  filename: string
-  thumbnailUrl: string
-  originalUrl: string
-  createdAt: string
-  likedBy: { userId: string }[]
-  favoritedBy: { userId: string }[]
-  postBy: { userId: string }[]
-}
-
-interface Folder {
-  id: string
-  name: string
-  children: Folder[]
-  photos: Photo[]
-  coverPhoto?: Photo
-  _count: {
-    photos: number
-    children: number
-  }
-}
+import type { Photo, Folder } from "@/types"
+import { usePhotoActions } from "@/hooks/usePhotoActions"
+import { useImagePreload } from "@/hooks/useImagePreload"
 
 interface FolderGridProps {
   folder: Folder
@@ -64,17 +44,19 @@ export function FolderGrid({
 }: FolderGridProps) {
   const { user } = useAuth()
   const { showToast } = useToast()
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
 
-  // Batch image load updates to reduce re-renders
-  const handleImageLoad = (photoId: string) => {
-    setLoadedImages(prev => {
-      if (prev.has(photoId)) return prev
-      const newSet = new Set(prev)
-      newSet.add(photoId)
-      return newSet
-    })
-  }
+  const {
+    handleLikePhoto,
+    handleFavoritePhoto,
+    handlePostPhoto,
+    handleDeletePhoto
+  } = usePhotoActions({
+    photos: folder.photos || [],
+    onPhotoStatusChange,
+    onDelete: onPhotoDelete
+  });
+
+  const { loadedImages, handleImageLoad } = useImagePreload();
 
   const handleDownload = async (photoId: string) => {
     try {
@@ -87,98 +69,6 @@ export function FolderGrid({
     } catch (error) {
       console.error("Download failed", error)
       showToast("Download failed", "error")
-    }
-  }
-
-  const handleDelete = (photoId: string) => {
-    if (onPhotoDelete && confirm("Are you sure you want to delete this photo?")) {
-      onPhotoDelete(photoId)
-    }
-  }
-
-  const handleLikePhoto = async (photoId: string) => {
-    try {
-      const photo = (folder.photos || []).find((p) => p.id === photoId)
-      if (!photo) return
-
-      if (!user?.id) {
-        showToast("Please log in to like photos", "error")
-        return
-      }
-
-      const isLiked = (photo.likedBy ?? []).some((like) => like.userId === user.id)
-
-      if (isLiked) {
-        await api.unlikePhoto(photoId)
-      } else {
-        await api.likePhoto(photoId)
-      }
-
-      // Notify parent so it can update its source list for filtering
-      onPhotoStatusChange?.(photoId, { liked: !isLiked })
-
-    } catch (error) {
-      console.error('Like photo error:', error)
-      showToast("Failed to update like status", "error")
-    }
-  }
-
-  const handleFavoritePhoto = async (photoId: string) => {
-    try {
-      const photo = (folder.photos || []).find((p) => p.id === photoId)
-      if (!photo) return
-
-      if (!user?.id) {
-        showToast("Please log in to favorite photos", "error")
-        return
-      }
-
-      const isFavorited = (photo.favoritedBy ?? []).some((favorite) => favorite.userId === user.id)
-
-      if (isFavorited) {
-        await api.unfavoritePhoto(photoId)
-      } else {
-        await api.favoritePhoto(photoId)
-      }
-
-      // Notify parent so it can update its source list for filtering
-      onPhotoStatusChange?.(photoId, { favorited: !isFavorited })
-
-    } catch (error) {
-      console.error('Favorite photo error:', error)
-      showToast("Failed to update favorite status", "error")
-    }
-  }
-
-  const handlePostPhoto = async (photoId: string) => {
-    try {
-      const photo = (folder.photos || []).find((p) => p.id === photoId)
-      if (!photo) return
-
-      if (!user?.id) {
-        showToast("Please log in to mark photos for posting", "error")
-        return
-      }
-
-      if (!isPhotographer) {
-        showToast("Only photographers can mark photos for posting", "error")
-        return
-      }
-
-      const isPosted = (photo.postBy ?? []).some((post) => post.userId === user.id)
-
-      if (isPosted) {
-        await api.unpostPhoto(photoId)
-      } else {
-        await api.postPhoto(photoId)
-      }
-
-      // Notify parent so it can update its source list for filtering
-      onPhotoStatusChange?.(photoId, { posted: !isPosted })
-
-    } catch (error) {
-      console.error('Post photo error:', error)
-      showToast("Failed to update post status", "error")
     }
   }
 
@@ -218,22 +108,20 @@ export function FolderGrid({
       {(folder.photos || []).map((photo) => (
         <div
           key={`photo-${photo.id}`}
-          className={`group relative ${
-            viewMode === "tile"
-              ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
-              : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
-          }`}
+          className={`group relative ${viewMode === "tile"
+            ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
+            : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:shadow-[#425146]/10 transition-shadow duration-200"
+            }`}
           style={{ contain: 'layout style paint' }}
         >
           <Image
             src={photo.thumbnailUrl || "/placeholder.svg"}
             alt={photo.filename}
             fill
-            className={`object-cover cursor-pointer transition-opacity duration-300 ${
-              loadedImages.has(photo.id)
-                ? 'opacity-100'
-                : 'opacity-0'
-            }`}
+            className={`object-cover cursor-pointer transition-opacity duration-300 ${loadedImages.has(photo.id)
+              ? 'opacity-100'
+              : 'opacity-0'
+              }`}
             onClick={() => onPhotoView(photo)}
             unoptimized
             loading="lazy"
@@ -289,7 +177,7 @@ export function FolderGrid({
                   className="backdrop-blur-sm h-7 w-7 p-0"
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleDelete(photo.id)
+                    handleDeletePhoto(photo.id)
                   }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

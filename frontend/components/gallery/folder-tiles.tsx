@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Folder, MoreHorizontal, Edit, Trash2, ImageIcon, ChevronDown, ChevronUp } from "lucide-react"
+import { Folder as FolderIcon, MoreHorizontal, Edit, Trash2, ImageIcon, ChevronDown, ChevronUp } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,31 +11,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SelectionCounter } from "@/components/ui/selection-counter"
-
-interface Photo {
-  id: string
-  filename: string
-  thumbnailUrl: string
-  originalUrl: string
-  createdAt: string
-  likedBy: { userId: string }[]
-  favoritedBy: { userId: string }[]
-}
-
-interface SubFolder {
-  id: string
-  name: string
-  children: SubFolder[]
-  photos: Photo[]
-  coverPhoto?: Photo
-  _count: {
-    photos: number
-    children: number
-  }
-}
+import type { Folder } from "@/types"
 
 interface FolderTilesProps {
-  folders: SubFolder[]
+  folders: Folder[]
   isPhotographer: boolean
   onFolderSelect: (folderId: string) => void
   onFolderRename?: (folderId: string, newName: string) => void
@@ -126,7 +105,7 @@ export function FolderTiles({
 
                 {/* Folder Content */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
-                  <Folder className="w-5 h-5 text-[#425146] mb-1" />
+                  <FolderIcon className="w-5 h-5 text-[#425146] mb-1" />
                   <p className="text-xs font-medium text-gray-900 dark:text-white text-center truncate w-full leading-tight">
                     {folder.name || 'Unnamed'}
                   </p>

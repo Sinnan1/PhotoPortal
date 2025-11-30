@@ -1,35 +1,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Trash2, FileImage, Folder } from "lucide-react"
+import { Trash2, FileImage, Folder as FolderIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-
-interface Photo {
-  id: string
-  filename: string
-  fileSize?: number
-  createdAt: string
-}
-
-interface ChildFolder {
-  id: string
-  name: string
-  _count: {
-    photos: number
-    children: number
-  }
-}
-
-interface Folder {
-  id: string
-  name: string
-  children: ChildFolder[]
-  photos: Photo[]
-  _count: {
-    photos: number
-    children: number
-  }
-}
+import type { Photo, Folder, ChildFolder } from "@/types"
 
 interface FileListProps {
   folder: Folder
@@ -84,13 +58,13 @@ export function FileList({
           onClick={() => onFolderSelect(subfolder.id)}
         >
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <Folder className="h-5 w-5 text-primary flex-shrink-0" />
+            <FolderIcon className="h-5 w-5 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">
                 {subfolder.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                {subfolder._count.photos} photos • {subfolder._count.children} subfolders
+                {subfolder._count?.photos ?? 0} photos • {subfolder._count?.children ?? 0} subfolders
               </p>
             </div>
           </div>

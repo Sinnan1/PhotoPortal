@@ -21,29 +21,10 @@ import {
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 import { TotalPhotoCount, PhotoCount } from "@/components/admin/PhotoCount";
-
-interface Gallery {
-  id: string;
-  title: string;
-  photographer: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  isPublic: boolean;
-  _count?: {
-    folders: number;
-  };
-  stats?: {
-    totalPhotos: number;
-    totalFolders: number;
-    storageUsed: number;
-    clientsWithAccess: number;
-  };
-}
+import type { AdminGallery } from "@/types";
 
 export default function AdminGalleriesPage() {
-  const [galleries, setGalleries] = useState<Gallery[]>([]);
+  const [galleries, setGalleries] = useState<AdminGallery[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [totalGalleries, setTotalGalleries] = useState(0);

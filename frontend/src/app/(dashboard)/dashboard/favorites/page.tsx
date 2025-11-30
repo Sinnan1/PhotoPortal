@@ -1,60 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
-import { PhotoGrid } from "@/components/photo-grid";
-import { PhotoLightbox } from "@/components/photo-lightbox";
+import { PhotoGrid } from "@/components/photo/photo-grid";
+import { PhotoLightbox } from "@/components/photo/photo-lightbox";
 import { Star, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface Photo {
-  id: string;
-  filename: string;
-  thumbnailUrl: string;
-  originalUrl: string;
-  createdAt: string;
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
-  folder: {
-    id: string;
-    name: string;
-    gallery: {
-      id: string;
-      title: string;
-      photographer: {
-        name: string;
-      };
-    };
-  };
-}
+import type { PhotoWithContext } from "@/types";
+import { useFavoritedPhotos } from "@/hooks/queries/usePhotos";
+import { usePhotoActions } from "@/hooks/usePhotoActions";
 
 export default function FavoritesPage() {
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const { data: photos = [], isLoading: loading } = useFavoritedPhotos();
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithContext | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchFavoritedPhotos();
-  }, []);
-
-  const fetchFavoritedPhotos = async () => {
-    try {
-      setLoading(true);
-      const response = await api.getFavoritedPhotos();
-      setPhotos(response.data);
-    } catch (error) {
-      console.error("Failed to fetch favorited photos:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load favorited photos",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const { handleLikePhoto, handleFavoritePhoto } = usePhotoActions({
+    photos,
+    onPhotoStatusChange: () => {
+      // React Query handles invalidation
     }
-  };
+  });
 
   const handleDownload = async (photoId: string) => {
     let blobUrl: string | null = null;
@@ -143,8 +110,8 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <PhotoGrid
-          photos={photos as any}
-          onView={(p) => setSelectedPhoto(p as any)}
+          photos={photos}
+          onView={(p) => setSelectedPhoto(p as PhotoWithContext)}
           onDownload={handleDownload}
           columns={{ sm: 2, md: 3, lg: 4 }}
         />
@@ -176,4 +143,4 @@ export default function FavoritesPage() {
       )}
     </div>
   );
-} 
+}

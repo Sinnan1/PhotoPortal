@@ -4,9 +4,10 @@ import { Playfair_Display, Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { ToastProvider } from "@/components/ui/toast"
-import { Navigation } from "@/components/navigation"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Footer } from "@/components/footer"
+import { Navigation } from "@/components/layout/navigation"
+import { ThemeProvider } from "@/components/theme/theme-provider"
+import { Footer } from "@/components/layout/footer"
+import { QueryProvider } from "@/lib/react-query"
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
@@ -75,11 +76,13 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <ToastProvider>
             <AuthProvider>
-              <div className="flex min-h-screen flex-col">
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
+              <QueryProvider>
+                <div className="flex min-h-screen flex-col">
+                  <Navigation />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+              </QueryProvider>
             </AuthProvider>
           </ToastProvider>
         </ThemeProvider>
