@@ -436,6 +436,16 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         />
       </div>
 
+      {/* Selection Instructions - Top Left */}
+      <div className="absolute top-20 left-4 md:top-20 md:left-4 text-white z-10 hidden md:block">
+        <div className="backdrop-blur-md bg-black/40 rounded-lg px-3 py-2 border border-white/20">
+          <p className="text-xs opacity-90 leading-relaxed">
+            ❤️ Like = Editing<br />
+            ⭐ Favorite = Album
+          </p>
+        </div>
+      </div>
+
       {/* Navigation Buttons - Mobile Responsive with Touch-Friendly Size */}
       {!isFirst && (
         <Button

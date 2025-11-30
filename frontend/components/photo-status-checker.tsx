@@ -35,7 +35,7 @@ export function PhotoStatusChecker({ photos, onStatusUpdate }: PhotoStatusChecke
     if (!user) return;
 
     setChecking(true);
-    
+
     try {
       // Check status for each photo
       const statusPromises = photos.map(async (photo) => {
@@ -58,7 +58,7 @@ export function PhotoStatusChecker({ photos, onStatusUpdate }: PhotoStatusChecke
       });
 
       const statuses = await Promise.all(statusPromises);
-      
+
       // Update each photo's status
       statuses.forEach((status) => {
         onStatusUpdate(status.photoId, {
