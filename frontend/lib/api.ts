@@ -34,6 +34,23 @@ const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL
   ? `${process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL}/api`
   : API_BASE_URL
 
+// Helper function to check if localStorage is available
+function isStorageAvailable(): boolean {
+  if (typeof window === 'undefined') return false
+  if (typeof localStorage === 'undefined') return false
+
+  try {
+    // Test if we can actually access localStorage
+    const test = '__storage_test__'
+    localStorage.setItem(test, test)
+    localStorage.removeItem(test)
+    return true
+  } catch (e) {
+    // localStorage is not available or restricted
+    return false
+  }
+}
+
 function getAuthToken() {
   if (typeof document === "undefined") return null
 
@@ -45,17 +62,19 @@ function getAuthToken() {
 
   if (cookieToken) return cookieToken
 
-  // Fallback: try to get token from localStorage
-  try {
-    const user = localStorage.getItem("user")
-    if (user) {
-      const userData = JSON.parse(user)
-      // Check if we have a token stored somewhere else
-      const storedToken = localStorage.getItem("auth-token")
-      if (storedToken) return storedToken
+  // Fallback: try to get token from localStorage only if available
+  if (isStorageAvailable()) {
+    try {
+      const user = localStorage.getItem("user")
+      if (user) {
+        const userData = JSON.parse(user)
+        // Check if we have a token stored somewhere else
+        const storedToken = localStorage.getItem("auth-token")
+        if (storedToken) return storedToken
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage:", error)
     }
-  } catch (error) {
-    console.error("Error reading from localStorage:", error)
   }
 
   return null
