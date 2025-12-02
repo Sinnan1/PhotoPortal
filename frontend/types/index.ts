@@ -136,6 +136,7 @@ export interface Gallery {
     photoCount: number;
     downloadCount: number;
     expiresAt: string | null;
+    shootDate?: string | null;
     createdAt: string;
     isExpired: boolean;
     downloadLimit?: number | null;

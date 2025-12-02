@@ -100,3 +100,18 @@ export function useUnfavoriteGallery() {
         },
     });
 }
+
+export function useSearchGalleries(query: string, dateRange?: { from?: Date; to?: Date }) {
+    return useQuery({
+        queryKey: ['search', query, dateRange],
+        queryFn: async () => {
+            const response = await api.searchGalleries(
+                query,
+                dateRange?.from?.toISOString(),
+                dateRange?.to?.toISOString()
+            );
+            return response.data;
+        },
+        enabled: !!query || !!dateRange?.from,
+    });
+}

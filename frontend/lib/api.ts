@@ -128,7 +128,64 @@ export const api = {
   // Gallery APIs - Fixed endpoints to match your backend
   getGalleries: () => apiRequest("/galleries"),
 
+  getGalleriesTimeline: () => apiRequest("/galleries/timeline"),
+
+  getGalleriesByYearMonth: (year: number, month: number) =>
+    apiRequest(`/galleries/timeline/${year}/${month}`),
+
+  getUncategorizedGalleries: () => apiRequest("/galleries/uncategorized"),
+
+  updateGalleryDate: (id: string, shootDate: string | null) =>
+    apiRequest(`/galleries/${id}/date`, {
+      method: "PATCH",
+      body: JSON.stringify({ shootDate }),
+    }),
+
+
+
   getClientGalleries: () => apiRequest("/galleries/client/accessible"),
+
+  searchGalleries: (query: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (query) params.append("q", query);
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    return apiRequest(`/galleries/search?${params.toString()}`);
+  },
+
+  // Gallery Group APIs
+  getGalleryGroups: () => apiRequest("/gallery-groups"),
+
+  getGalleryGroup: (id: string) => apiRequest(`/gallery-groups/${id}`),
+
+  createGalleryGroup: (data: any) =>
+    apiRequest("/gallery-groups", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGalleryGroup: (id: string, data: any) =>
+    apiRequest(`/gallery-groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteGalleryGroup: (id: string) =>
+    apiRequest(`/gallery-groups/${id}`, {
+      method: "DELETE",
+    }),
+
+  assignGalleriesToGroup: (groupId: string, galleryIds: string[]) =>
+    apiRequest(`/gallery-groups/${groupId}/galleries`, {
+      method: "POST",
+      body: JSON.stringify({ galleryIds }),
+    }),
+
+  removeGalleriesFromGroup: (groupId: string, galleryIds: string[]) =>
+    apiRequest(`/gallery-groups/${groupId}/galleries`, {
+      method: "DELETE",
+      body: JSON.stringify({ galleryIds }),
+    }),
 
   createGallery: (galleryData: any) =>
     apiRequest("/galleries", {

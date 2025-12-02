@@ -16,6 +16,7 @@ import adminSystemConfigRoutes from './routes/adminSystemConfig'
 import adminInvitationsRoutes from './routes/adminInvitations'
 import auditRoutes from './routes/audit'
 import galleryRoutes from './routes/galleries'
+import galleryGroupRoutes from './routes/galleryGroups'
 import photoRoutes from './routes/photos'
 import photographersRoutes from './routes/photographers'
 import uploadsRoutes from './routes/uploads'
@@ -36,11 +37,11 @@ const prisma = new PrismaClient()
 // Enhanced middleware for photo uploads
 app.use(helmet())
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-production-domain.com'] 
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://your-production-domain.com']
     : ['http://localhost:3000'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }))
 app.use(morgan('combined'))
@@ -57,13 +58,13 @@ app.use((req, res, next) => {
     req.setTimeout(UPLOAD_CONFIG.UPLOAD_TIMEOUT)
     res.setTimeout(UPLOAD_CONFIG.UPLOAD_TIMEOUT)
     console.log(`Extended timeout set for upload request: ${req.path}`)
-  } 
+  }
   // Set longer timeouts for download routes
   else if (req.path.includes('/download') || req.path.includes('/photos/gallery/')) {
     req.setTimeout(30 * 60 * 1000) // 30 minutes for downloads
     res.setTimeout(30 * 60 * 1000)
     console.log(`Extended timeout set for download request: ${req.path}`)
-  } 
+  }
   else {
     req.setTimeout(30 * 1000) // 30 seconds for other requests
     res.setTimeout(30 * 1000)
@@ -76,13 +77,13 @@ app.use((req, res, next) => {
   // Log upload requests with more detail
   if (req.path.includes('/upload')) {
     console.log(`📤 Upload request started: ${req.method} ${req.path}`)
-    console.log(`� Contaent-Length: ${req.headers['content-length'] || 'unknown'}`)
-    
+    console.log(`📏 Content-Length: ${req.headers['content-length'] || 'unknown'}`)
+
     // Track request completion
     const startTime = Date.now()
     const originalSend = res.send
-    
-    res.send = function(data) {
+
+    res.send = function (data) {
       const duration = Date.now() - startTime
       console.log(`✅ Upload request completed in ${duration}ms`)
       return originalSend.call(this, data)
@@ -101,6 +102,7 @@ app.use('/api/admin/system-config', adminSystemConfigRoutes)
 app.use('/api/admin/invitations', adminInvitationsRoutes)
 app.use('/api/admin/audit', auditRoutes)
 app.use('/api/galleries', galleryRoutes)
+app.use('/api/gallery-groups', galleryGroupRoutes)
 app.use('/api/photos', photoRoutes)
 app.use('/api/photographers', photographersRoutes)
 app.use('/api/uploads', uploadsRoutes)
@@ -120,7 +122,7 @@ app.get('/api/upload-config', (req, res) => {
 app.get('/api/system-status', (req, res) => {
   const memoryUsage = process.memoryUsage()
   const uptime = process.uptime()
-  
+
   res.json({
     success: true,
     data: {
@@ -141,7 +143,7 @@ app.get('/api/system-status', (req, res) => {
 
 // Basic route
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Photo Gallery API is running!',
     version: '2.0.0',
     features: ['high-volume uploads (2000 files)', 'raw file support', 'async thumbnails', 'upload sessions'],
@@ -172,7 +174,7 @@ app.get('/test-db', async (req, res) => {
       prisma.photo.count()
     ])
     const queryTime = Date.now() - startTime
-    
+
     res.json({
       success: true,
       message: 'Database connected successfully!',
@@ -197,7 +199,7 @@ app.get('/test-db', async (req, res) => {
 // Global error handler for upload errors
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('❌ Global error handler:', err)
-  
+
   // Handle specific upload errors
   if (err.type === 'entity.too.large') {
     return res.status(413).json({
@@ -206,14 +208,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
       maxSize: EXPRESS_BODY_LIMIT
     })
   }
-  
+
   if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
     return res.status(408).json({
       success: false,
       error: 'Upload timeout. Please try with fewer files or check your connection.'
     })
   }
-  
+
   // Generic error
   res.status(500).json({
     success: false,
@@ -247,11 +249,11 @@ app.listen(PORT, async () => {
   console.log(`📁 Max files per session: ${UPLOAD_CONFIG.MAX_FILES_PER_SESSION}`)
   console.log(`🔗 Upload config: http://localhost:${PORT}/api/upload-config`)
   console.log(`�  Admin auth: http://localhost:${PORT}/api/admin/auth`)
-  
+
   // Start admin session cleanup
   adminSessionManager.startAutomaticCleanup()
   console.log(`🧹 Admin session cleanup started`)
-  
+
   // Start upload session cleanup
   const { uploadSessionService } = await import('./services/uploadSessionService')
   setInterval(() => {

@@ -10,13 +10,32 @@ import {
 	unlikeGallery,
 	favoriteGallery,
 	unfavoriteGallery,
-	getClientGalleries
+	getClientGalleries,
+	updateGalleryAccess,
+	getAllowedClients,
+	searchGalleries
 } from '../controllers/galleryController'
+import {
+	getGalleriesTimeline,
+	getGalleriesByYearMonth,
+	getUncategorizedGalleries,
+	updateGalleryDate
+} from '../controllers/galleryTimelineController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
-import { updateGalleryAccess, getAllowedClients } from '../controllers/galleryController'
 import { auditMiddleware } from '../middleware/auditMiddleware'
 
 const router = Router()
+
+// Search route (must be before /:id routes)
+router.get('/search', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN', 'CLIENT']), searchGalleries)
+
+// Timeline organization routes (must be before /:id routes)
+router.get('/timeline', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleriesTimeline)
+router.get('/timeline/:year/:month', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleriesByYearMonth)
+router.get('/uncategorized', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getUncategorizedGalleries)
+router.patch('/:id/date', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY_DATE', 'gallery', {
+	extractTargetId: (req) => req.params.id
+}), updateGalleryDate)
 
 // Protected routes (require authentication) - Admin can access all
 router.post('/', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('CREATE_GALLERY', 'gallery'), createGallery)

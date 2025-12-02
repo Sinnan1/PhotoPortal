@@ -8,57 +8,71 @@ datasource db {
 }
 
 model User {
-  id                  String             @id @default(cuid())
-  email               String             @unique
-  password            String
-  name                String
-  role                Role               @default(CLIENT)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  photographerId      String?
-  canDownload         Boolean            @default(true)
-  suspendedAt         DateTime?
-  suspendedBy         String?
-  suspensionReason    String?
-  feedbackRequestedAt DateTime?
-  feedbackRequestActive Boolean          @default(false)
-  adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
-  adminSessions       AdminSession[]     @relation("AdminSessions")
-  favoritedGalleries  FavoritedGallery[]
-  favoritedPhotos     FavoritedPhoto[]
-  galleries           Gallery[]
-  accessibleGalleries GalleryAccess[]
-  likedGalleries      LikedGallery[]
-  likedPhotos         LikedPhoto[]
-  postPhotos          PostPhoto[]
-  systemConfigUpdates SystemConfig[]     @relation("SystemConfigUpdates")
-  adminInvitations    AdminInvitation[]  @relation("AdminInvitations")
-  uploadSessions      UploadSession[]    @relation("UploadSessions")
-  photographer        User?              @relation("PhotographerClients", fields: [photographerId], references: [id])
-  clients             User[]             @relation("PhotographerClients")
-  feedbackGiven       ClientFeedback[]   @relation("ClientFeedbackGiven")
+  id                    String             @id @default(cuid())
+  email                 String             @unique
+  password              String
+  name                  String
+  role                  Role               @default(CLIENT)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  photographerId        String?
+  canDownload           Boolean            @default(true)
+  suspendedAt           DateTime?
+  suspendedBy           String?
+  suspensionReason      String?
+  feedbackRequestedAt   DateTime?
+  feedbackRequestActive Boolean            @default(false)
+  adminAuditLogs        AdminAuditLog[]    @relation("AdminAuditLogs")
+  adminSessions         AdminSession[]     @relation("AdminSessions")
+  favoritedGalleries    FavoritedGallery[]
+  favoritedPhotos       FavoritedPhoto[]
+  galleries             Gallery[]
+  accessibleGalleries   GalleryAccess[]
+  likedGalleries        LikedGallery[]
+  likedPhotos           LikedPhoto[]
+  postPhotos            PostPhoto[]
+  systemConfigUpdates   SystemConfig[]     @relation("SystemConfigUpdates")
+  adminInvitations      AdminInvitation[]  @relation("AdminInvitations")
+  uploadSessions        UploadSession[]    @relation("UploadSessions")
+  photographer          User?              @relation("PhotographerClients", fields: [photographerId], references: [id])
+  clients               User[]             @relation("PhotographerClients")
+  feedbackGiven         ClientFeedback[]   @relation("ClientFeedbackGiven")
+  galleryGroups         GalleryGroup[]     @relation("PhotographerGalleryGroups")
 
   @@map("users")
 }
 
 model Gallery {
-  id             String             @id @default(cuid())
+  id             String    @id @default(cuid())
   title          String
   description    String?
   password       String?
   expiresAt      DateTime?
-  downloadLimit  Int?               @default(0)
-  downloadCount  Int                @default(0)
+  downloadLimit  Int?      @default(0)
+  downloadCount  Int       @default(0)
   photographerId String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Timeline organization fields
+  shootDate  DateTime? // Optional shoot date set by photographer
+  shootYear  Int? // Derived from shootDate for indexing (e.g., 2025)
+  shootMonth Int? // Derived from shootDate for indexing (1-12)
+  
+  // Event grouping (optional)
+  groupId    String? // Optional link to GalleryGroup
+
   favoritedBy    FavoritedGallery[]
   folders        Folder[]
   photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
   accessibleBy   GalleryAccess[]
   likedBy        LikedGallery[]
   uploadSessions UploadSession[]    @relation("GalleryUploadSessions")
+  group          GalleryGroup?      @relation("GroupGalleries", fields: [groupId], references: [id], onDelete: SetNull)
 
+  @@index([photographerId, shootYear, shootMonth])
+  @@index([photographerId, shootDate])
+  @@index([groupId])
   @@map("galleries")
 }
 
@@ -100,6 +114,8 @@ model Photo {
   folder          Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
   uploadSession   UploadSession?   @relation(fields: [uploadSessionId], references: [id], onDelete: SetNull)
   postBy          PostPhoto[]
+
+  groupCovers     GalleryGroup[]   @relation("GroupCover")
 
   @@index([uploadSessionId])
   @@index([thumbnailStatus])
@@ -174,6 +190,27 @@ model GalleryAccess {
   @@map("gallery_access")
 }
 
+model GalleryGroup {
+  id              String    @id @default(cuid())
+  name            String    // Custom name (e.g., "Sinnan's Function")
+  description     String?   // Optional description
+  coverPhotoId    String?   // Cover photo for the group
+  shootDate       DateTime? // Date for this event group
+  shootYear       Int?      // Derived from shootDate for indexing
+  shootMonth      Int?      // Derived from shootDate for indexing (1-12)
+  photographerId  String    // Owner
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  photographer    User      @relation("PhotographerGalleryGroups", fields: [photographerId], references: [id], onDelete: Cascade)
+  galleries       Gallery[] @relation("GroupGalleries")
+  coverPhoto      Photo?    @relation("GroupCover", fields: [coverPhotoId], references: [id])
+
+  @@index([photographerId, shootYear, shootMonth])
+  @@index([photographerId])
+  @@map("gallery_groups")
+}
+
 model AdminAuditLog {
   id         String   @id @default(cuid())
   adminId    String
@@ -215,17 +252,17 @@ model AdminSession {
 }
 
 model AdminInvitation {
-  id          String                @id @default(cuid())
-  email       String                @unique
-  name        String
-  invitedBy   String
-  token       String                @unique
-  status      AdminInvitationStatus @default(PENDING)
-  expiresAt   DateTime
-  acceptedAt  DateTime?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  invitedByUser User                @relation("AdminInvitations", fields: [invitedBy], references: [id], onDelete: Cascade)
+  id            String                @id @default(cuid())
+  email         String                @unique
+  name          String
+  invitedBy     String
+  token         String                @unique
+  status        AdminInvitationStatus @default(PENDING)
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  invitedByUser User                  @relation("AdminInvitations", fields: [invitedBy], references: [id], onDelete: Cascade)
 
   @@map("admin_invitations")
 }
@@ -290,16 +327,16 @@ model UploadSession {
 }
 
 model ClientFeedback {
-  id                    String   @id @default(cuid())
-  clientId              String
-  photographerId        String
-  overallRating         Int
+  id                     String   @id @default(cuid())
+  clientId               String
+  photographerId         String
+  overallRating          Int
   selectionProcessRating Int
   portalExperienceRating Int
-  comments              String?
-  wouldRecommend        Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  client                User     @relation("ClientFeedbackGiven", fields: [clientId], references: [id], onDelete: Cascade)
+  comments               String?
+  wouldRecommend         Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  client                 User     @relation("ClientFeedbackGiven", fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, photographerId])
   @@index([photographerId])

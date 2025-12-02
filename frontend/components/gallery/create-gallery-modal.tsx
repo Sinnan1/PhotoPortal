@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { api } from "@/lib/api"
+import { useQuery } from "@tanstack/react-query"
 import { useCreateGallery } from "@/hooks/queries/useGalleries"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
 
 interface CreateGalleryModalProps {
@@ -34,6 +42,14 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
     password: "",
     expiresAt: "",
     downloadLimit: "",
+    groupId: "none",
+  })
+
+  // Fetch available groups
+  const { data: groups } = useQuery({
+    queryKey: ['gallery-groups'],
+    queryFn: () => api.getGalleryGroups(),
+    enabled: open,
   })
 
   const createGalleryMutation = useCreateGallery()
@@ -50,6 +66,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
+        groupId: formData.groupId === "none" ? undefined : formData.groupId,
       }
 
       await createGalleryMutation.mutateAsync(galleryData)
@@ -60,6 +77,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
         password: "",
         expiresAt: "",
         downloadLimit: "",
+        groupId: "none",
       })
       onSuccess()
     } catch (error) {
@@ -88,6 +106,27 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
                 required
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="group">Event Group (Optional)</Label>
+              <Select
+                value={formData.groupId}
+                onValueChange={(value) => setFormData({ ...formData, groupId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Ungrouped)</SelectItem>
+                  {groups?.map((group: any) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -134,7 +173,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
             </Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Gallery
+              {loading ? "Creating..." : "Create Gallery"}
             </Button>
           </DialogFooter>
         </form>

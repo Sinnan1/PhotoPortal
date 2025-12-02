@@ -406,7 +406,7 @@ export const verifyGalleryPassword = async (req: Request, res: Response) => {
 export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const { title, description, password, expiresAt, downloadLimit } = req.body
+		const { title, description, password, expiresAt, downloadLimit, groupId } = req.body
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -433,6 +433,7 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 		if (title !== undefined) updateData.title = title
 		if (description !== undefined) updateData.description = description
 		if (downloadLimit !== undefined) updateData.downloadLimit = downloadLimit
+		if (groupId !== undefined) updateData.groupId = groupId
 
 		// Handle password update
 		if (password !== undefined) {
@@ -636,10 +637,103 @@ export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
 
 		res.json({ success: true, message: 'Gallery unfavorited' });
 	} catch (error) {
-		console.error('Unfavorite gallery error:', error);
 		res.status(500).json({ success: false, error: 'Internal server error' });
 	}
 };
+
+export const searchGalleries = async (req: AuthRequest, res: Response) => {
+	try {
+		const userId = req.user!.id
+		const userRole = req.user!.role
+		const { q, startDate, endDate } = req.query
+
+		// Build where clause
+		const where: any = {}
+
+		// Role-based access control
+		if (userRole === 'PHOTOGRAPHER') {
+			where.photographerId = userId
+		} else if (userRole === 'CLIENT') {
+			// Clients can only search galleries they have access to
+			const accessibleGalleries = await prisma.galleryAccess.findMany({
+				where: { userId },
+				select: { galleryId: true }
+			})
+			where.id = { in: accessibleGalleries.map(a => a.galleryId) }
+		}
+
+		// Text search
+		if (q) {
+			const query = q.toString()
+			where.OR = [
+				{ title: { contains: query, mode: 'insensitive' } },
+				{ description: { contains: query, mode: 'insensitive' } }
+			]
+		}
+
+		// Date range filter
+		if (startDate || endDate) {
+			where.shootDate = {}
+			if (startDate) {
+				where.shootDate.gte = new Date(startDate as string)
+			}
+			if (endDate) {
+				where.shootDate.lte = new Date(endDate as string)
+			}
+		}
+
+		const galleries = await prisma.gallery.findMany({
+			where,
+			select: {
+				id: true,
+				title: true,
+				description: true,
+				shootDate: true,
+				createdAt: true,
+				folders: {
+					take: 1,
+					select: {
+						photos: {
+							take: 1,
+							select: {
+								thumbnailUrl: true,
+								originalUrl: true
+							}
+						}
+					}
+				},
+				_count: {
+					select: {
+						folders: true
+					}
+				}
+			},
+			orderBy: { shootDate: 'desc' },
+			take: 50 // Limit results
+		})
+
+		const formattedGalleries = galleries.map(gallery => ({
+			id: gallery.id,
+			title: gallery.title,
+			description: gallery.description,
+			shootDate: gallery.shootDate,
+			createdAt: gallery.createdAt,
+			coverPhoto: gallery.folders[0]?.photos[0]?.thumbnailUrl || gallery.folders[0]?.photos[0]?.originalUrl || null,
+			folderCount: gallery._count.folders
+		}))
+
+		res.json({
+			success: true,
+			data: formattedGalleries
+		})
+	} catch (error) {
+		console.error('Search galleries error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
 
 export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 	try {
