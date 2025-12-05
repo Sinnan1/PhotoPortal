@@ -334,11 +334,20 @@ export default function DashboardPage() {
             results={searchResults}
             isLoading={isSearching}
             query={searchQuery}
+            onManageGroup={handleManageGroup}
+            onAddDate={handleAddDate}
+            onShare={handleShareGallery}
+            onManageAccess={handleManageAccess}
+            onDelete={handleDeleteGallery}
           />
         ) : viewMode === 'timeline' ? (
           <TimelineView
             onGalleryClick={(id: string) => window.location.href = `/gallery/${id}`}
             onAddDate={handleAddDate}
+            onManageGroup={handleManageGroup}
+            onShare={handleShareGallery}
+            onManageAccess={handleManageAccess}
+            onDelete={handleDeleteGallery}
           />
         ) : (
           <GalleryGrid

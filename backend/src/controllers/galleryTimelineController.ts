@@ -254,6 +254,12 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
                         photos: {
                             select: {
                                 fileSize: true,
+                                _count: {
+                                    select: {
+                                        likedBy: true,
+                                        favoritedBy: true
+                                    }
+                                }
                             },
                         },
                         _count: {
@@ -261,13 +267,6 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
                                 photos: true,
                             },
                         },
-                    },
-                },
-                _count: {
-                    select: {
-                        folders: true,
-                        likedBy: true,
-                        favoritedBy: true,
                     },
                 },
             },
@@ -291,7 +290,25 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
                 coverPhoto: group.coverPhoto?.thumbnailUrl || group.coverPhoto?.mediumUrl || group.coverPhoto?.originalUrl || null,
             })),
             ungroupedGalleries: ungroupedGalleries.map((gallery) => {
-                const totalPhotos = gallery.folders?.reduce((sum, folder) => sum + (folder._count?.photos || 0), 0) || 0;
+                // Count unique photos with likes/favorites (like getGalleries does)
+                let uniqueLikedPhotos = 0;
+                let uniqueFavoritedPhotos = 0;
+                let totalPhotos = 0;
+                let totalSize = 0;
+
+                gallery.folders?.forEach(folder => {
+                    totalPhotos += folder._count?.photos || 0;
+                    folder.photos?.forEach(photo => {
+                        totalSize += photo.fileSize || 0;
+                        if (photo._count.likedBy > 0) {
+                            uniqueLikedPhotos++;
+                        }
+                        if (photo._count.favoritedBy > 0) {
+                            uniqueFavoritedPhotos++;
+                        }
+                    });
+                });
+
                 const coverPhoto = gallery.folders?.[0]?.coverPhoto;
 
                 return {
@@ -300,14 +317,10 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
                     description: gallery.description,
                     shootDate: gallery.shootDate,
                     coverPhoto: coverPhoto?.thumbnailUrl || coverPhoto?.mediumUrl || coverPhoto?.originalUrl || null,
-                    folderCount: gallery._count?.folders || 0,
                     photoCount: totalPhotos,
-                    likedBy: gallery._count?.likedBy || 0,
-                    favoritedBy: gallery._count?.favoritedBy || 0,
-                    totalSize: gallery.folders?.reduce((acc, folder) => {
-                        const folderSize = folder.photos?.reduce((photoAcc, photo) => photoAcc + (photo.fileSize || 0), 0) || 0;
-                        return acc + folderSize;
-                    }, 0) || 0,
+                    likedBy: uniqueLikedPhotos,
+                    favoritedBy: uniqueFavoritedPhotos,
+                    totalSize,
                 };
             }),
         })
@@ -428,8 +441,8 @@ export const updateGalleryDate = async (req: AuthRequest, res: Response) => {
 
             updateData = {
                 shootDate: parsedDate,
-                shootYear: parsedDate.getFullYear(),
-                shootMonth: parsedDate.getMonth() + 1,
+                shootYear: parsedDate.getUTCFullYear(),
+                shootMonth: parsedDate.getUTCMonth() + 1,
             }
         }
 

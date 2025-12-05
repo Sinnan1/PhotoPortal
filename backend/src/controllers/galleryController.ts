@@ -691,14 +691,29 @@ export const searchGalleries = async (req: AuthRequest, res: Response) => {
 				shootDate: true,
 				createdAt: true,
 				folders: {
-					take: 1,
+					orderBy: { createdAt: 'asc' },
 					select: {
-						photos: {
-							take: 1,
+						coverPhoto: {
 							select: {
 								thumbnailUrl: true,
-								originalUrl: true
+								mediumUrl: true,
+								largeUrl: true,
+								originalUrl: true,
 							}
+						},
+						photos: {
+							select: {
+								fileSize: true,
+								_count: {
+									select: {
+										likedBy: true,
+										favoritedBy: true
+									}
+								}
+							}
+						},
+						_count: {
+							select: { photos: true }
 						}
 					}
 				},
@@ -712,15 +727,42 @@ export const searchGalleries = async (req: AuthRequest, res: Response) => {
 			take: 50 // Limit results
 		})
 
-		const formattedGalleries = galleries.map(gallery => ({
-			id: gallery.id,
-			title: gallery.title,
-			description: gallery.description,
-			shootDate: gallery.shootDate,
-			createdAt: gallery.createdAt,
-			coverPhoto: gallery.folders[0]?.photos[0]?.thumbnailUrl || gallery.folders[0]?.photos[0]?.originalUrl || null,
-			folderCount: gallery._count.folders
-		}))
+		const formattedGalleries = galleries.map(gallery => {
+			// Count unique photos with likes/favorites (like getGalleries does)
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
+			let totalPhotos = 0;
+			let totalSize = 0;
+
+			gallery.folders.forEach(folder => {
+				totalPhotos += folder._count?.photos || 0;
+				folder.photos?.forEach(photo => {
+					totalSize += photo.fileSize || 0;
+					if (photo._count.likedBy > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo._count.favoritedBy > 0) {
+						uniqueFavoritedPhotos++;
+					}
+				});
+			});
+
+			const coverPhoto = gallery.folders[0]?.coverPhoto;
+
+			return {
+				id: gallery.id,
+				title: gallery.title,
+				description: gallery.description,
+				shootDate: gallery.shootDate,
+				createdAt: gallery.createdAt,
+				coverPhoto: coverPhoto?.thumbnailUrl || coverPhoto?.mediumUrl || coverPhoto?.largeUrl || coverPhoto?.originalUrl || null,
+				folderCount: gallery._count.folders,
+				photoCount: totalPhotos,
+				likedBy: uniqueLikedPhotos,
+				favoritedBy: uniqueFavoritedPhotos,
+				totalSize,
+			}
+		})
 
 		res.json({
 			success: true,

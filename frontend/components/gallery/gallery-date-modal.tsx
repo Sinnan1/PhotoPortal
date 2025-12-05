@@ -37,7 +37,9 @@ export function GalleryDateModal({ open, onOpenChange, gallery, onSuccess }: Gal
 
         try {
             setIsSubmitting(true);
-            await api.updateGalleryDate(gallery.id, date ? date.toISOString() : null);
+            // Normalize to noon to prevent timezone-related date shifts
+            const normalizedDate = date ? new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0) : null;
+            await api.updateGalleryDate(gallery.id, normalizedDate ? normalizedDate.toISOString() : null);
 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries({ queryKey: ['galleries'] });

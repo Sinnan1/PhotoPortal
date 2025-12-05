@@ -4,9 +4,9 @@ import { api } from "@/lib/api";
 import { YearFolderCard } from "./YearFolderCard";
 import { MonthFolderCard } from "./MonthFolderCard";
 import { EventGroupCard } from "./EventGroupCard";
-import { GalleryCardDetailed } from "./GalleryCardDetailed";
 import { TimelineBreadcrumb } from "./TimelineBreadcrumb";
 import { UncategorizedSection } from "./UncategorizedSection";
+import { GalleryGrid } from "@/components/dashboard/GalleryGrid";
 import { Gallery } from "@/types";
 import { Loader2, Calendar, Plus, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,9 +19,13 @@ import { GalleryGroupModal } from "./GalleryGroupModal";
 interface TimelineViewProps {
     onGalleryClick: (galleryId: string) => void;
     onAddDate: (gallery: Gallery) => void;
+    onManageGroup: (gallery: Gallery) => void;
+    onShare: (gallery: Gallery) => void;
+    onManageAccess: (gallery: Gallery) => void;
+    onDelete: (id: string) => void;
 }
 
-export function TimelineView({ onGalleryClick, onAddDate }: TimelineViewProps) {
+export function TimelineView({ onGalleryClick, onAddDate, onManageGroup, onShare, onManageAccess, onDelete }: TimelineViewProps) {
     const [selectedYear, setSelectedYear] = useState<number | null>(null);
     const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
     const [selectedMonthName, setSelectedMonthName] = useState<string | null>(null);
@@ -177,6 +181,38 @@ export function TimelineView({ onGalleryClick, onAddDate }: TimelineViewProps) {
 
     // Render Month View (Galleries in a specific month)
     if (selectedYear && selectedMonth && monthData) {
+        // Transform timeline data to match Gallery type expected by GalleryGrid
+        const transformedGalleries: Gallery[] = monthData.ungroupedGalleries?.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            description: g.description || '',
+            photoCount: g.photoCount || 0,
+            downloadCount: 0,
+            expiresAt: null,
+            shootDate: g.shootDate,
+            createdAt: g.shootDate || new Date().toISOString(),
+            isExpired: false,
+            folders: g.coverPhoto ? [{
+                id: 'cover',
+                name: 'Cover',
+                coverPhoto: {
+                    id: 'cover-photo',
+                    filename: 'cover',
+                    thumbnailUrl: g.coverPhoto,
+                    originalUrl: g.coverPhoto,
+                    createdAt: new Date().toISOString(),
+                },
+                _count: { photos: g.photoCount || 0 },
+            }] : [],
+            likedBy: [],
+            favoritedBy: [],
+            totalSize: g.totalSize || 0,
+            _count: {
+                likedBy: g.likedBy || 0,
+                favoritedBy: g.favoritedBy || 0,
+            },
+        })) || [];
+
         return (
             <div className="animate-in fade-in duration-500">
                 <TimelineBreadcrumb
@@ -187,12 +223,15 @@ export function TimelineView({ onGalleryClick, onAddDate }: TimelineViewProps) {
                     onHomeClick={handleHomeClick}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {/* Galleries in this month */}
-                    {monthData.ungroupedGalleries?.map((gallery: any) => (
-                        <GalleryCardDetailed key={gallery.id} gallery={gallery} />
-                    ))}
-                </div>
+                <GalleryGrid
+                    galleries={transformedGalleries}
+                    isLoading={false}
+                    onManageGroup={onManageGroup}
+                    onAddDate={onAddDate}
+                    onShare={onShare}
+                    onManageAccess={onManageAccess}
+                    onDelete={onDelete}
+                />
             </div>
         );
     }
