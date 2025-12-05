@@ -27,9 +27,9 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
     ] as const;
 
     return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
             {/* View Mode Selector */}
-            <div className="flex items-center bg-muted/30 p-1 rounded-xl border border-border/50 backdrop-blur-sm">
+            <div className="flex items-center gap-2 bg-zinc-100/50 dark:bg-card/40 p-1.5 rounded-xl border border-zinc-200/50 dark:border-border/50 backdrop-blur-sm">
                 {modes.map((mode) => {
                     const Icon = mode.icon;
                     const isActive = currentMode === mode.id;
@@ -41,14 +41,16 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
                             size="sm"
                             onClick={() => onChange(mode.id)}
                             className={cn(
-                                "relative gap-2 px-4 py-2 h-9 rounded-lg transition-all duration-300",
-                                isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                                "relative gap-2 px-6 py-2.5 h-10 rounded-lg transition-all duration-300",
+                                isActive
+                                    ? "text-white dark:text-background"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
                             )}
                         >
                             {isActive && (
                                 <motion.div
                                     layoutId="activeViewMode"
-                                    className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                                    className="absolute inset-0 bg-zinc-900 dark:bg-foreground rounded-lg shadow-sm"
                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                 />
                             )}
@@ -64,8 +66,8 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
             {/* Sort Dropdown - Only show for "all" and "recent" views */}
             {onSortChange && (currentMode === 'all' || currentMode === 'recent') && (
                 <Select value={sortBy} onValueChange={onSortChange}>
-                    <SelectTrigger className="w-[180px] h-9 bg-muted/30 border-border/50">
-                        <div className="flex items-center gap-2">
+                    <SelectTrigger className="w-[180px] h-10 rounded-xl bg-zinc-100/50 dark:bg-card/40 border-zinc-200/50 dark:border-border/50 backdrop-blur-sm focus:ring-0">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                             <ArrowUpDown className="h-4 w-4" />
                             <SelectValue placeholder="Sort by..." />
                         </div>

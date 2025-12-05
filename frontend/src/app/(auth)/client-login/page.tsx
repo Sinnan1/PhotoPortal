@@ -73,7 +73,7 @@ export default function ClientLoginPage() {
       {/* Main Content Container */}
       <div className="relative z-10 w-full max-w-md px-6">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="space-y-8"
@@ -81,7 +81,7 @@ export default function ClientLoginPage() {
           {/* Header */}
           <div className="text-center space-y-2">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 1, scale: 1 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.8 }}
             >
@@ -157,7 +157,7 @@ export default function ClientLoginPage() {
 
           {/* Feature Icons */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 1 }}
             className="flex justify-center gap-8 text-gray-400"
@@ -184,7 +184,7 @@ export default function ClientLoginPage() {
 
           {/* Footer */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
             className="text-center"

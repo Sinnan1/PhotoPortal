@@ -333,13 +333,6 @@ export default function ClientDashboardPage() {
                   {/* Stats Grid */}
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
-                      <User className="h-4 w-4 text-primary mb-1" />
-                      <span className="text-xs font-semibold truncate w-full text-center">
-                        {gallery.photographer?.name || 'Unknown Photographer'}
-                      </span>
-                      <span className="text-xs text-muted-foreground">photographer</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
                       <Images className="h-4 w-4 text-primary mb-1" />
                       <span className="text-lg font-semibold">
                         {gallery.folders?.reduce((sum, folder) => sum + (folder?._count?.photos ?? 0), 0) ?? 0}
@@ -350,6 +343,11 @@ export default function ClientDashboardPage() {
                       <Heart className="h-4 w-4 text-red-500 mb-1" />
                       <span className="text-lg font-semibold">{gallery._count?.likedBy ?? 0}</span>
                       <span className="text-xs text-muted-foreground">liked</span>
+                    </div>
+                    <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
+                      <Star className="h-4 w-4 text-yellow-500 mb-1" />
+                      <span className="text-lg font-semibold">{gallery._count?.favoritedBy ?? 0}</span>
+                      <span className="text-xs text-muted-foreground">favorites</span>
                     </div>
                   </div>
 
@@ -363,15 +361,9 @@ export default function ClientDashboardPage() {
                         <span>No expiry</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Heart className="h-3.5 w-3.5" />
-                        <span>{gallery._count?.likedBy ?? 0}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5" />
-                        <span>{gallery._count?.favoritedBy ?? 0}</span>
-                      </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                      <User className="h-3.5 w-3.5" />
+                      <span className="truncate max-w-[120px]">{gallery.photographer?.name || 'Unknown'}</span>
                     </div>
                   </div>
                 </CardContent>

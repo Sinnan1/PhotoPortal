@@ -230,19 +230,19 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 font-audrey bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="space-y-1">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight font-serif text-foreground">
             Dashboard
           </h1>
-          <p className="text-muted-foreground text-base sm:text-lg font-light tracking-wide">
+          <p className="text-muted-foreground font-light text-lg tracking-wide">
             Manage your photo galleries
           </p>
         </div>
         <Button
           onClick={() => setShowCreateModal(true)}
           size="lg"
-          className="shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6 h-10 text-sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-black/5 rounded-full px-8 h-12 font-medium tracking-wide transition-all duration-300 hover:scale-105"
         >
           <Plus className="mr-2 h-4 w-4" />
           Create Gallery
@@ -250,7 +250,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Search Bar */}
-      <div className="mb-8 animate-in fade-in slide-in-from-top-6 duration-700 delay-50">
+      <div className="mb-12 animate-in fade-in slide-in-from-top-6 duration-700 delay-50">
         <SearchBar
           onSearch={(query, range) => {
             setSearchQuery(query);
@@ -260,48 +260,60 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Quick Access Cards - Premium Design (Compact) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 animate-in fade-in slide-in-from-top-8 duration-700 delay-100">
+      {/* Quick Access Cards - Premium Design */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 animate-in fade-in slide-in-from-top-8 duration-700 delay-100">
+        {/* Liked Photos Card */}
         <Link href="/dashboard/liked" className="group">
-          <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 hover:shadow-lg transition-all duration-500 group-hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-3 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-500 border border-border/50">
-                <Heart className="h-5 w-5 text-red-500" />
+          <div className="h-full relative overflow-hidden rounded-2xl border border-border/50 bg-white/40 dark:bg-card/40 backdrop-blur-sm p-6 hover:border-border hover:bg-white/60 dark:hover:bg-card/60 transition-all duration-500 group-hover:-translate-y-1 shadow-sm hover:shadow-md">
+            <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-5 group-hover:opacity-[0.07] dark:group-hover:opacity-10 transition-opacity duration-500 scale-150 group-hover:scale-100 transform origin-top-right">
+              <Heart className="w-32 h-32 text-foreground" />
+            </div>
+
+            <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
+              <div className="w-12 h-12 rounded-full bg-background/50 flex items-center justify-center border border-border/50 group-hover:border-red-500/20 group-hover:bg-red-500/10 transition-colors duration-500">
+                <Heart className="h-5 w-5 text-muted-foreground group-hover:text-red-600 dark:group-hover:text-red-500 transition-colors duration-500" />
               </div>
               <div>
-                <h3 className="text-base font-semibold mb-0.5 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">Liked Photos</h3>
-                <p className="text-muted-foreground text-xs font-light">View your liked photos</p>
+                <h3 className="text-xl font-serif font-medium text-foreground group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors mb-1">Liked Photos</h3>
+                <p className="text-sm text-muted-foreground font-light">Curated collection of your top picks</p>
               </div>
             </div>
           </div>
         </Link>
 
+        {/* Favorites Card */}
         <Link href="/dashboard/favorites" className="group">
-          <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 hover:shadow-lg transition-all duration-500 group-hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-3 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-500 border border-border/50">
-                <Star className="h-5 w-5 text-yellow-500" />
+          <div className="h-full relative overflow-hidden rounded-2xl border border-border/50 bg-white/40 dark:bg-card/40 backdrop-blur-sm p-6 hover:border-border hover:bg-white/60 dark:hover:bg-card/60 transition-all duration-500 group-hover:-translate-y-1 shadow-sm hover:shadow-md">
+            <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-5 group-hover:opacity-[0.07] dark:group-hover:opacity-10 transition-opacity duration-500 scale-150 group-hover:scale-100 transform origin-top-right">
+              <Star className="w-32 h-32 text-foreground" />
+            </div>
+
+            <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
+              <div className="w-12 h-12 rounded-full bg-background/50 flex items-center justify-center border border-border/50 group-hover:border-yellow-500/20 group-hover:bg-yellow-500/10 transition-colors duration-500">
+                <Star className="h-5 w-5 text-muted-foreground group-hover:text-yellow-600 dark:group-hover:text-yellow-500 transition-colors duration-500" />
               </div>
               <div>
-                <h3 className="text-base font-semibold mb-0.5 group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">Favorites</h3>
-                <p className="text-muted-foreground text-xs font-light">View your favorited photos</p>
+                <h3 className="text-xl font-serif font-medium text-foreground group-hover:text-yellow-700 dark:group-hover:text-yellow-300 transition-colors mb-1">Favorites</h3>
+                <p className="text-sm text-muted-foreground font-light">Your absolute favorite moments</p>
               </div>
             </div>
           </div>
         </Link>
 
+        {/* For Posts Card */}
         <Link href="/dashboard/posts" className="group">
-          <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 hover:shadow-lg transition-all duration-500 group-hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-3 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-500 border border-border/50">
-                <Share2 className="h-5 w-5 text-purple-500" />
+          <div className="h-full relative overflow-hidden rounded-2xl border border-border/50 bg-white/40 dark:bg-card/40 backdrop-blur-sm p-6 hover:border-border hover:bg-white/60 dark:hover:bg-card/60 transition-all duration-500 group-hover:-translate-y-1 shadow-sm hover:shadow-md">
+            <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-5 group-hover:opacity-[0.07] dark:group-hover:opacity-10 transition-opacity duration-500 scale-150 group-hover:scale-100 transform origin-top-right">
+              <Share2 className="w-32 h-32 text-foreground" />
+            </div>
+
+            <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
+              <div className="w-12 h-12 rounded-full bg-background/50 flex items-center justify-center border border-border/50 group-hover:border-purple-500/20 group-hover:bg-purple-500/10 transition-colors duration-500">
+                <Share2 className="h-5 w-5 text-muted-foreground group-hover:text-purple-600 dark:group-hover:text-purple-500 transition-colors duration-500" />
               </div>
               <div>
-                <h3 className="text-base font-semibold mb-0.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">For Posts</h3>
-                <p className="text-muted-foreground text-xs font-light">Photos for social media</p>
+                <h3 className="text-xl font-serif font-medium text-foreground group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors mb-1">For Posts</h3>
+                <p className="text-sm text-muted-foreground font-light">Ready for social media sharing</p>
               </div>
             </div>
           </div>
@@ -310,8 +322,8 @@ export default function DashboardPage() {
 
       {/* Galleries Section Header with View Selector */}
       {!isSearchActive && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10 animate-in fade-in slide-in-from-top-8 duration-700 delay-200">
-          <h2 className="text-3xl font-bold tracking-tight font-audrey">Your Galleries</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-8 duration-700 delay-200">
+          <h2 className="text-3xl font-bold tracking-tight font-serif text-foreground">Your Galleries</h2>
           <ViewModeSelector currentMode={viewMode} onChange={setViewMode} sortBy={sortBy} onSortChange={setSortBy} />
         </div>
       )}
