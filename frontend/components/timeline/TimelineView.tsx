@@ -218,7 +218,6 @@ export function TimelineView({ onGalleryClick, onAddDate }: TimelineViewProps) {
                             month={month.month}
                             monthName={month.monthName}
                             galleryCount={month.galleryCount}
-                            coverPhoto={month.coverPhoto}
                             onClick={() => handleMonthClick(month.month, month.monthName)}
                         />
                     ))}

@@ -1,6 +1,15 @@
+"use client";
+
 import type React from "react"
+import { usePathname } from "next/navigation"
 
 export function Footer() {
+  const pathname = usePathname()
+
+  if (pathname?.startsWith("/admin")) {
+    return null
+  }
+
   return (
     <footer className="mt-auto w-full bg-background/50 backdrop-blur-sm border-t border-border/50">
       <div className="flex h-9 items-center justify-center">

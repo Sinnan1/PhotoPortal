@@ -1,6 +1,4 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Calendar } from "lucide-react";
 
 interface YearFolderCardProps {
     year: number;
@@ -10,30 +8,39 @@ interface YearFolderCardProps {
 
 export function YearFolderCard({ year, galleryCount, onClick }: YearFolderCardProps) {
     return (
-        <div
-            className="group cursor-pointer relative"
+        <Card
+            className="group cursor-pointer border-0 bg-transparent shadow-none"
             onClick={onClick}
         >
-            <div className="absolute inset-0 bg-primary/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <Card className="relative h-full border-none bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden group-hover:-translate-y-1">
-                <CardContent className="p-0">
-                    <div className="aspect-[4/3] flex flex-col items-center justify-center relative">
-                        <div className="relative z-10 text-center">
-                            <h3 className="text-5xl font-audrey font-bold tracking-tighter text-foreground/90 group-hover:text-primary transition-colors duration-500">
+            <CardContent className="p-0">
+                <div className="aspect-[4/3] relative overflow-hidden rounded-xl bg-zinc-900/50 border border-white/5 transition-all duration-500 group-hover:border-white/10 group-hover:bg-zinc-800/80">
+
+                    {/* Abstract Background Year */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[140px] font-serif font-black text-white/[0.03] tracking-tighter select-none transition-all duration-700 group-hover:scale-110 group-hover:text-white/[0.05]">
+                            {year}
+                        </span>
+                    </div>
+
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+                        <div className="transform transition-transform duration-500 group-hover:-translate-y-1 text-center">
+                            <h3 className="font-serif text-5xl font-medium tracking-wide text-white/90 mb-3 group-hover:text-white transition-colors">
                                 {year}
                             </h3>
-                            <div className="h-1 w-12 bg-primary/20 mx-auto my-3 rounded-full group-hover:w-20 group-hover:bg-primary/50 transition-all duration-500" />
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-                                {galleryCount} {galleryCount === 1 ? 'Gallery' : 'Galleries'}
-                            </p>
+                            <div className="flex items-center justify-center gap-2">
+                                <div className="h-[1px] w-6 bg-white/20 group-hover:w-10 group-hover:bg-white/40 transition-all duration-500" />
+                                <span className="text-xs uppercase tracking-[0.2em] text-white/40 font-medium group-hover:text-white/60 transition-colors">
+                                    {galleryCount} {galleryCount === 1 ? 'Gallery' : 'Galleries'}
+                                </span>
+                                <div className="h-[1px] w-6 bg-white/20 group-hover:w-10 group-hover:bg-white/40 transition-all duration-500" />
+                            </div>
                         </div>
-
-                        {/* Decorative background elements */}
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors duration-500" />
-                        <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors duration-500" />
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+
+                    {/* Hover Glow Effect */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                </div>
+            </CardContent>
+        </Card>
     );
 }

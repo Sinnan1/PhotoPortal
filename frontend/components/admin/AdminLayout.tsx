@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { AdminNavigation } from "./AdminNavigation";
 import { AdminHeader } from "./AdminHeader";
+import { AdminSidebar } from "./AdminSidebar";
 import { AdminBreadcrumb } from "./AdminBreadcrumb";
 import { AdminSessionTimeout } from "./AdminSessionTimeout";
-import { Sidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 interface AdminLayoutProps {
@@ -56,6 +55,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             setIsMobile(mobile);
             if (mobile) {
                 setSidebarOpen(false);
+            } else {
+                setSidebarOpen(true);
             }
         };
 
@@ -67,10 +68,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     // Show loading or redirect if not admin
     if (loading || !user || user.role !== "ADMIN" || !sessionValid) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#425146] mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">
                         {!sessionValid ? "Session expired. Redirecting..." : "Verifying admin access..."}
                     </p>
                 </div>
@@ -79,7 +80,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
             {/* Admin Session Timeout Warning */}
             <AdminSessionTimeout />
 
@@ -89,54 +90,40 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 sidebarOpen={sidebarOpen}
             />
 
-            <div className="flex">
-                {/* Admin Sidebar Navigation */}
-                <div
-                    className={cn(
-                        "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out",
-                        sidebarOpen ? "translate-x-0" : "-translate-x-full",
-                        "md:relative md:translate-x-0",
-                        !sidebarOpen && "md:-translate-x-full"
-                    )}
-                    style={{ top: "64px" }} // Account for header height
-                >
-                    <AdminNavigation
-                        currentPath={pathname}
-                        onNavigate={(path) => {
-                            router.push(path);
-                            if (isMobile) setSidebarOpen(false);
-                        }}
-                    />
-                </div>
+            {/* Admin Sidebar Navigation */}
+            <AdminSidebar
+                open={sidebarOpen}
+                setOpen={setSidebarOpen}
+                isMobile={isMobile}
+            />
 
-                {/* Mobile overlay */}
-                {isMobile && sidebarOpen && (
-                    <div
-                        className="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden"
-                        onClick={() => setSidebarOpen(false)}
-                        style={{ top: "64px" }}
-                    />
+            {/* Mobile overlay */}
+            {isMobile && sidebarOpen && (
+                <div
+                    className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            {/* Main Content Area */}
+            <main
+                className={cn(
+                    "min-h-screen transition-all duration-300 ease-in-out",
+                    !isMobile && (sidebarOpen ? "ml-72" : "ml-20")
                 )}
-
-                {/* Main Content Area */}
-                <div
-                    className={cn(
-                        "flex-1 transition-all duration-300 ease-in-out",
-                        sidebarOpen && !isMobile ? "ml-0" : "ml-0"
-                    )}
-                    style={{ paddingTop: "64px" }} // Account for fixed header
-                >
-                    <div className="p-6">
-                        {/* Breadcrumb Navigation */}
+            >
+                <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-6">
+                    {/* Breadcrumb Navigation */}
+                    <div className="mb-6">
                         <AdminBreadcrumb currentPath={pathname} />
+                    </div>
 
-                        {/* Page Content */}
-                        <div className="mt-6">
-                            {children}
-                        </div>
+                    {/* Page Content */}
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {children}
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

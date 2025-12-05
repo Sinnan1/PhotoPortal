@@ -8,7 +8,6 @@ import { useAuth } from "@/lib/auth-context";
 import type { Photo } from "@/types";
 import { usePhotoActions } from "@/hooks/usePhotoActions";
 import { useImagePreload } from "@/hooks/useImagePreload";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 interface PhotoGridProps {
   photos: Photo[];
@@ -80,7 +79,6 @@ export function PhotoGrid({
   });
 
   const { loadedImages, handleImageLoad } = useImagePreload();
-  const { konamiActivated } = useKeyboardShortcuts();
 
   const handleDownloadClick = (photoId: string) => {
     if (onDownload) {
@@ -155,9 +153,6 @@ export function PhotoGrid({
             className={`photo-grid-item group relative ${viewMode === "tile"
               ? "aspect-[16/9] bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:border-olive-green/20 transition-all duration-200"
               : "aspect-square bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-lg hover:border-olive-green/20 transition-all duration-200"
-              } ${konamiActivated ? 'konami-code' : ''
-              } ${index === 3 ? 'wedding-joke' : '' // Add wedding joke to 4th photo
-              } ${index === 7 ? 'secret-joke' : '' // Add secret joke to 8th photo
               }`}
           >
             <Image

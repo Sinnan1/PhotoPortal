@@ -7,6 +7,7 @@ import { LogOut, Settings, User, Heart, Star, Users, BarChart3, Moon, Sun, Share
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,10 +20,15 @@ export function Navigation() {
   const { user, logout } = useAuth();
   const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   return (
     <nav className="border-b border-border/20 bg-[#505c51] backdrop-blur-xl supports-[backdrop-filter]:bg-[#505c51]/90 shadow-sm">

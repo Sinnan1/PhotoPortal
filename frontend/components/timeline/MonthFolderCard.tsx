@@ -1,56 +1,45 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Calendar } from "lucide-react";
-import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface MonthFolderCardProps {
     month: number;
     monthName: string;
     galleryCount: number;
-    coverPhoto: string | null;
     onClick: () => void;
 }
 
-export function MonthFolderCard({ month, monthName, galleryCount, coverPhoto, onClick }: MonthFolderCardProps) {
+export function MonthFolderCard({ month, monthName, galleryCount, onClick }: MonthFolderCardProps) {
     return (
-        <div
-            className="group cursor-pointer relative"
+        <Card
+            className="group cursor-pointer border-0 bg-transparent shadow-none"
             onClick={onClick}
         >
-            <div className="absolute -inset-0.5 bg-gradient-to-b from-primary/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
-            <Card className="relative h-full border-0 overflow-hidden bg-card shadow-sm hover:shadow-2xl transition-all duration-500 group-hover:-translate-y-1">
-                <CardContent className="p-0">
-                    <div className="aspect-[4/3] relative overflow-hidden">
-                        {coverPhoto ? (
-                            <>
-                                <Image
-                                    src={coverPhoto}
-                                    alt={monthName}
-                                    fill
-                                    className="object-cover transition-transform duration-700 group-hover:scale-110"
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
-                            </>
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted/30">
-                                <Calendar className="w-10 h-10 text-muted-foreground/20" />
-                            </div>
-                        )}
+            <CardContent className="p-0">
+                <div className="aspect-[4/3] relative overflow-hidden rounded-xl bg-zinc-900/50 border border-white/5 transition-all duration-500 group-hover:border-white/10 group-hover:bg-zinc-800/80">
 
-                        <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
-                            <h3 className="text-2xl font-audrey font-bold tracking-wide text-white mb-1 drop-shadow-lg">
+                    {/* Abstract Background Decoration */}
+                    <div className="absolute -right-4 -top-12 text-[120px] font-serif font-black text-white/[0.02] tracking-tighter select-none transition-transform duration-700 group-hover:scale-110 group-hover:text-white/[0.04] group-hover:-translate-y-2">
+                        {month.toString().padStart(2, '0')}
+                    </div>
+
+                    <div className="absolute inset-0 flex flex-col justify-end p-6">
+                        <div className="transform transition-transform duration-500 group-hover:-translate-y-1">
+                            <h3 className="font-serif text-3xl font-medium tracking-wide text-white/90 mb-2 group-hover:text-white transition-colors">
                                 {monthName}
                             </h3>
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
-                                <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-md text-xs">
+                            <div className="flex items-center gap-2">
+                                <div className="h-[1px] w-8 bg-white/20 group-hover:w-12 group-hover:bg-white/40 transition-all duration-500" />
+                                <span className="text-xs uppercase tracking-[0.2em] text-white/40 font-medium group-hover:text-white/60 transition-colors">
                                     {galleryCount} {galleryCount === 1 ? 'Gallery' : 'Galleries'}
-                                </Badge>
+                                </span>
                             </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+
+                    {/* Hover Glow Effect */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                </div>
+            </CardContent>
+        </Card>
     );
 }
