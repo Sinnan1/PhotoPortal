@@ -27,9 +27,9 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
     ] as const;
 
     return (
-        <div className="flex items-center gap-6">
-            {/* View Mode Selector */}
-            <div className="flex items-center gap-2 bg-zinc-100/50 dark:bg-card/40 p-1.5 rounded-xl border border-zinc-200/50 dark:border-border/50 backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 w-full sm:w-auto">
+            {/* ViewMode Selector */}
+            <div className="flex items-center gap-1 sm:gap-2 bg-zinc-100/50 dark:bg-card/40 p-1 sm:p-1.5 rounded-xl border border-zinc-200/50 dark:border-border/50 backdrop-blur-sm w-full sm:w-auto overflow-x-auto no-scrollbar justify-between sm:justify-start">
                 {modes.map((mode) => {
                     const Icon = mode.icon;
                     const isActive = currentMode === mode.id;
@@ -41,7 +41,7 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
                             size="sm"
                             onClick={() => onChange(mode.id)}
                             className={cn(
-                                "relative gap-2 px-6 py-2.5 h-10 rounded-lg transition-all duration-300",
+                                "relative gap-2 px-3 sm:px-6 py-2 sm:py-2.5 h-9 sm:h-10 rounded-lg transition-all duration-300 flex-1 sm:flex-none justify-center",
                                 isActive
                                     ? "text-white dark:text-background"
                                     : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
@@ -55,18 +55,18 @@ export function ViewModeSelector({ currentMode, onChange, sortBy, onSortChange }
                                 />
                             )}
                             <span className="relative z-10 flex items-center gap-2">
-                                <Icon className="w-4 h-4" />
-                                <span className="font-medium">{mode.label}</span>
+                                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{mode.label}</span>
                             </span>
                         </Button>
                     );
                 })}
             </div>
 
-            {/* Sort Dropdown - Only show for "all" and "recent" views */}
+            {/* Sort Dropdown */}
             {onSortChange && (currentMode === 'all' || currentMode === 'recent') && (
                 <Select value={sortBy} onValueChange={onSortChange}>
-                    <SelectTrigger className="w-[180px] h-10 rounded-xl bg-zinc-100/50 dark:bg-card/40 border-zinc-200/50 dark:border-border/50 backdrop-blur-sm focus:ring-0">
+                    <SelectTrigger className="w-full sm:w-[180px] h-10 rounded-xl bg-zinc-100/50 dark:bg-card/40 border-zinc-200/50 dark:border-border/50 backdrop-blur-sm focus:ring-0">
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <ArrowUpDown className="h-4 w-4" />
                             <SelectValue placeholder="Sort by..." />

@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 interface SearchBarProps {
     onSearch: (query: string, dateRange: DateRange | undefined) => void;
     className?: string;
@@ -17,6 +19,7 @@ export function SearchBar({ onSearch, className }: SearchBarProps) {
     const [query, setQuery] = useState("");
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [isExpanded, setIsExpanded] = useState(false);
+    const isMobile = useIsMobile();
 
     // Debounce search
     useEffect(() => {
@@ -41,7 +44,8 @@ export function SearchBar({ onSearch, className }: SearchBarProps) {
                 "flex items-center rounded-xl border border-zinc-200/50 dark:border-border/50 bg-white/40 dark:bg-card/40 backdrop-blur-md transition-all duration-500 overflow-hidden",
                 "hover:border-zinc-300/50 dark:hover:border-border hover:bg-white/60 dark:hover:bg-card/60",
                 "focus-within:border-primary/20 focus-within:bg-white/80 dark:focus-within:bg-muted/80 focus-within:ring-1 focus-within:ring-primary/20",
-                isExpanded ? "w-full md:w-[450px]" : "w-10 md:w-[320px]"
+                "flex-1 md:flex-none",
+                isExpanded ? "md:w-[450px]" : "md:w-[320px]"
             )}>
                 <div className="pl-4 text-muted-foreground/50 group-focus-within:text-primary/50 transition-colors">
                     <Search className="w-4 h-4" />
@@ -81,14 +85,14 @@ export function SearchBar({ onSearch, className }: SearchBarProps) {
                         <CalendarIcon className="w-4 h-4" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 border-border/50 bg-background/95 backdrop-blur-xl" align="end">
+                <PopoverContent className="w-auto p-0 border-border/50 bg-background/95 backdrop-blur-xl max-w-[calc(100vw-2rem)]" align="end">
                     <Calendar
                         initialFocus
                         mode="range"
                         defaultMonth={dateRange?.from}
                         selected={dateRange}
                         onSelect={setDateRange}
-                        numberOfMonths={2}
+                        numberOfMonths={isMobile ? 1 : 2}
                         className="p-3"
                     />
                 </PopoverContent>
