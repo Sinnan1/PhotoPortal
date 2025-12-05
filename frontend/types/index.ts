@@ -142,6 +142,7 @@ export interface Gallery {
     downloadLimit?: number | null;
     canDownload?: boolean;
     password?: string | null;
+    groupId?: string | null;
     folders?: Folder[];
     likedBy: { userId: string }[];
     favoritedBy: { userId: string }[];
@@ -176,6 +177,9 @@ export interface AdminGallery {
     stats?: {
         totalPhotos: number;
         totalFolders: number;
+        totalLikes?: number;
+        totalFavorites?: number;
+        totalViews?: number;
         storageUsed: number;
         clientsWithAccess: number;
     };

@@ -40,6 +40,8 @@ import { ViewModeSelector } from "@/components/timeline/ViewModeSelector";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { SearchResults } from "@/components/dashboard/SearchResults";
 import { GalleryGrid } from "@/components/dashboard/GalleryGrid";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { ShortcutsHelpModal } from "@/components/ShortcutsHelpModal";
 import { useQuery } from "@tanstack/react-query";
 import { DateRange } from "react-day-picker";
 import {
@@ -79,7 +81,9 @@ export default function DashboardPage() {
   const unfavoriteGalleryMutation = useUnfavoriteGallery();
 
   const [viewMode, setViewMode] = useState<'timeline' | 'all' | 'recent'>('timeline');
+  const [sortBy, setSortBy] = useState<string>('date-desc');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
@@ -96,6 +100,45 @@ export default function DashboardPage() {
   const { data: searchResults = [], isLoading: isSearching } = useSearchGalleries(searchQuery, dateRange ? { from: dateRange.from, to: dateRange.to } : undefined);
 
   const isSearchActive = !!searchQuery || !!dateRange?.from;
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onEscape: () => {
+      setShowCreateModal(false);
+      setShowShareModal(false);
+      setShowAccessModal(false);
+      setShowDateModal(false);
+      setShowGroupAssignmentModal(false);
+      setShowShortcutsHelp(false);
+    },
+    onSearch: () => {
+      const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+      searchInput?.focus();
+    },
+    onNewGallery: () => setShowCreateModal(true),
+    onShowHelp: () => setShowShortcutsHelp(true),
+  });
+
+  // Sort galleries
+  const sortGalleries = (galleriesToSort: Gallery[]) => {
+    const sorted = [...galleriesToSort];
+    switch (sortBy) {
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.shootDate || b.createdAt).getTime() - new Date(a.shootDate || a.createdAt).getTime());
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.shootDate || a.createdAt).getTime() - new Date(b.shootDate || b.createdAt).getTime());
+      case 'name-asc':
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.title.localeCompare(a.title));
+      case 'likes':
+        return sorted.sort((a, b) => (b._count?.likedBy || 0) - (a._count?.likedBy || 0));
+      case 'size':
+        return sorted.sort((a, b) => (b.totalSize || 0) - (a.totalSize || 0));
+      default:
+        return sorted;
+    }
+  };
 
   const handleDeleteGallery = async (id: string) => {
     if (!confirm("Are you sure you want to delete this gallery?")) return;
@@ -182,7 +225,7 @@ export default function DashboardPage() {
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   ).slice(0, 20);
 
-  const displayedGalleries = viewMode === 'recent' ? recentGalleries : galleries;
+  const displayedGalleries = viewMode === 'recent' ? sortGalleries(recentGalleries) : sortGalleries(galleries);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -269,7 +312,7 @@ export default function DashboardPage() {
       {!isSearchActive && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10 animate-in fade-in slide-in-from-top-8 duration-700 delay-200">
           <h2 className="text-3xl font-bold tracking-tight font-audrey">Your Galleries</h2>
-          <ViewModeSelector currentMode={viewMode} onChange={setViewMode} />
+          <ViewModeSelector currentMode={viewMode} onChange={setViewMode} sortBy={sortBy} onSortChange={setSortBy} />
         </div>
       )}
 
@@ -359,6 +402,11 @@ export default function DashboardPage() {
         open={showGroupAssignmentModal}
         onOpenChange={setShowGroupAssignmentModal}
         gallery={galleryToAssignGroup}
+      />
+
+      <ShortcutsHelpModal
+        open={showShortcutsHelp}
+        onOpenChange={setShowShortcutsHelp}
       />
     </div>
   );

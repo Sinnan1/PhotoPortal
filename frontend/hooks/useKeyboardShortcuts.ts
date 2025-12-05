@@ -1,30 +1,58 @@
-import { useState, useEffect } from "react"
+import { useEffect } from 'react';
 
-export function useKeyboardShortcuts() {
-    const [konamiSequence, setKonamiSequence] = useState<string[]>([])
-    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA']
-    const [konamiActivated, setKonamiActivated] = useState(false)
+interface KeyboardShortcutsConfig {
+    onEscape?: () => void;
+    onSearch?: () => void;
+    onNewGallery?: () => void;
+    onShowHelp?: () => void;
+}
 
+export function useKeyboardShortcuts({
+    onEscape,
+    onSearch,
+    onNewGallery,
+    onShowHelp,
+}: KeyboardShortcutsConfig) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            const newSequence = [...konamiSequence, e.code]
-            setKonamiSequence(newSequence.slice(-10)) // Keep last 10 keys
+            // Check if user is typing in an input field
+            const isInputFocused =
+                document.activeElement?.tagName === 'INPUT' ||
+                document.activeElement?.tagName === 'TEXTAREA' ||
+                document.activeElement?.getAttribute('contenteditable') === 'true';
 
-            if (newSequence.length >= 10 && newSequence.slice(-10).every((code, index) => code === konamiCode[index])) {
-                setKonamiActivated(true)
-                // Fun animation effect
-                document.body.style.animation = 'rainbow 2s ease-in-out'
-                setTimeout(() => {
-                    document.body.style.animation = ''
-                }, 2000)
+            // Escape - Always works, even in inputs
+            if (e.key === 'Escape' && onEscape) {
+                onEscape();
+                return;
             }
-        }
 
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [konamiSequence])
+            // Don't trigger shortcuts if user is typing
+            if (isInputFocused) return;
 
-    return {
-        konamiActivated
-    }
+            // Ctrl/Cmd + K - Focus search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k' && onSearch) {
+                e.preventDefault();
+                onSearch();
+                return;
+            }
+
+            // N - New gallery
+            if (e.key === 'n' && onNewGallery) {
+                e.preventDefault();
+                onNewGallery();
+                return;
+            }
+
+            // ? - Show shortcuts help
+            if (e.key === '?' && onShowHelp) {
+                e.preventDefault();
+                onShowHelp();
+                return;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onEscape, onSearch, onNewGallery, onShowHelp]);
 }
