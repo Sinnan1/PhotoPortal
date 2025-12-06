@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -46,19 +46,6 @@ export const getGalleriesTimeline = async (req: AuthRequest, res: Response) => {
                 shootDate: true,
                 shootYear: true,
                 shootMonth: true,
-                createdAt: true,
-                folders: {
-                    select: {
-                        id: true,
-                        photos: {
-                            take: 1,
-                            select: {
-                                thumbnailUrl: true,
-                                originalUrl: true,
-                            },
-                        },
-                    },
-                },
             },
             orderBy: [
                 { shootYear: 'desc' },
@@ -77,18 +64,6 @@ export const getGalleriesTimeline = async (req: AuthRequest, res: Response) => {
                 id: true,
                 title: true,
                 createdAt: true,
-                folders: {
-                    select: {
-                        id: true,
-                        photos: {
-                            take: 1,
-                            select: {
-                                thumbnailUrl: true,
-                                originalUrl: true,
-                            },
-                        },
-                    },
-                },
             },
             orderBy: { createdAt: 'desc' },
         })
@@ -132,20 +107,11 @@ export const getGalleriesTimeline = async (req: AuthRequest, res: Response) => {
             const monthData = yearData.months.get(month)!
             monthData.galleryCount++
 
-            // Set cover photo from first gallery
-            if (!monthData.coverPhoto) {
-                const firstPhoto = gallery.folders[0]?.photos[0]
-                if (firstPhoto) {
-                    monthData.coverPhoto = firstPhoto.thumbnailUrl || firstPhoto.originalUrl
-                }
-            }
-
             // Add gallery to month
             monthData.galleries.push({
                 id: gallery.id,
                 title: gallery.title,
                 shootDate: gallery.shootDate,
-                coverPhoto: gallery.folders[0]?.photos[0]?.thumbnailUrl || gallery.folders[0]?.photos[0]?.originalUrl || null,
             })
         }
 
@@ -161,7 +127,6 @@ export const getGalleriesTimeline = async (req: AuthRequest, res: Response) => {
             id: gallery.id,
             title: gallery.title,
             createdAt: gallery.createdAt,
-            coverPhoto: gallery.folders[0]?.photos[0]?.thumbnailUrl || gallery.folders[0]?.photos[0]?.originalUrl || null,
         }))
 
         res.json({
@@ -232,46 +197,59 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
             orderBy: { createdAt: 'desc' },
         })
 
-        // Get all galleries for this month (not filtering by groupId anymore)
+        // Get all galleries for this month - minimal data, stats come from SQL
         const ungroupedGalleries = await prisma.gallery.findMany({
-            where: where, // Removed groupId: null filter
+            where: where,
             select: {
                 id: true,
                 title: true,
                 description: true,
                 shootDate: true,
-                createdAt: true,
-                folders: {
-                    select: {
-                        id: true,
-                        coverPhoto: {
-                            select: {
-                                thumbnailUrl: true,
-                                mediumUrl: true,
-                                originalUrl: true,
-                            },
-                        },
-                        photos: {
-                            select: {
-                                fileSize: true,
-                                _count: {
-                                    select: {
-                                        likedBy: true,
-                                        favoritedBy: true
-                                    }
-                                }
-                            },
-                        },
-                        _count: {
-                            select: {
-                                photos: true,
-                            },
-                        },
-                    },
-                },
             },
             orderBy: { shootDate: 'desc' },
         })
+
+        // Fetch stats and cover photo efficiently using raw query
+        const galleryIds = ungroupedGalleries.map(g => g.id);
+
+        let statsMap = new Map();
+
+        if (galleryIds.length > 0) {
+            const stats = await prisma.$queryRaw`
+                SELECT 
+                    g.id as "galleryId",
+                    COUNT(DISTINCT p.id) as "photoCount",
+                    COALESCE(SUM(p."fileSize"), 0) as "totalSize",
+                    COUNT(DISTINCT lp."photoId") as "likedCount",
+                    COUNT(DISTINCT fp."photoId") as "favoritedCount",
+                    (
+                        SELECT COALESCE(cover."thumbnailUrl", cover."mediumUrl", cover."originalUrl", first_photo."thumbnailUrl", first_photo."originalUrl")
+                        FROM folders first_folder
+                        LEFT JOIN photos cover ON cover.id = first_folder."coverPhotoId"
+                        LEFT JOIN photos first_photo ON first_photo."folderId" = first_folder.id
+                        WHERE first_folder."galleryId" = g.id
+                        ORDER BY first_folder."createdAt" ASC
+                        LIMIT 1
+                    ) as "coverPhoto"
+                FROM galleries g
+                LEFT JOIN folders f ON f."galleryId" = g.id
+                LEFT JOIN photos p ON p."folderId" = f.id
+                LEFT JOIN liked_photos lp ON lp."photoId" = p.id
+                LEFT JOIN favorited_photos fp ON fp."photoId" = p.id
+                WHERE g.id IN (${Prisma.join(galleryIds)})
+                GROUP BY g.id
+            ` as any[];
+
+            stats.forEach(stat => {
+                statsMap.set(stat.galleryId, {
+                    photoCount: Number(stat.photoCount),
+                    totalSize: Number(stat.totalSize),
+                    likedCount: Number(stat.likedCount),
+                    favoritedCount: Number(stat.favoritedCount),
+                    coverPhoto: stat.coverPhoto || null,
+                });
+            });
+        }
 
         const monthNames = [
             'January', 'February', 'March', 'April', 'May', 'June',
@@ -290,37 +268,18 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
                 coverPhoto: group.coverPhoto?.thumbnailUrl || group.coverPhoto?.mediumUrl || group.coverPhoto?.originalUrl || null,
             })),
             ungroupedGalleries: ungroupedGalleries.map((gallery) => {
-                // Count unique photos with likes/favorites (like getGalleries does)
-                let uniqueLikedPhotos = 0;
-                let uniqueFavoritedPhotos = 0;
-                let totalPhotos = 0;
-                let totalSize = 0;
-
-                gallery.folders?.forEach(folder => {
-                    totalPhotos += folder._count?.photos || 0;
-                    folder.photos?.forEach(photo => {
-                        totalSize += photo.fileSize || 0;
-                        if (photo._count.likedBy > 0) {
-                            uniqueLikedPhotos++;
-                        }
-                        if (photo._count.favoritedBy > 0) {
-                            uniqueFavoritedPhotos++;
-                        }
-                    });
-                });
-
-                const coverPhoto = gallery.folders?.[0]?.coverPhoto;
+                const stats = statsMap.get(gallery.id) || { photoCount: 0, totalSize: 0, likedCount: 0, favoritedCount: 0, coverPhoto: null };
 
                 return {
                     id: gallery.id,
                     title: gallery.title,
                     description: gallery.description,
                     shootDate: gallery.shootDate,
-                    coverPhoto: coverPhoto?.thumbnailUrl || coverPhoto?.mediumUrl || coverPhoto?.originalUrl || null,
-                    photoCount: totalPhotos,
-                    likedBy: uniqueLikedPhotos,
-                    favoritedBy: uniqueFavoritedPhotos,
-                    totalSize,
+                    coverPhoto: stats.coverPhoto,
+                    photoCount: stats.photoCount,
+                    likedBy: stats.likedCount,
+                    favoritedBy: stats.favoritedCount,
+                    totalSize: stats.totalSize,
                 };
             }),
         })
@@ -363,18 +322,6 @@ export const getUncategorizedGalleries = async (req: AuthRequest, res: Response)
                 title: true,
                 description: true,
                 createdAt: true,
-                folders: {
-                    select: {
-                        id: true,
-                        photos: {
-                            take: 1,
-                            select: {
-                                thumbnailUrl: true,
-                                originalUrl: true,
-                            },
-                        },
-                    },
-                },
             },
             orderBy: { createdAt: 'desc' },
         })
@@ -385,7 +332,6 @@ export const getUncategorizedGalleries = async (req: AuthRequest, res: Response)
                 title: gallery.title,
                 description: gallery.description,
                 createdAt: gallery.createdAt,
-                coverPhoto: gallery.folders[0]?.photos[0]?.thumbnailUrl || gallery.folders[0]?.photos[0]?.originalUrl || null,
             })),
         })
     } catch (error) {
