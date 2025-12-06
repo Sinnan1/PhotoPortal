@@ -262,7 +262,6 @@ export default function AdminGalleriesPage() {
 
                       {/* Client Activity Metrics */}
                       <ClientActivityMetrics
-                        totalViews={gallery.stats?.totalViews}
                         totalLikes={gallery.stats?.totalLikes}
                         totalFavorites={gallery.stats?.totalFavorites}
                       />

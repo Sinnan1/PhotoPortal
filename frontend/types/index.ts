@@ -179,7 +179,6 @@ export interface AdminGallery {
         totalFolders: number;
         totalLikes?: number;
         totalFavorites?: number;
-        totalViews?: number;
         storageUsed: number;
         clientsWithAccess: number;
     };

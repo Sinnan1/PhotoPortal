@@ -4,9 +4,9 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  BarChart3, 
-  TrendingUp, 
+import {
+  BarChart3,
+  TrendingUp,
   TrendingDown,
   Users,
   FolderOpen,
@@ -22,7 +22,6 @@ interface AnalyticsData {
   totalUsers: number;
   activeUsers: number;
   totalGalleries: number;
-  totalViews: number;
   totalDownloads: number;
   storageUsage: { value: number; total: number; percentage: number };
 }
@@ -32,7 +31,6 @@ export default function AdminAnalyticsPage() {
     totalUsers: 0,
     activeUsers: 0,
     totalGalleries: 0,
-    totalViews: 0,
     totalDownloads: 0,
     storageUsage: { value: 0, total: 10, percentage: 0 },
   });
@@ -46,24 +44,23 @@ export default function AdminAnalyticsPage() {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch user statistics
       const userStatsResponse = await adminApi.getUserStatistics();
       const userStats = userStatsResponse.data;
-      
+
       // Fetch gallery statistics
       const galleryStatsResponse = await adminApi.getAllGalleries({ limit: 1 });
       const totalGalleries = galleryStatsResponse.data.pagination?.total || 0;
-      
+
       // Calculate estimated storage (simplified calculation)
       const estimatedStorage = totalGalleries * 0.1; // Assume 100MB per gallery
       const storagePercentage = Math.min((estimatedStorage / 10) * 100, 100);
-      
+
       setAnalytics({
         totalUsers: userStats.overview.totalUsers,
         activeUsers: userStats.overview.activeUsers,
         totalGalleries,
-        totalViews: totalGalleries * 50, // Estimated views
         totalDownloads: totalGalleries * 15, // Estimated downloads
         storageUsage: {
           value: parseFloat(estimatedStorage.toFixed(1)),
@@ -71,7 +68,7 @@ export default function AdminAnalyticsPage() {
           percentage: Math.round(storagePercentage),
         },
       });
-      
+
     } catch (error: any) {
       console.error('Failed to fetch analytics data:', error);
       toast({
@@ -182,31 +179,7 @@ export default function AdminAnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estimated Views</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{analytics.totalViews.toLocaleString()}</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  <span className="text-muted-foreground">
-                    Estimated gallery views
-                  </span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estimated Downloads</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Downloads</CardTitle>
             <Download className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -280,8 +253,8 @@ export default function AdminAnalyticsPage() {
                   <div className="flex items-center space-x-3">
                     <div className="w-16 text-sm font-medium">Users</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.totalUsers > 0 ? (analytics.activeUsers / analytics.totalUsers) * 100 : 0} 
+                      <Progress
+                        value={analytics.totalUsers > 0 ? (analytics.activeUsers / analytics.totalUsers) * 100 : 0}
                         className="h-2"
                       />
                     </div>
@@ -290,26 +263,26 @@ export default function AdminAnalyticsPage() {
                     {analytics.activeUsers}/{analytics.totalUsers}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-16 text-sm font-medium">Galleries</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.totalGalleries > 0 ? Math.min((analytics.totalGalleries / 10) * 100, 100) : 0} 
+                      <Progress
+                        value={analytics.totalGalleries > 0 ? Math.min((analytics.totalGalleries / 10) * 100, 100) : 0}
                         className="h-2"
                       />
                     </div>
                   </div>
                   <div className="text-sm font-medium w-16 text-right">{analytics.totalGalleries}</div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-16 text-sm font-medium">Storage</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.storageUsage.percentage} 
+                      <Progress
+                        value={analytics.storageUsage.percentage}
                         className="h-2"
                       />
                     </div>
@@ -356,7 +329,7 @@ export default function AdminAnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
                   <div className="flex items-center space-x-3">
                     <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center text-xs bg-blue-100">
@@ -370,7 +343,7 @@ export default function AdminAnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20">
                   <div className="flex items-center space-x-3">
                     <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center text-xs bg-purple-100">
@@ -419,7 +392,7 @@ export default function AdminAnalyticsPage() {
                 <Progress value={100} className="h-2" />
                 <p className="text-xs text-gray-500">All systems running</p>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>User Activity</span>
@@ -428,7 +401,7 @@ export default function AdminAnalyticsPage() {
                 <Progress value={(analytics.activeUsers / Math.max(analytics.totalUsers, 1)) * 100} className="h-2" />
                 <p className="text-xs text-gray-500">Active user ratio</p>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Storage Health</span>

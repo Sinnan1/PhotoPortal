@@ -37,23 +37,39 @@ async function extractExifDate(photoUrl: string): Promise<Date | null> {
 
     console.log(`  📊 Downloaded ${buffer.length} bytes`);
 
-    // Extract EXIF data
-    const exifParser = require('exif-parser');
-    const parser = exifParser.create(buffer);
-    const result = parser.parse();
+    // Extract EXIF data using sharp + exif-reader
+    const sharp = require('sharp');
+    const exifReader = require('exif-reader');
 
-    if (result.tags && result.tags.DateTimeOriginal) {
-      const capturedAt = new Date(result.tags.DateTimeOriginal * 1000);
-      console.log(`  ✅ EXIF date found: ${capturedAt.toISOString()}`);
-      return capturedAt;
-    } else if (result.tags && result.tags.CreateDate) {
-      const capturedAt = new Date(result.tags.CreateDate * 1000);
-      console.log(`  ✅ EXIF create date found: ${capturedAt.toISOString()}`);
-      return capturedAt;
-    } else {
-      console.log(`  ⚠️ No EXIF date found`);
-      return null;
+    const metadata = await sharp(buffer).metadata();
+
+    if (metadata.exif) {
+      const parsedExif = exifReader(metadata.exif);
+
+      let capturedAt: Date | null = null;
+
+      if (parsedExif.exif) {
+        if (parsedExif.exif.DateTimeOriginal) {
+          capturedAt = parsedExif.exif.DateTimeOriginal;
+        } else if (parsedExif.exif.CreateDate) {
+          capturedAt = parsedExif.exif.CreateDate;
+        }
+      }
+
+      // Fallback to 'image' tags
+      if (!capturedAt && parsedExif.image && parsedExif.image.DateTime) {
+        capturedAt = parsedExif.image.DateTime;
+      }
+
+      if (capturedAt) {
+        console.log(`  ✅ EXIF date found: ${capturedAt.toISOString()}`);
+        return capturedAt;
+      }
     }
+
+    console.log(`  ⚠️ No EXIF date found`);
+    return null;
+
   } catch (error) {
     console.error(`  ❌ Error extracting EXIF:`, error instanceof Error ? error.message : error);
     return null;
