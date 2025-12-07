@@ -30,7 +30,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
 	uploadToS3,
 	deleteFromS3,
@@ -1599,32 +1599,41 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 			})
 		);
 
-		// Create workbook and worksheet
-		const workbook = XLSX.utils.book_new();
-		const worksheet = XLSX.utils.json_to_sheet(excelData);
+		// Create workbook and worksheet using ExcelJS
+		const workbook = new ExcelJS.Workbook();
+		const worksheet = workbook.addWorksheet('Liked Photos');
 
-		// Set column widths
-		worksheet['!cols'] = [
-			{ wch: 5 },  // #
-			{ wch: 50 }, // Filename
-			{ wch: 20 }, // Folder
-			{ wch: 30 }, // Liked By
-			{ wch: 15 }  // Liked Date
+		// Set column headers and widths
+		worksheet.columns = [
+			{ header: '#', key: 'num', width: 5 },
+			{ header: 'Filename', key: 'filename', width: 50 },
+			{ header: 'Folder', key: 'folder', width: 20 },
+			{ header: 'Liked By', key: 'likedBy', width: 30 },
+			{ header: 'Liked Date', key: 'likedDate', width: 15 }
 		];
 
-		XLSX.utils.book_append_sheet(workbook, worksheet, 'Liked Photos');
+		// Add data rows
+		excelData.forEach(row => {
+			worksheet.addRow({
+				num: row['#'],
+				filename: row['Filename'],
+				folder: row['Folder'],
+				likedBy: row['Liked By'],
+				likedDate: row['Liked Date']
+			});
+		});
 
 		// Generate Excel file buffer
-		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		const excelBuffer = await workbook.xlsx.writeBuffer();
 
 		// Set response headers
 		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_liked_photos.xlsx`;
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-		res.setHeader('Content-Length', excelBuffer.length);
+		res.setHeader('Content-Length', excelBuffer.byteLength);
 
 		// Send the file
-		res.send(excelBuffer);
+		res.send(Buffer.from(excelBuffer));
 
 	} catch (error) {
 		console.error("Export liked photos to Excel error:", error);
@@ -1737,32 +1746,41 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 			})
 		);
 
-		// Create workbook and worksheet
-		const workbook = XLSX.utils.book_new();
-		const worksheet = XLSX.utils.json_to_sheet(excelData);
+		// Create workbook and worksheet using ExcelJS
+		const workbook = new ExcelJS.Workbook();
+		const worksheet = workbook.addWorksheet('Favorited Photos');
 
-		// Set column widths
-		worksheet['!cols'] = [
-			{ wch: 5 },  // #
-			{ wch: 50 }, // Filename
-			{ wch: 20 }, // Folder
-			{ wch: 30 }, // Favorited By
-			{ wch: 15 }  // Favorited Date
+		// Set column headers and widths
+		worksheet.columns = [
+			{ header: '#', key: 'num', width: 5 },
+			{ header: 'Filename', key: 'filename', width: 50 },
+			{ header: 'Folder', key: 'folder', width: 20 },
+			{ header: 'Favorited By', key: 'favoritedBy', width: 30 },
+			{ header: 'Favorited Date', key: 'favoritedDate', width: 15 }
 		];
 
-		XLSX.utils.book_append_sheet(workbook, worksheet, 'Favorited Photos');
+		// Add data rows
+		excelData.forEach(row => {
+			worksheet.addRow({
+				num: row['#'],
+				filename: row['Filename'],
+				folder: row['Folder'],
+				favoritedBy: row['Favorited By'],
+				favoritedDate: row['Favorited Date']
+			});
+		});
 
 		// Generate Excel file buffer
-		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		const excelBuffer = await workbook.xlsx.writeBuffer();
 
 		// Set response headers
 		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_favorited_photos.xlsx`;
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-		res.setHeader('Content-Length', excelBuffer.length);
+		res.setHeader('Content-Length', excelBuffer.byteLength);
 
 		// Send the file
-		res.send(excelBuffer);
+		res.send(Buffer.from(excelBuffer));
 
 	} catch (error) {
 		console.error("Export favorited photos to Excel error:", error);
