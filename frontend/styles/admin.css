@@ -1,10 +1,13 @@
 /* Admin-specific styles for Yarrow Weddings & Co. */
 /* Updated to use unified theme system with Cinematic Luxury aesthetic */
 
+@reference "../src/app/globals.css";
+
 /* Utility classes for luxury effects */
 
 .gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-amber-200 to-primary;
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(to right, var(--primary), oklch(0.84 0.06 95), var(--primary));
   background-size: 200% auto;
   animation: shine 4s linear infinite;
 }
