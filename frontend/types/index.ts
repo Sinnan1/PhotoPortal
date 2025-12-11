@@ -143,6 +143,8 @@ export interface Gallery {
     canDownload?: boolean;
     password?: string | null;
     groupId?: string | null;
+    selectionLocked?: boolean;
+    selectionLockedAt?: string | null;
     folders?: Folder[];
     likedBy: { userId: string }[];
     favoritedBy: { userId: string }[];

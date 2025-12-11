@@ -119,7 +119,11 @@ export const getFolderTree = async (req: AuthRequest, res: Response) => {
 								likedBy: true,
 								favoritedBy: true,
 								postBy: true
-							}
+							},
+							orderBy: [
+								{ capturedAt: 'asc' },
+								{ createdAt: 'asc' }
+							]
 						},
 						coverPhoto: true,
 						_count: {
@@ -132,7 +136,11 @@ export const getFolderTree = async (req: AuthRequest, res: Response) => {
 						likedBy: true,
 						favoritedBy: true,
 						postBy: true
-					}
+					},
+					orderBy: [
+						{ capturedAt: 'asc' },
+						{ createdAt: 'asc' }
+					]
 				},
 				coverPhoto: true,
 				_count: {
@@ -186,7 +194,10 @@ export const getFolder = async (req: AuthRequest, res: Response) => {
 						favoritedBy: true,
 						postBy: true
 					},
-					orderBy: { createdAt: 'desc' }
+					orderBy: [
+						{ capturedAt: 'asc' },
+						{ createdAt: 'asc' }
+					]
 				},
 				coverPhoto: true,
 				gallery: {

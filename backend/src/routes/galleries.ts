@@ -13,7 +13,8 @@ import {
 	getClientGalleries,
 	updateGalleryAccess,
 	getAllowedClients,
-	searchGalleries
+	searchGalleries,
+	toggleSelectionLock
 } from '../controllers/galleryController'
 import {
 	getGalleriesTimeline,
@@ -65,5 +66,10 @@ router.put('/:id/access', authenticateToken, requireAdminOrOwner, auditMiddlewar
 	extractTargetId: (req) => req.params.id
 }), updateGalleryAccess)
 router.get('/:id/allowed-clients', authenticateToken, requireAdminOrOwner, getAllowedClients)
+
+// Toggle selection lock for a gallery (photographer only) 
+router.patch('/:id/selection-lock', authenticateToken, requireAdminOrOwner, auditMiddleware('TOGGLE_SELECTION_LOCK', 'gallery', {
+	extractTargetId: (req) => req.params.id
+}), toggleSelectionLock)
 
 export default router

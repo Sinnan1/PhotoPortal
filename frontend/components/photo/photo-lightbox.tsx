@@ -20,9 +20,10 @@ interface PhotoLightboxProps {
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
   dataSaverMode?: boolean
   canDownload?: boolean
+  selectionLocked?: boolean
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false, canDownload = true }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false, canDownload = true, selectionLocked = false }: PhotoLightboxProps) {
   const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
@@ -342,13 +343,13 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           break
         case "q":
         case "Q":
-          // Trigger like action
-          handleLikePhoto(photo.id);
+          // Trigger like action (if not locked)
+          if (!selectionLocked) handleLikePhoto(photo.id);
           break
         case "w":
         case "W":
-          // Trigger favorite action
-          handleFavoritePhoto(photo.id);
+          // Trigger favorite action (if not locked)
+          if (!selectionLocked) handleFavoritePhoto(photo.id);
           break
       }
     }
@@ -420,6 +421,7 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
           onLikeToggle={() => handleLikePhoto(photo.id)}
           onFavoriteToggle={() => handleFavoritePhoto(photo.id)}
           onUnpost={onUnpost}
+          selectionLocked={selectionLocked}
           className="flex-col [&>button]:text-white [&>button]:backdrop-blur-md [&>button]:bg-white/10 [&>button]:hover:bg-olive-green/30 [&>button]:border [&>button]:border-white/20 [&>button]:rounded-xl [&>button]:transition-all [&>button]:duration-all [&>button]:hover:scale-105 [&>button]:sm:w-10 [&>button]:sm:h-10"
         />
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Heart, Star, Share2 } from "lucide-react";
+import { Heart, Star, Share2, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -17,6 +17,7 @@ interface PhotoActionsProps {
   onLikeToggle?: () => void;
   onFavoriteToggle?: () => void;
   className?: string;
+  selectionLocked?: boolean;
 }
 
 export function PhotoActions({
@@ -30,6 +31,7 @@ export function PhotoActions({
   onLikeToggle,
   onFavoriteToggle,
   className = "",
+  selectionLocked = false,
 }: PhotoActionsProps) {
   const [internalLiked, setInternalLiked] = useState(initialLiked);
   const [internalFavorited, setInternalFavorited] = useState(initialFavorited);
@@ -84,11 +86,13 @@ export function PhotoActions({
         title: !isLiked ? "Photo liked!" : "Photo unliked",
         description: !isLiked ? "Added to your liked photos" : "Removed from liked photos",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to like photo:", error);
+      // Check if error is due to selection lock
+      const isLocked = error?.selectionLocked || error?.response?.data?.selectionLocked;
       toast({
-        title: "Error",
-        description: "Failed to update like status",
+        title: isLocked ? "Selections Locked" : "Error",
+        description: isLocked ? "The photographer has locked selections for this gallery" : "Failed to update like status",
         variant: "destructive",
       });
     } finally {
@@ -121,11 +125,13 @@ export function PhotoActions({
         title: !isFavorited ? "Photo favorited!" : "Photo unfavorited",
         description: !isFavorited ? "Added to your favorites" : "Removed from favorites",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to favorite photo:", error);
+      // Check if error is due to selection lock
+      const isLocked = error?.selectionLocked || error?.response?.data?.selectionLocked;
       toast({
-        title: "Error",
-        description: "Failed to update favorite status",
+        title: isLocked ? "Selections Locked" : "Error",
+        description: isLocked ? "The photographer has locked selections for this gallery" : "Failed to update favorite status",
         variant: "destructive",
       });
     } finally {
@@ -139,30 +145,38 @@ export function PhotoActions({
         size="sm"
         variant={isLiked ? "default" : "secondary"}
         onClick={handleLike}
-        disabled={loading}
+        disabled={loading || selectionLocked}
         data-action="like"
-        title="Like photo (Press Q)"
+        title={selectionLocked ? "Selections are locked" : "Like photo (Press Q)"}
         className={`transition-all duration-200 ${isLiked ? "bg-red-500 hover:bg-red-600" : ""
-          }`}
+          } ${selectionLocked ? "opacity-50 cursor-not-allowed" : ""}`}
       >
-        <Heart
-          className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
-        />
+        {selectionLocked ? (
+          <Lock className="h-4 w-4" />
+        ) : (
+          <Heart
+            className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
+          />
+        )}
       </Button>
 
       <Button
         size="sm"
         variant={isFavorited ? "default" : "secondary"}
         onClick={handleFavorite}
-        disabled={loading}
+        disabled={loading || selectionLocked}
         data-action="favorite"
-        title="Favorite photo (Press W)"
+        title={selectionLocked ? "Selections are locked" : "Favorite photo (Press W)"}
         className={`transition-all duration-200 ${isFavorited ? "bg-yellow-500 hover:bg-yellow-600" : ""
-          }`}
+          } ${selectionLocked ? "opacity-50 cursor-not-allowed" : ""}`}
       >
-        <Star
-          className={`h-4 w-4 ${isFavorited ? "fill-current" : ""}`}
-        />
+        {selectionLocked ? (
+          <Lock className="h-4 w-4" />
+        ) : (
+          <Star
+            className={`h-4 w-4 ${isFavorited ? "fill-current" : ""}`}
+          />
+        )}
       </Button>
 
       {onUnpost && (

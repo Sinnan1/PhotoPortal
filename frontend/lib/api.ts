@@ -351,6 +351,13 @@ export const api = {
       method: "DELETE",
     }),
 
+  // Selection Lock API
+  toggleSelectionLock: (galleryId: string, locked?: boolean) =>
+    apiRequest(`/galleries/${galleryId}/selection-lock`, {
+      method: "PATCH",
+      body: JSON.stringify(locked !== undefined ? { locked } : {}),
+    }),
+
   // Client Management APIs
   createClient: (clientData: { email: string; password: string; name: string }) =>
     apiRequest("/photographers/clients", {

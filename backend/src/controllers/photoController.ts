@@ -738,7 +738,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, selectionLocked: true },
 						},
 					},
 				},
@@ -746,6 +746,15 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery selections are locked (photographers can still modify)
+		if (photo.folder.gallery.selectionLocked && req.user!.role !== 'PHOTOGRAPHER') {
+			return res.status(403).json({
+				success: false,
+				error: "Selections are locked for this gallery",
+				selectionLocked: true
+			});
 		}
 
 		// Sync likes across photographer and all clients with access to this gallery
@@ -799,7 +808,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, selectionLocked: true },
 						},
 					},
 				},
@@ -807,6 +816,15 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery selections are locked (photographers can still modify)
+		if (photo.folder.gallery.selectionLocked && req.user!.role !== 'PHOTOGRAPHER') {
+			return res.status(403).json({
+				success: false,
+				error: "Selections are locked for this gallery",
+				selectionLocked: true
+			});
 		}
 
 		// Get gallery owner and all clients with access
@@ -850,7 +868,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, selectionLocked: true },
 						},
 					},
 				},
@@ -858,6 +876,15 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery selections are locked (photographers can still modify)
+		if (photo.folder.gallery.selectionLocked && req.user!.role !== 'PHOTOGRAPHER') {
+			return res.status(403).json({
+				success: false,
+				error: "Selections are locked for this gallery",
+				selectionLocked: true
+			});
 		}
 
 		// Sync favorites across photographer and all clients with access
@@ -906,7 +933,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, selectionLocked: true },
 						},
 					},
 				},
@@ -914,6 +941,15 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery selections are locked (photographers can still modify)
+		if (photo.folder.gallery.selectionLocked && req.user!.role !== 'PHOTOGRAPHER') {
+			return res.status(403).json({
+				success: false,
+				error: "Selections are locked for this gallery",
+				selectionLocked: true
+			});
 		}
 
 		// Get gallery owner and all clients with access

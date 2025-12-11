@@ -983,3 +983,57 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 		res.status(500).json({ success: false, error: 'Internal server error' })
 	}
 }
+
+// Toggle selection lock for a gallery (photographer only)
+export const toggleSelectionLock = async (req: AuthRequest, res: Response) => {
+	try {
+		const { id } = req.params
+		const { locked } = req.body
+		const userId = req.user!.id
+		const userRole = req.user!.role
+
+		// Check if gallery exists and user has permission
+		const whereClause = userRole === 'ADMIN' ? { id } : { id, photographerId: userId }
+		const gallery = await prisma.gallery.findFirst({
+			where: whereClause,
+			select: { id: true, selectionLocked: true }
+		})
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: 'Gallery not found or access denied'
+			})
+		}
+
+		// Determine new lock state (toggle if not specified)
+		const newLockState = locked !== undefined ? locked : !gallery.selectionLocked
+
+		// Update gallery
+		const updatedGallery = await prisma.gallery.update({
+			where: { id },
+			data: {
+				selectionLocked: newLockState,
+				selectionLockedAt: newLockState ? new Date() : null
+			},
+			select: {
+				id: true,
+				title: true,
+				selectionLocked: true,
+				selectionLockedAt: true
+			}
+		})
+
+		res.json({
+			success: true,
+			message: newLockState ? 'Gallery selections locked' : 'Gallery selections unlocked',
+			data: updatedGallery
+		})
+	} catch (error) {
+		console.error('Toggle selection lock error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}

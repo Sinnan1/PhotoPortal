@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder as FolderIcon, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
+import { Lock, LockOpen, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder as FolderIcon, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import type { Photo, Folder, Gallery } from "@/types";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo/photo-lightbox";
@@ -97,6 +97,8 @@ function GalleryPage() {
   const [showFolderTree, setShowFolderTree] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
+  const [selectionLocked, setSelectionLocked] = useState(false);
+  const [isTogglingLock, setIsTogglingLock] = useState(false);
 
   // React Query hooks
   const { data: gallery, isLoading: galleryLoading, error: galleryError } = useGallery(galleryId, { password });
@@ -236,6 +238,13 @@ function GalleryPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [sidebarCollapsed]);
 
+  // Sync selectionLocked state from gallery data
+  useEffect(() => {
+    if (gallery?.selectionLocked !== undefined) {
+      setSelectionLocked(gallery.selectionLocked);
+    }
+  }, [gallery?.selectionLocked]);
+
 
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -302,6 +311,29 @@ function GalleryPage() {
 
   const handleImageError = (photoId: string) => {
     setImageErrors(prev => new Set(prev).add(photoId));
+  };
+
+  // Handle toggling selection lock (photographers only)
+  const handleToggleSelectionLock = async () => {
+    if (!gallery) return;
+    setIsTogglingLock(true);
+    try {
+      const response = await api.toggleSelectionLock(galleryId, !selectionLocked);
+      // API returns { success: true, data: { selectionLocked: boolean, ... } }
+      const newLockState = response.data?.selectionLocked ?? response.selectionLocked;
+      setSelectionLocked(newLockState);
+      showToast(
+        newLockState
+          ? "Client selections are now locked"
+          : "Client selections are now unlocked",
+        "success"
+      );
+    } catch (error) {
+      console.error("Failed to toggle selection lock:", error);
+      showToast("Failed to toggle selection lock", "error");
+    } finally {
+      setIsTogglingLock(false);
+    }
   };
 
 
@@ -727,6 +759,19 @@ function GalleryPage() {
           <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-3xl">{gallery.description}</p>
         )}
 
+        {/* Selection Locked Banner - For Clients */}
+        {selectionLocked && user?.role !== "PHOTOGRAPHER" && (
+          <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <div className="flex-shrink-0 w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+              <Lock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-amber-700 dark:text-amber-400">Thank you for your selections!</h4>
+              <p className="text-sm text-muted-foreground">Your selections have been finalized. You can continue to view and download your gallery anytime.</p>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Bar: Breadcrumb + Info */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 sm:px-4 bg-muted/30 rounded-xl border">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 min-w-0">
@@ -889,6 +934,27 @@ function GalleryPage() {
                 {currentFolder ? (currentFolder.photos || []).filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
               </Badge>
             </Button>
+
+            {/* Selection Lock Toggle - Photographers Only */}
+            {user?.role === "PHOTOGRAPHER" && (
+              <Button
+                variant={selectionLocked ? "default" : "outline"}
+                size="sm"
+                onClick={handleToggleSelectionLock}
+                disabled={isTogglingLock}
+                className={`h-8 sm:h-9 px-2.5 sm:px-4 whitespace-nowrap flex-shrink-0 ${selectionLocked ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
+                title={selectionLocked ? "Client selections are locked - Click to unlock" : "Lock client selections"}
+              >
+                {isTogglingLock ? (
+                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                ) : selectionLocked ? (
+                  <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                ) : (
+                  <LockOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">{selectionLocked ? "Locked" : "Lock"}</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1109,6 +1175,7 @@ function GalleryPage() {
           onPhotoStatusChange={handlePhotoStatusChange}
           dataSaverMode={dataSaverMode}
           canDownload={gallery.canDownload !== false}
+          selectionLocked={gallery.selectionLocked && user?.role !== 'PHOTOGRAPHER'}
         />
       )}
     </div>

@@ -62,6 +62,10 @@ model Gallery {
   // Event grouping (optional)
   groupId    String? // Optional link to GalleryGroup
 
+  // Selection lock (prevents clients from modifying likes/favorites)
+  selectionLocked   Boolean   @default(false)
+  selectionLockedAt DateTime?
+
   favoritedBy    FavoritedGallery[]
   folders        Folder[]
   photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
