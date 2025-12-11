@@ -389,6 +389,40 @@ export const registerPhoto = async (req: Request, res: Response) => {
       }.backblazeb2.com`;
     const originalUrl = `${endpoint}/${bucketName}/${key}`;
 
+    // Extract EXIF capture date from the uploaded file (download first 64KB only)
+    let capturedAt: Date | null = null;
+    try {
+      const { getPartialObjectFromS3 } = await import("../utils/s3Storage");
+      const sharp = require("sharp");
+      const exifReader = require("exif-reader");
+
+      console.log(`📅 Extracting EXIF from multipart upload: ${key}`);
+      const partialBuffer = await getPartialObjectFromS3(key, 65536, bucketName);
+      const metadata = await sharp(partialBuffer).metadata();
+
+      if (metadata.exif) {
+        const parsedExif = exifReader(metadata.exif);
+
+        if (parsedExif && parsedExif.exif) {
+          if (parsedExif.exif.DateTimeOriginal) {
+            capturedAt = parsedExif.exif.DateTimeOriginal;
+          } else if (parsedExif.exif.CreateDate) {
+            capturedAt = parsedExif.exif.CreateDate;
+          }
+        }
+        // Fallback to 'image' tags if not in standard exif block
+        if (!capturedAt && parsedExif.image && parsedExif.image.DateTime) {
+          capturedAt = parsedExif.image.DateTime;
+        }
+
+        if (capturedAt) {
+          console.log(`📅 EXIF date extracted: ${capturedAt.toISOString()}`);
+        }
+      }
+    } catch (exifError) {
+      console.log(`⚠️ No EXIF date found or parse error for ${filename}:`, exifError);
+    }
+
     // Create photo record in database WITHOUT thumbnails (will be generated async)
     const photo = await prisma.photo.create({
       data: {
@@ -402,6 +436,7 @@ export const registerPhoto = async (req: Request, res: Response) => {
         fileSize: fileSize || 0,
         folderId,
         uploadSessionId: uploadSessionId || null,
+        capturedAt,
       },
     });
 

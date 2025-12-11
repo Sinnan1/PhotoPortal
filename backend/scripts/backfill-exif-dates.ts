@@ -8,18 +8,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { getObjectStreamFromS3 } from '../src/utils/s3Storage';
+import { getPartialObjectFromS3 } from '../src/utils/s3Storage';
 
 const prisma = new PrismaClient();
 
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
-    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
+// EXIF data is typically in the first 64KB of a JPEG/image file
+const EXIF_BYTES = 65536;
 
 async function extractExifDate(photoUrl: string): Promise<Date | null> {
   try {
@@ -29,13 +23,12 @@ async function extractExifDate(photoUrl: string): Promise<Date | null> {
     const bucketName = pathParts[0];
     const key = decodeURIComponent(pathParts.slice(1).join('/'));
 
-    console.log(`  📥 Downloading from B2: ${key}`);
+    console.log(`  📥 Downloading first ${EXIF_BYTES / 1024}KB from B2: ${key}`);
 
-    // Download photo from B2
-    const { stream } = await getObjectStreamFromS3(key, bucketName);
-    const buffer = await streamToBuffer(stream);
+    // Download only the first 64KB (EXIF metadata lives in the header)
+    const buffer = await getPartialObjectFromS3(key, EXIF_BYTES, bucketName);
 
-    console.log(`  📊 Downloaded ${buffer.length} bytes`);
+    console.log(`  📊 Downloaded ${buffer.length} bytes (partial)`);
 
     // Extract EXIF data using sharp + exif-reader
     const sharp = require('sharp');
