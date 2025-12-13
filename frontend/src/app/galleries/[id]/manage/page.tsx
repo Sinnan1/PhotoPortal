@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder as FolderIcon, FileSpreadsheet, Heart, Star, Eye, FolderPlus, Search, Calendar, Lock, Download as DownloadIcon } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder as FolderIcon, FileSpreadsheet, Heart, Star, Eye, FolderPlus, Search, Calendar, Lock, Download as DownloadIcon, LockKeyhole } from "lucide-react"
 import Link from "next/link"
 import { FolderTree } from "@/components/gallery/folder-tree"
 import { FileList } from "@/components/gallery/file-list"
@@ -79,6 +80,9 @@ export default function ManageGalleryPage() {
   const [isExportingLikedCSV, setIsExportingLikedCSV] = useState(false)
   const [isExportingFavoritedCSV, setIsExportingFavoritedCSV] = useState(false)
 
+  // Lock selection state
+  const [isLocked, setIsLocked] = useState(false)
+
   useEffect(() => {
     if (gallery) {
       setFormData({
@@ -88,6 +92,7 @@ export default function ManageGalleryPage() {
         expiresAt: gallery.expiresAt ? new Date(gallery.expiresAt).toISOString().slice(0, 16) : "",
         downloadLimit: gallery.downloadLimit?.toString() || "",
       })
+      setIsLocked(gallery.isLocked || false)
 
       // Set default folder if none selected
       if (!selectedFolderId && gallery.folders && gallery.folders.length > 0) {
@@ -136,6 +141,7 @@ export default function ManageGalleryPage() {
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
+        isLocked: isLocked,
       }
 
       await updateGalleryMutation.mutateAsync({ id: galleryId, data: updateData })
@@ -718,6 +724,31 @@ export default function ManageGalleryPage() {
                       <p className="text-sm text-muted-foreground">Set maximum number of downloads (0 = unlimited)</p>
                       <p className="text-sm text-muted-foreground">Current: <span className="font-medium">{gallery?.downloadCount ?? 0}</span></p>
                     </div>
+                  </div>
+
+                  {/* Lock Selection */}
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="isLocked" className="flex items-center gap-2 text-sm font-medium">
+                          <LockKeyhole className="h-4 w-4" />
+                          Lock Selection
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          When enabled, clients cannot add or remove likes/favorites
+                        </p>
+                      </div>
+                      <Switch
+                        id="isLocked"
+                        checked={isLocked}
+                        onCheckedChange={setIsLocked}
+                      />
+                    </div>
+                    {isLocked && (
+                      <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
+                        Selection is currently locked. Clients will see a message and cannot modify their selections.
+                      </p>
+                    )}
                   </div>
 
                   {/* Save Button */}

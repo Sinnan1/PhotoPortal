@@ -20,6 +20,7 @@ import { useImagePreload } from "@/hooks/useImagePreload"
 interface FolderGridProps {
   folder: Folder
   isPhotographer: boolean
+  isLocked?: boolean
   onPhotoView: (photo: Photo) => void
   onPhotoDelete?: (photoId: string) => void
   onFolderSelect: (folderId: string) => void
@@ -33,6 +34,7 @@ interface FolderGridProps {
 export function FolderGrid({
   folder,
   isPhotographer,
+  isLocked = false,
   onPhotoView,
   onPhotoDelete,
   onFolderSelect,
@@ -186,50 +188,52 @@ export function FolderGrid({
             </div>
           </div>
 
-          {/* Like/Favorite buttons */}
-          <div className="absolute top-1.5 left-1.5 flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleLikePhoto(photo.id)
-              }}
-            >
-              <Heart
-                className={`h-3 w-3 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
-              />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleFavoritePhoto(photo.id)
-              }}
-            >
-              <Star
-                className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
-              />
-            </Button>
-            {isPhotographer && (
+          {/* Like/Favorite buttons - only show when not locked */}
+          {!isLocked && (
+            <div className="absolute top-1.5 left-1.5 flex gap-1">
               <Button
                 size="sm"
                 variant="ghost"
                 className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
                 onClick={(e) => {
                   e.stopPropagation()
-                  handlePostPhoto(photo.id)
+                  handleLikePhoto(photo.id)
                 }}
               >
-                <Share2
-                  className={`h-3 w-3 ${(photo.postBy ?? []).some((post) => post.userId === user?.id) ? "text-purple-500 fill-current" : ""}`}
+                <Heart
+                  className={`h-3 w-3 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
                 />
               </Button>
-            )}
-          </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleFavoritePhoto(photo.id)
+                }}
+              >
+                <Star
+                  className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
+                />
+              </Button>
+              {isPhotographer && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handlePostPhoto(photo.id)
+                  }}
+                >
+                  <Share2
+                    className={`h-3 w-3 ${(photo.postBy ?? []).some((post) => post.userId === user?.id) ? "text-purple-500 fill-current" : ""}`}
+                  />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       ))}
 

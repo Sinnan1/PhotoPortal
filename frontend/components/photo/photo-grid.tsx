@@ -13,6 +13,7 @@ interface PhotoGridProps {
   photos: Photo[];
   galleryId?: string;
   isAdmin?: boolean;
+  isLocked?: boolean;
   onDelete?: (photoId: string) => void;
   onView?: (photo: Photo) => void;
   onDownload?: (photoId: string) => void;
@@ -55,6 +56,7 @@ export function PhotoGrid({
   photos,
   galleryId,
   isAdmin = false,
+  isLocked = false,
   onDelete,
   onView,
   onDownload,
@@ -238,36 +240,39 @@ export function PhotoGrid({
             </div>
 
             {/* Like/Favorite buttons - positioned at top-left to avoid overlap */}
-            <div className="absolute top-1.5 left-1.5 flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLikePhoto(photo.id);
-                }}
-                aria-label="Like photo"
-              >
-                <Heart
-                  className={`h-3 w-3 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
-                />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleFavoritePhoto(photo.id);
-                }}
-                aria-label="Favorite photo"
-              >
-                <Star
-                  className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
-                />
-              </Button>
-            </div>
+            {/* Only show when gallery is not locked */}
+            {!isLocked && (
+              <div className="absolute top-1.5 left-1.5 flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLikePhoto(photo.id);
+                  }}
+                  aria-label="Like photo"
+                >
+                  <Heart
+                    className={`h-3 w-3 ${(photo.likedBy ?? []).some((like) => like.userId === user?.id) ? "text-red-500 fill-current" : ""}`}
+                  />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white backdrop-blur-sm bg-black/20 hover:bg-black/30 h-6 w-6 p-0 transition-all duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFavoritePhoto(photo.id);
+                  }}
+                  aria-label="Favorite photo"
+                >
+                  <Star
+                    className={`h-3 w-3 ${(photo.favoritedBy ?? []).some((fav) => fav.userId === user?.id) ? "text-yellow-500 fill-current" : ""}`}
+                  />
+                </Button>
+              </div>
+            )}
 
             {/* Photo info overlay for admin */}
             {isAdmin && (photo.fileSize || photo.downloadCount !== undefined) && (

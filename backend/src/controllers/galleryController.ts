@@ -419,7 +419,7 @@ export const verifyGalleryPassword = async (req: Request, res: Response) => {
 export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const { title, description, password, expiresAt, downloadLimit, groupId } = req.body
+		const { title, description, password, expiresAt, downloadLimit, groupId, isLocked } = req.body
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -447,6 +447,7 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 		if (description !== undefined) updateData.description = description
 		if (downloadLimit !== undefined) updateData.downloadLimit = downloadLimit
 		if (groupId !== undefined) updateData.groupId = groupId
+		if (isLocked !== undefined) updateData.isLocked = isLocked
 
 		// Handle password update
 		if (password !== undefined) {

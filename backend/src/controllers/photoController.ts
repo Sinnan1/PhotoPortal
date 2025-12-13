@@ -730,6 +730,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists
 		const photo = await prisma.photo.findUnique({
@@ -738,7 +739,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -746,6 +747,14 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot like photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Sync likes across photographer and all clients with access to this gallery
@@ -791,6 +800,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists to derive gallery
 		const photo = await prisma.photo.findUnique({
@@ -799,7 +809,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -807,6 +817,14 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot unlike photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Get gallery owner and all clients with access
@@ -843,6 +861,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		const photo = await prisma.photo.findUnique({
 			where: { id },
@@ -850,7 +869,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -858,6 +877,14 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot favorite photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Sync favorites across photographer and all clients with access
@@ -898,6 +925,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists to derive gallery
 		const photo = await prisma.photo.findUnique({
@@ -906,7 +934,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -914,6 +942,14 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot unfavorite photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Get gallery owner and all clients with access

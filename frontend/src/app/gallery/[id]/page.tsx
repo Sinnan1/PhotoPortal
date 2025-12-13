@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { useGallery } from "@/hooks/queries/useGalleries";
+import { useGallery, useUpdateGallery } from "@/hooks/queries/useGalleries";
 import { useFolder, useSetFolderCover } from "@/hooks/queries/useFolders";
 import { useDeletePhoto } from "@/hooks/queries/usePhotos";
 import { useToast } from "@/components/ui/toast";
@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder as FolderIcon, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
+import { Lock, LockOpen, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder as FolderIcon, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
 import type { Photo, Folder, Gallery } from "@/types";
 import Image from "next/image";
 import { PhotoLightbox } from "@/components/photo/photo-lightbox";
@@ -105,6 +105,7 @@ function GalleryPage() {
 
   const setFolderCoverMutation = useSetFolderCover();
   const deletePhotoMutation = useDeletePhoto();
+  const updateGalleryMutation = useUpdateGallery();
 
   // Derived state
   const loading = galleryLoading || (!!currentFolderId && folderLoading);
@@ -638,6 +639,19 @@ function GalleryPage() {
         </div>
       </div>
 
+      {/* Locked Gallery Banner for Clients */}
+      {gallery.isLocked && user?.role === 'CLIENT' && (
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20 rounded-xl p-6 mb-6 text-center">
+          <Lock className="mx-auto h-8 w-8 text-primary mb-3" />
+          <h3 className="text-lg font-semibold text-primary mb-2">
+            Thank You for Your Selection
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            You can view your images anytime with your provided credentials.
+          </p>
+        </div>
+      )}
+
       {/* Modern Gallery Header Section */}
       <div className="mb-6 sm:mb-8 space-y-4 sm:space-y-6">
         {/* Top Bar: Title + Main Actions */}
@@ -719,6 +733,39 @@ function GalleryPage() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {/* Lock Toggle Button - Only for Photographers */}
+          {user?.role === 'PHOTOGRAPHER' && (
+            <Button
+              variant={gallery.isLocked ? "default" : "outline"}
+              className={`shadow-sm flex-shrink-0 h-9 px-3 sm:h-10 sm:px-4 ${gallery.isLocked ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+              onClick={async () => {
+                try {
+                  await updateGalleryMutation.mutateAsync({
+                    id: galleryId,
+                    data: { isLocked: !gallery.isLocked }
+                  });
+                  showToast(
+                    gallery.isLocked ? 'Selection unlocked' : 'Selection locked',
+                    'success'
+                  );
+                } catch (error) {
+                  showToast('Failed to update lock status', 'error');
+                }
+              }}
+              disabled={updateGalleryMutation.isPending}
+              title={gallery.isLocked ? 'Click to unlock selection' : 'Click to lock selection'}
+            >
+              {updateGalleryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+              ) : gallery.isLocked ? (
+                <Lock className="h-4 w-4 sm:mr-2" />
+              ) : (
+                <LockOpen className="h-4 w-4 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">{gallery.isLocked ? 'Locked' : 'Lock'}</span>
+            </Button>
           )}
         </div>
 
@@ -986,6 +1033,7 @@ function GalleryPage() {
                   photos: paginatedPhotos
                 }}
                 isPhotographer={user?.role === "PHOTOGRAPHER"}
+                isLocked={gallery.isLocked && user?.role === 'CLIENT'}
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}
                 onPhotoStatusChange={handlePhotoStatusChange}

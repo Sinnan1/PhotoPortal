@@ -1,7 +1,7 @@
 import { Gallery } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Download, Eye, Heart, Images, MoreHorizontal, Share2, Star, Trash2, Users, Edit } from "lucide-react";
+import { Calendar, Download, Eye, Heart, Images, Lock, MoreHorizontal, Share2, Star, Trash2, Users, Edit } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -196,14 +196,20 @@ export function GalleryGrid({
                                 </DropdownMenu>
                             </div>
 
-                            {/* Expired badge */}
-                            {gallery.isExpired && (
-                                <div className="absolute top-4 left-4">
+                            {/* Status badges */}
+                            <div className="absolute top-4 left-4 flex gap-2">
+                                {gallery.isExpired && (
                                     <Badge variant="destructive" className="shadow-lg rounded-full px-3 py-1">
                                         Expired
                                     </Badge>
-                                </div>
-                            )}
+                                )}
+                                {gallery.isLocked && (
+                                    <Badge variant="secondary" className="shadow-lg rounded-full px-3 py-1 bg-amber-500/90 text-white border-0">
+                                        <Lock className="h-3 w-3 mr-1" />
+                                        Locked
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
                     </Link>
 
