@@ -638,6 +638,12 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 		// Delete from database
 		await prisma.photo.delete({ where: { id } });
 
+		// Decrement gallery totalSize
+		await prisma.gallery.update({
+			where: { id: photo.folder.galleryId },
+			data: { totalSize: { decrement: photo.fileSize || 0 } }
+		});
+
 		res.json({
 			success: true,
 			message: "Photo deleted successfully",

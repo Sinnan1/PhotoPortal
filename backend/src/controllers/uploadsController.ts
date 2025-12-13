@@ -442,6 +442,12 @@ export const registerPhoto = async (req: Request, res: Response) => {
 
     console.log(`✅ Photo registered in database: ${photo.id}`);
 
+    // Increment gallery totalSize
+    await prisma.gallery.update({
+      where: { id: folder.galleryId },
+      data: { totalSize: { increment: fileSize || 0 } }
+    });
+
     // Queue thumbnail generation (non-blocking) - Using parallel processing
     const { parallelThumbnailQueue } = await import("../services/parallelThumbnailQueue");
     await parallelThumbnailQueue.add({
@@ -683,6 +689,12 @@ export const uploadDirect = async (req: Request, res: Response) => {
       });
 
       console.log(`✅ Photo registered: ${photo.id}`);
+
+      // Increment gallery totalSize
+      await prisma.gallery.update({
+        where: { id: folder.galleryId },
+        data: { totalSize: { increment: file.size } }
+      });
 
       // Queue thumbnail generation
       const { parallelThumbnailQueue } = await import('../services/parallelThumbnailQueue');

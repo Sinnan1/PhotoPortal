@@ -51,6 +51,7 @@ model Gallery {
   downloadLimit  Int?      @default(0)
   downloadCount  Int       @default(0)
   isLocked       Boolean   @default(false)
+  totalSize      BigInt    @default(0)
   photographerId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
