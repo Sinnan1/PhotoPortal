@@ -1,326 +1,117 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
-import {
-  Camera,
-  Shield,
-  Download,
-  Users,
-  Heart,
-  ArrowRight,
-  CheckCircle,
-} from "lucide-react";
+import { Mail } from "lucide-react";
+import Image from "next/image";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export default function HomePage() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#F5F5DC] dark:bg-[#121212]">
-      {/* Hero Section */}
-      <section
-        className="pt-16 pb-20 px-6"
-        style={{
-          fontFamily:
-            'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
-      >
-        <div className="max-w-7xl mx-auto">
-          {/* Hero Card */}
-          <div className="bg-white dark:bg-[#1E1E1E] border border-[#333b33]/20 dark:border-[#333333] rounded-[40px] p-16 md:p-12">
-            {/* Intro eyebrow */}
-            <div className="flex items-baseline gap-2 mb-6">
-              <span className="text-xl" aria-hidden="true">
-                🤍
-              </span>
-              <p className="text-[#333b33] dark:text-[#9CAF88] text-[15px] font-normal">
-                Premium wedding photography galleries for discerning couples...
-              </p>
-            </div>
+    <div className="relative h-screen min-h-[600px] bg-[#EAE8E0] dark:bg-[#1a1e1b] flex flex-col overflow-hidden selection:bg-[#333b33] selection:text-white dark:selection:bg-[#9CAF88]">
+      {/* 
+        LUXURY AESTHETIC LAYER 
+        1. Noise Texture for "Paper" / "Film" feel
+        2. Subtle Vignette
+      */}
+      <div className="fixed inset-0 pointer-events-none z-0 mix-blend-multiply opacity-[0.03] dark:opacity-[0.05] dark:mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat"></div>
 
-            {/* Headline */}
-            <h1
-              className="text-[#333b33] dark:text-white font-normal leading-[1.05] mb-8"
-              style={{
-                fontSize: "clamp(36px, 6vw, 68px)",
-              }}
-            >
-              Preserving your most
-              <br />
-              precious moments with
-              <br />
-              professional elegance
-            </h1>
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.03)_100%)] dark:bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
 
-            {/* Subtitle */}
-            <p className="text-[#6B7C32] dark:text-[#9CAF88] text-lg max-w-2xl mb-12 leading-relaxed">
-              Secure, private galleries where your wedding photography is
-              curated and presented with the sophistication your special day
-              deserves.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start">
-              <a href="/login">
-                <Button className="bg-[#333b33] hover:bg-[#6B7C32] text-[#F5F5DC] px-8 py-3 rounded-full font-medium transition-all duration-150 shadow-lg">
-                  <span className="flex items-center gap-2">
-                    Access Your Gallery
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                </Button>
-              </a>
-
-              <a href="/client-login">
-                <Button
-                  variant="outline"
-                  className="border-[#333b33] text-[#333b33] hover:bg-[#333b33] hover:text-[#F5F5DC] px-8 py-3 rounded-full font-medium transition-all duration-150"
-                >
-                  Client Login
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Showcase */}
-      <section className="py-20 px-6 bg-white dark:bg-[#121212]">
-        <div className="max-w-6xl mx-auto">
-          {/* Section Header */}
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-[#333b33]/10 border border-[#333b33]/20 rounded-full px-4 py-2 mb-6">
-              <Heart className="w-4 h-4 text-[#333b33]" />
-              <span className="text-sm font-medium text-[#333b33]">
-                Professional Excellence
-              </span>
-            </div>
-
-            <h2
-              className="text-[#333b33] dark:text-white text-4xl lg:text-6xl leading-tight mb-6"
-              style={{
-                fontFamily:
-                  'Instrument Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontWeight: 500,
-              }}
-            >
-              Your memories deserve
-              <br />
-              the finest presentation
-            </h2>
-
-            <p className="text-[#6B7C32] dark:text-[#9CAF88] text-xl max-w-3xl mx-auto leading-relaxed">
-              Every gallery is thoughtfully curated with professional-grade
-              security, elegant presentation, and seamless access for you and
-              your loved ones.
-            </p>
-          </div>
-
-          {/* Feature Cards */}
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
-            {/* Security Card */}
-            <div className="bg-[#F5F5DC] dark:bg-[#1E1E1E] border border-[#333b33]/20 dark:border-[#333333] rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#333b33]/10 mb-6">
-                <Shield className="h-6 w-6 text-[#333b33]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-[#333b33] dark:text-white">
-                Secure & Private
-              </h3>
-              <p className="text-[#6B7C32] dark:text-[#9CAF88] leading-relaxed">
-                Bank-level security ensures your intimate moments remain
-                private, accessible only to those you choose to invite.
-              </p>
-            </div>
-
-            {/* Quality Card */}
-            <div className="bg-[#F5F5DC] dark:bg-[#1E1E1E] border border-[#333b33]/20 dark:border-[#333333] rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#333b33]/10 mb-6">
-                <Download className="h-6 w-6 text-[#333b33]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-[#333b33] dark:text-white">
-                Premium Quality
-              </h3>
-              <p className="text-[#6B7C32] dark:text-[#9CAF88] leading-relaxed">
-                Download your photos in full resolution, perfectly optimized for
-                printing and archival preservation.
-              </p>
-            </div>
-
-            {/* Curation Card */}
-            <div className="bg-[#F5F5DC] dark:bg-[#1E1E1E] border border-[#333b33]/20 dark:border-[#333333] rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#333b33]/10 mb-6">
-                <Camera className="h-6 w-6 text-[#333b33]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-[#333b33] dark:text-white">
-                Expert Curation
-              </h3>
-              <p className="text-[#6B7C32] dark:text-[#9CAF88] leading-relaxed">
-                Each image is carefully selected and arranged to tell your
-                unique love story with artistic sophistication.
-              </p>
-            </div>
-
-            {/* Sharing Card */}
-            <div className="bg-[#F5F5DC] dark:bg-[#1E1E1E] border border-[#333b33]/20 dark:border-[#333333] rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#333b33]/10 mb-6">
-                <Users className="h-6 w-6 text-[#333b33]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-[#333b33] dark:text-white">
-                Effortless Sharing
-              </h3>
-              <p className="text-[#6B7C32] dark:text-[#9CAF88] leading-relaxed">
-                Share your joy with family and friends through elegant,
-                password-protected galleries designed for seamless viewing.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-20 px-6 bg-[#F5F5DC] dark:bg-[#1E1E1E] border-t border-[#333b33]/20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2
-            className="text-[#333b33] dark:text-white text-3xl lg:text-5xl leading-tight mb-12"
-            style={{
-              fontFamily:
-                'Instrument Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontWeight: 500,
-            }}
+      {/* CLASSIC & CREATIVE THEME TOGGLE */}
+      <div className="absolute top-6 right-6 z-50 animate-in fade-in duration-1000 delay-500">
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="group flex items-center gap-3 text-[10px] md:text-xs uppercase tracking-[0.25em] text-[#333b33] dark:text-[#E0E0E0] hover:text-[#6B7C32] dark:hover:text-[#9CAF88] transition-colors duration-500"
+            aria-label="Toggle Theme"
           >
-            What our couples say
-          </h2>
-
-          <div className="bg-white dark:bg-[#2A2A2A] border border-[#333b33]/20 dark:border-[#404040] rounded-2xl p-8 lg:p-12">
-            <blockquote className="text-[#333b33] dark:text-white text-lg lg:text-xl italic leading-relaxed mb-6">
-              "The gallery was absolutely stunning. Every photo was presented
-              beautifully, and sharing with our family was so elegant and
-              simple. It truly felt like our love story was being honored with
-              the care it deserved."
-            </blockquote>
-            <div className="flex items-center justify-center gap-4">
-              <div className="w-12 h-12 bg-[#333b33] rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold">M&J</span>
-              </div>
-              <div className="text-left">
-                <p className="text-[#333b33] dark:text-white font-medium">
-                  Marcus & Julia
-                </p>
-                <p className="text-[#6B7C32] dark:text-[#9CAF88] text-sm">
-                  Wedding, September 2024
-                </p>
-              </div>
+            <span className={`transition-opacity duration-500 ${theme === 'dark' ? 'opacity-50' : 'opacity-100 font-medium'}`}>Light</span>
+            <div className="w-6 md:w-8 h-[1px] bg-current relative overflow-hidden">
+              <div className={`absolute inset-0 bg-current transition-transform duration-500 ${theme === 'dark' ? 'translate-x-4' : '-translate-x-4'}`}></div>
             </div>
+            <span className={`transition-opacity duration-500 ${theme === 'dark' ? 'opacity-100 font-medium' : 'opacity-50'}`}>Dark</span>
+          </button>
+        )}
+      </div>
+
+      {/* Main Content - Centered vertically in visible area */}
+      <main className="flex-1 flex flex-col items-center justify-center relative z-10 w-full px-6">
+
+        <div className="w-full max-w-5xl mx-auto flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-[1500ms] ease-out">
+
+          {/* LOGO AREA - Compact spacing */}
+          <div className="relative w-[180px] h-[80px] md:w-[250px] md:h-[110px] mb-6 md:mb-8 opacity-90 hover:opacity-100 transition-opacity duration-500">
+            <Image
+              src="/WHITE-NoBack2.png"
+              alt="Yarrow Weddings Symbol"
+              fill
+              className="object-contain invert dark:invert-0"
+              priority
+            />
           </div>
-        </div>
-      </section>
 
-      {/* Final CTA Section */}
-      <section
-        className="relative rounded-[24px] mx-6 mb-6 overflow-hidden"
-        style={{
-          background:
-            "radial-gradient(circle at bottom right, #333b33 0%, #6B7C32 30%, transparent 70%), #F5F5DC",
-          paddingTop: "10vh",
-          paddingBottom: "10vh",
-          paddingLeft: "clamp(4vw, 8vw, 8vw)",
-          paddingRight: "clamp(4vw, 8vw, 8vw)",
-          fontFamily:
-            'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
-      >
-        {/* Dark mode overlay */}
-        <div
-          className="absolute inset-0 hidden dark:block"
-          style={{
-            background:
-              "radial-gradient(circle at bottom right, #333b33 0%, #1E1E1E 30%, transparent 70%), #121212",
-          }}
-        ></div>
-
-        <div className="relative z-10 text-center">
-          {/* Main headline */}
-          <h1
-            className="text-[#333b33] dark:text-white leading-[0.9] mb-8"
-            style={{
-              fontFamily:
-                'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: "clamp(2.5rem, 5vw, 4.5rem)",
-              letterSpacing: "-0.04em",
-              fontWeight: 800,
-            }}
-          >
-            Ready to access your
-            <br />
-            private wedding gallery?
-            <br />
-            Your memories await ✨
+          {/* BRAND TYPOGRAPHY */}
+          <h1 className="text-[#1A1A1A] dark:text-[#F0F0F0] text-center font-audrey tracking-[0.3em] md:tracking-[0.5em] text-2xl md:text-5xl lg:text-6xl leading-tight mb-6 font-medium uppercase border-y border-transparent transition-all duration-700 hover:tracking-[0.55em]">
+            Yarrow Weddings & Co.
           </h1>
 
-          {/* Primary CTA Button */}
-          <div className="mb-12">
-            <a href="/login">
+          {/* DIVIDER */}
+          <div className="w-12 h-[1px] bg-[#333b33] dark:bg-[#9CAF88] opacity-30 mb-6"></div>
+
+          {/* STATUS TEXT */}
+          <p className="text-[#333b33] dark:text-[#A0A0A0] text-base md:text-xl font-serif italic tracking-wide mb-8 md:mb-12 opacity-80">
+            A curated digital experience. Coming soon.
+          </p>
+
+          {/* ACTIONS */}
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full max-w-sm md:max-w-md justify-center">
+            <a href="/client-login" className="w-full group">
+              <Button className="w-full bg-[#1A1A1A] dark:bg-[#F0F0F0] text-[#EAE8E0] dark:text-[#1a1e1b] hover:bg-[#333b33] dark:hover:bg-white rounded-none px-6 py-5 md:py-6 uppercase tracking-[0.2em] text-[10px] md:text-xs transition-all duration-500 hover:shadow-[0_0_20px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] border border-transparent">
+                Client Portal
+              </Button>
+            </a>
+
+            <a href="/login" className="w-full group">
               <Button
-                className="bg-[#333b33] dark:bg-white hover:bg-[#6B7C32] dark:hover:bg-[#F0F0F0] text-white dark:text-black px-8 py-4 rounded-full transition-all duration-150 shadow-lg hover:shadow-xl hover:scale-105"
-                style={{
-                  fontFamily:
-                    'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  fontWeight: 600,
-                }}
+                variant="outline"
+                className="w-full bg-transparent border-[#1A1A1A] dark:border-[#505050] text-[#1A1A1A] dark:text-[#9CAF88] hover:bg-[#1A1A1A] hover:text-[#EAE8E0] dark:hover:bg-[#1E1E1E] dark:hover:border-[#1E1E1E] dark:hover:text-white rounded-none px-6 py-5 md:py-6 uppercase tracking-[0.2em] text-[10px] md:text-xs transition-all duration-500"
               >
-                Enter Your Gallery
+                Photographer
               </Button>
             </a>
           </div>
 
-          {/* Divider */}
-          <div className="w-full h-px mb-8 bg-[#333b33]/30 dark:bg-[#9CAF88]/20"></div>
+          <p className="mt-8 text-[#333b33]/40 dark:text-[#A0A0A0]/40 text-[9px] uppercase tracking-[0.3em]">
+            Access Your Gallery
+          </p>
 
-          {/* Information bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-8">
-            {/* Left - Contact */}
-            <div className="flex flex-col gap-2">
-              <span
-                className="text-[#333b33] dark:text-[#9CAF88] text-sm uppercase tracking-wider"
-                style={{
-                  fontFamily:
-                    'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  letterSpacing: "0.05em",
-                  fontWeight: 500,
-                }}
-              >
-                Contact
-              </span>
-              <a
-                href="mailto:hello@yarrowweddings.com"
-                className="text-[#333b33] dark:text-white hover:underline transition-all duration-150"
-                style={{
-                  fontFamily:
-                    'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                }}
-              >
-                hello@yarrowweddings.com
-              </a>
-            </div>
-
-            {/* Right - Support */}
-            <div className="flex flex-col gap-2 items-end">
-              <span
-                className="text-[#333b33] dark:text-[#9CAF88] text-sm uppercase tracking-wider"
-                style={{
-                  fontFamily:
-                    'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  letterSpacing: "0.05em",
-                  fontWeight: 500,
-                }}
-              >
-                Support
-              </span>
-              <div className="flex items-center gap-2 text-[#333b33] dark:text-white">
-                <CheckCircle className="w-4 h-4 text-[#6B7C32]" />
-                <span className="text-sm">Available 24/7</span>
-              </div>
-            </div>
-          </div>
         </div>
-      </section>
+      </main>
+
+      {/* FOOTER */}
+      <footer className="w-full py-4 text-center relative z-10 shrink-0">
+        <div className="flex flex-col items-center gap-2">
+          <a
+            href="mailto:support@yarrowweddings.com"
+            className="flex items-center gap-2 text-[#333b33]/60 dark:text-[#9CAF88]/60 hover:text-[#333b33] dark:hover:text-[#9CAF88] transition-colors duration-300 group"
+          >
+            <span className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] border-b border-transparent group-hover:border-[#333b33]/40 dark:group-hover:border-[#9CAF88]/40 pb-1">
+              Contact Support
+            </span>
+          </a>
+          <p className="text-[#333b33]/20 dark:text-white/10 text-[8px] md:text-[9px] uppercase tracking-[0.3em]">
+            © {new Date().getFullYear()} Yarrow Weddings
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
-
-
-
