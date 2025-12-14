@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  HardDrive, 
+import {
+  HardDrive,
   Database,
   FolderOpen,
   Search,
@@ -68,25 +68,25 @@ export default function GalleryStoragePage() {
   const fetchStorageData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch storage analytics
       const storageResponse = await adminApi.getStorageAnalytics();
       const storageStats = storageResponse.data;
-      
+
       // Fetch all galleries for storage calculation
       const galleriesResponse = await adminApi.getAllGalleries({ limit: 100 });
       const galleries = galleriesResponse.data.galleries || [];
-      
+
       // Calculate storage metrics
       const totalUsed = galleries.length * 0.1; // Estimate 100MB per gallery
       const totalStorage = 10; // 10GB total
       const percentage = Math.min((totalUsed / totalStorage) * 100, 100);
-      
+
       // Generate gallery storage data
       const galleryStorage = galleries.map((gallery: any) => {
         const size = Math.random() * 0.5 + 0.05; // 50MB to 550MB
         const photoCount = gallery.stats?.totalPhotos || Math.floor(Math.random() * 50) + 10;
-        
+
         return {
           id: gallery.id,
           title: gallery.title,
@@ -96,30 +96,30 @@ export default function GalleryStoragePage() {
           lastModified: gallery.createdAt,
           status: size > 0.4 ? 'large' : 'active' as 'active' | 'archived' | 'large',
         };
-      }).sort((a, b) => sortBy === 'size' ? b.size - a.size : 
-                      sortBy === 'name' ? a.title.localeCompare(b.title) :
-                      new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-      
+      }).sort((a: any, b: any) => sortBy === 'size' ? b.size - a.size :
+        sortBy === 'name' ? a.title.localeCompare(b.title) :
+          new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
       // Filter by search query
-      const filteredGalleries = searchQuery 
-        ? galleryStorage.filter(g => 
-            g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            g.photographer.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+      const filteredGalleries = searchQuery
+        ? galleryStorage.filter((g: any) =>
+          g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          g.photographer.toLowerCase().includes(searchQuery.toLowerCase())
+        )
         : galleryStorage;
-      
+
       // Calculate storage breakdown
-      const totalGallerySize = galleryStorage.reduce((sum, g) => sum + g.size, 0);
+      const totalGallerySize = galleryStorage.reduce((sum: number, g: any) => sum + g.size, 0);
       const storageBreakdown = {
         photos: parseFloat((totalGallerySize * 0.85).toFixed(2)),
         thumbnails: parseFloat((totalGallerySize * 0.10).toFixed(2)),
         metadata: parseFloat((totalGallerySize * 0.03).toFixed(2)),
         other: parseFloat((totalGallerySize * 0.02).toFixed(2)),
       };
-      
+
       // Generate warnings
       const warnings = [];
-      const largeGalleries = galleryStorage.filter(g => g.size > 0.4).length;
+      const largeGalleries = galleryStorage.filter((g: any) => g.size > 0.4).length;
       if (largeGalleries > 0) {
         warnings.push({
           type: 'large_gallery' as const,
@@ -127,7 +127,7 @@ export default function GalleryStoragePage() {
           count: largeGalleries,
         });
       }
-      
+
       if (percentage > 80) {
         warnings.push({
           type: 'storage_full' as const,
@@ -135,7 +135,7 @@ export default function GalleryStoragePage() {
           count: 1,
         });
       }
-      
+
       setStorageData({
         totalStorage: {
           used: parseFloat(totalUsed.toFixed(2)),
@@ -146,7 +146,7 @@ export default function GalleryStoragePage() {
         storageBreakdown,
         warnings,
       });
-      
+
     } catch (error: any) {
       console.error('Failed to fetch storage data:', error);
       toast({
@@ -272,8 +272,8 @@ export default function GalleryStoragePage() {
                   {storageData.totalStorage.percentage > 80 ? "Warning" : "Good"}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {storageData.totalStorage.percentage > 80 
-                    ? "Storage approaching capacity" 
+                  {storageData.totalStorage.percentage > 80
+                    ? "Storage approaching capacity"
                     : "Storage levels are healthy"}
                 </p>
               </>
@@ -306,8 +306,8 @@ export default function GalleryStoragePage() {
                 <div className="flex items-center space-x-3">
                   <div className="w-20 text-sm font-medium">Photos</div>
                   <div className="flex-1">
-                    <Progress 
-                      value={(storageData.storageBreakdown.photos / storageData.totalStorage.used) * 100} 
+                    <Progress
+                      value={(storageData.storageBreakdown.photos / storageData.totalStorage.used) * 100}
                       className="h-2"
                     />
                   </div>
@@ -316,13 +316,13 @@ export default function GalleryStoragePage() {
                   {formatSize(storageData.storageBreakdown.photos)}
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-20 text-sm font-medium">Thumbnails</div>
                   <div className="flex-1">
-                    <Progress 
-                      value={(storageData.storageBreakdown.thumbnails / storageData.totalStorage.used) * 100} 
+                    <Progress
+                      value={(storageData.storageBreakdown.thumbnails / storageData.totalStorage.used) * 100}
                       className="h-2"
                     />
                   </div>
@@ -331,13 +331,13 @@ export default function GalleryStoragePage() {
                   {formatSize(storageData.storageBreakdown.thumbnails)}
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-20 text-sm font-medium">Metadata</div>
                   <div className="flex-1">
-                    <Progress 
-                      value={(storageData.storageBreakdown.metadata / storageData.totalStorage.used) * 100} 
+                    <Progress
+                      value={(storageData.storageBreakdown.metadata / storageData.totalStorage.used) * 100}
                       className="h-2"
                     />
                   </div>
@@ -346,13 +346,13 @@ export default function GalleryStoragePage() {
                   {formatSize(storageData.storageBreakdown.metadata)}
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-20 text-sm font-medium">Other</div>
                   <div className="flex-1">
-                    <Progress 
-                      value={(storageData.storageBreakdown.other / storageData.totalStorage.used) * 100} 
+                    <Progress
+                      value={(storageData.storageBreakdown.other / storageData.totalStorage.used) * 100}
                       className="h-2"
                     />
                   </div>
@@ -409,19 +409,19 @@ export default function GalleryStoragePage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button 
+              <Button
                 variant={sortBy === 'size' ? 'default' : 'outline'}
                 onClick={() => setSortBy('size')}
               >
                 By Size
               </Button>
-              <Button 
+              <Button
                 variant={sortBy === 'name' ? 'default' : 'outline'}
                 onClick={() => setSortBy('name')}
               >
                 By Name
               </Button>
-              <Button 
+              <Button
                 variant={sortBy === 'date' ? 'default' : 'outline'}
                 onClick={() => setSortBy('date')}
               >

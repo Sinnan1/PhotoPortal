@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { 
-  Users, 
+import {
+  Users,
   UserPlus,
   UserMinus,
-  TrendingUp, 
+  TrendingUp,
   TrendingDown,
   Activity,
   Clock,
@@ -48,7 +48,6 @@ interface UserAnalytics {
     role: string;
     lastActive: string;
     galleries: number;
-    totalViews: number;
     totalDownloads: number;
   }>;
   registrationTrends: Array<{
@@ -80,30 +79,30 @@ export default function UserAnalyticsPage() {
   const fetchUserAnalytics = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch user statistics
       const userStatsResponse = await adminApi.getUserStatistics(timeRange);
       const userStats = userStatsResponse.data;
-      
+
       // Fetch all users for additional calculations
       const usersResponse = await adminApi.getAllUsers({ limit: 100 });
       const users = usersResponse.data.users || [];
-      
+
       // Calculate role distribution
       const photographers = users.filter((u: any) => u.role === 'photographer').length;
       const clients = users.filter((u: any) => u.role === 'client').length;
       const admins = users.filter((u: any) => u.role === 'admin').length;
-      
+
       // Calculate activity metrics
       const totalUsers = users.length;
       const activeUsers = users.filter((u: any) => u.status === 'active').length;
       const suspendedUsers = users.filter((u: any) => u.status === 'suspended').length;
-      
+
       // Estimate new users this month (simplified)
       const newUsersThisMonth = Math.floor(totalUsers * 0.15);
       const lastMonth = Math.floor(totalUsers * 0.12);
       const percentageChange = lastMonth > 0 ? Math.round(((newUsersThisMonth - lastMonth) / lastMonth) * 100) : 0;
-      
+
       // Generate top users (mock data based on real users)
       const topUsers = users.slice(0, 5).map((user: any, index: number) => ({
         id: user.id,
@@ -112,10 +111,9 @@ export default function UserAnalyticsPage() {
         role: user.role,
         lastActive: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
         galleries: user.role === 'photographer' ? Math.floor(Math.random() * 10) + 1 : 0,
-        totalViews: Math.floor(Math.random() * 1000) + 100,
         totalDownloads: Math.floor(Math.random() * 200) + 20,
       }));
-      
+
       // Generate registration trends (last 6 months)
       const registrationTrends = [];
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -125,7 +123,7 @@ export default function UserAnalyticsPage() {
           registrations: Math.floor(Math.random() * 20) + 5,
         });
       }
-      
+
       setAnalytics({
         totalUsers,
         activeUsers,
@@ -149,7 +147,7 @@ export default function UserAnalyticsPage() {
         topUsers,
         registrationTrends,
       });
-      
+
     } catch (error: any) {
       console.error('Failed to fetch user analytics:', error);
       toast({
@@ -211,19 +209,19 @@ export default function UserAnalyticsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant={timeRange === '7d' ? 'default' : 'outline'}
             onClick={() => setTimeRange('7d')}
           >
             7 Days
           </Button>
-          <Button 
+          <Button
             variant={timeRange === '30d' ? 'default' : 'outline'}
             onClick={() => setTimeRange('30d')}
           >
             30 Days
           </Button>
-          <Button 
+          <Button
             variant={timeRange === '90d' ? 'default' : 'outline'}
             onClick={() => setTimeRange('90d')}
           >
@@ -359,8 +357,8 @@ export default function UserAnalyticsPage() {
                     <Camera className="h-4 w-4 text-blue-600" />
                     <div className="w-20 text-sm font-medium">Photographers</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.photographers / analytics.totalUsers) * 100 : 0} 
+                      <Progress
+                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.photographers / analytics.totalUsers) * 100 : 0}
                         className="h-2"
                       />
                     </div>
@@ -369,14 +367,14 @@ export default function UserAnalyticsPage() {
                     {analytics.usersByRole.photographers}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Users className="h-4 w-4 text-green-600" />
                     <div className="w-20 text-sm font-medium">Clients</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.clients / analytics.totalUsers) * 100 : 0} 
+                      <Progress
+                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.clients / analytics.totalUsers) * 100 : 0}
                         className="h-2"
                       />
                     </div>
@@ -385,14 +383,14 @@ export default function UserAnalyticsPage() {
                     {analytics.usersByRole.clients}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Activity className="h-4 w-4 text-purple-600" />
                     <div className="w-20 text-sm font-medium">Admins</div>
                     <div className="flex-1">
-                      <Progress 
-                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.admins / analytics.totalUsers) * 100 : 0} 
+                      <Progress
+                        value={analytics.totalUsers > 0 ? (analytics.usersByRole.admins / analytics.totalUsers) * 100 : 0}
                         className="h-2"
                       />
                     </div>
@@ -438,7 +436,7 @@ export default function UserAnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -452,7 +450,7 @@ export default function UserAnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -534,13 +532,6 @@ export default function UserAnalyticsPage() {
                         <p className="text-xs text-gray-400">galleries</p>
                       </div>
                     )}
-                    <div className="text-center">
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{user.totalViews}</span>
-                      </div>
-                      <p className="text-xs text-gray-400">views</p>
-                    </div>
                     <div className="text-center">
                       <div className="flex items-center space-x-1">
                         <Download className="h-4 w-4 text-gray-400" />

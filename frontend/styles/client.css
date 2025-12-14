@@ -1,6 +1,8 @@
 /* Client Portal styles for Yarrow Weddings & Co. */
 /* Standardized dark mode implementation following admin portal pattern */
 
+@reference "../src/app/globals.css";
+
 /* Client portal styles using unified theme system */
 
 /* Client layout specific styles */

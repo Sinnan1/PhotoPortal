@@ -37,9 +37,8 @@ const ALLOWED_CONTENT_TYPES = [
 // B2 S3-Compatible Client Configuration
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || "us-east-005",
-  endpoint: `https://s3.${
-    process.env.AWS_REGION || "us-east-005"
-  }.backblazeb2.com`,
+  endpoint: `https://s3.${process.env.AWS_REGION || "us-east-005"
+    }.backblazeb2.com`,
   forcePathStyle: true, // Required for B2
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -386,10 +385,43 @@ export const registerPhoto = async (req: Request, res: Response) => {
 
     // Generate B2 URLs
     const bucketName = process.env.S3_BUCKET_NAME!;
-    const endpoint = `https://s3.${
-      process.env.AWS_REGION || "us-east-005"
-    }.backblazeb2.com`;
+    const endpoint = `https://s3.${process.env.AWS_REGION || "us-east-005"
+      }.backblazeb2.com`;
     const originalUrl = `${endpoint}/${bucketName}/${key}`;
+
+    // Extract EXIF capture date from the uploaded file (download first 64KB only)
+    let capturedAt: Date | null = null;
+    try {
+      const { getPartialObjectFromS3 } = await import("../utils/s3Storage");
+      const sharp = require("sharp");
+      const exifReader = require("exif-reader");
+
+      console.log(`📅 Extracting EXIF from multipart upload: ${key}`);
+      const partialBuffer = await getPartialObjectFromS3(key, 65536, bucketName);
+      const metadata = await sharp(partialBuffer).metadata();
+
+      if (metadata.exif) {
+        const parsedExif = exifReader(metadata.exif);
+
+        if (parsedExif && parsedExif.exif) {
+          if (parsedExif.exif.DateTimeOriginal) {
+            capturedAt = parsedExif.exif.DateTimeOriginal;
+          } else if (parsedExif.exif.CreateDate) {
+            capturedAt = parsedExif.exif.CreateDate;
+          }
+        }
+        // Fallback to 'image' tags if not in standard exif block
+        if (!capturedAt && parsedExif.image && parsedExif.image.DateTime) {
+          capturedAt = parsedExif.image.DateTime;
+        }
+
+        if (capturedAt) {
+          console.log(`📅 EXIF date extracted: ${capturedAt.toISOString()}`);
+        }
+      }
+    } catch (exifError) {
+      console.log(`⚠️ No EXIF date found or parse error for ${filename}:`, exifError);
+    }
 
     // Create photo record in database WITHOUT thumbnails (will be generated async)
     const photo = await prisma.photo.create({
@@ -404,6 +436,7 @@ export const registerPhoto = async (req: Request, res: Response) => {
         fileSize: fileSize || 0,
         folderId,
         uploadSessionId: uploadSessionId || null,
+        capturedAt,
       },
     });
 
@@ -463,10 +496,15 @@ export const registerPhoto = async (req: Request, res: Response) => {
 };
 
 // Direct upload endpoint for simple file uploads (non-multipart)
+// Direct upload endpoint for simple file uploads (non-multipart)
 export const uploadDirect = async (req: Request, res: Response) => {
   try {
     const multer = require('multer');
-    const upload = multer({ storage: multer.memoryStorage() }).single('file');
+    // Use memory storage to process file buffer
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: UPLOAD_CONFIG.MAX_FILE_SIZE }
+    }).single('file');
 
     upload(req, res, async (err: any) => {
       if (err) {
@@ -497,6 +535,35 @@ export const uploadDirect = async (req: Request, res: Response) => {
 
       console.log(`📤 Direct upload: ${file.originalname} (${file.size} bytes)`);
 
+      // ---------------------------------------------------------
+      // SECURITY: Magic Bytes Validation using Sharp
+      // ---------------------------------------------------------
+      let metadata;
+      const sharp = require('sharp');
+      try {
+        // This validates the file is a REAL image, not just a renamed script
+        metadata = await sharp(file.buffer).metadata();
+
+        // Ensure it's in our allowed format list (basically standard web/photo formats)
+        const allowedFormats = ['jpeg', 'png', 'webp', 'gif', 'tiff', 'heif', 'avif'];
+        // Note: raw formats like 'cr2' might not be fully detected as format='cr2' by sharp immediately 
+        // without robust decoders, but sharp usually handles them or returns 'tiff'/'raw'.
+        // For strict security, we ensure it parses as *some* image.
+
+        if (!metadata.format) {
+          throw new Error("Could not determine file format");
+        }
+
+        console.log(`🛡️ Magic Bytes verified. Format: ${metadata.format}`);
+
+      } catch (validationError) {
+        console.error(`❌ Security rejection for ${file.originalname}:`, validationError);
+        return res.status(400).json({
+          success: false,
+          error: 'Security Error: File is not a valid image.'
+        });
+      }
+
       // Verify folder exists and belongs to photographer
       const folder = await prisma.folder.findFirst({
         where: { id: folderId },
@@ -524,8 +591,8 @@ export const uploadDirect = async (req: Request, res: Response) => {
           filename: file.originalname,
           fileSize: file.size,
         },
-        select: { 
-          id: true, 
+        select: {
+          id: true,
           filename: true,
           createdAt: true,
         },
@@ -576,22 +643,31 @@ export const uploadDirect = async (req: Request, res: Response) => {
       const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`;
       const originalUrl = `${endpoint}/${bucketName}/${b2Key}`;
 
-      // Extract EXIF capture date if available
+      // Extract EXIF capture date using exif-reader + sharp
       let capturedAt: Date | null = null;
       try {
-        const exifParser = require('exif-parser');
-        const parser = exifParser.create(file.buffer);
-        const result = parser.parse();
-        
-        if (result.tags && result.tags.DateTimeOriginal) {
-          capturedAt = new Date(result.tags.DateTimeOriginal * 1000);
-          console.log(`📅 EXIF date extracted: ${capturedAt.toISOString()}`);
-        } else if (result.tags && result.tags.CreateDate) {
-          capturedAt = new Date(result.tags.CreateDate * 1000);
-          console.log(`📅 EXIF create date extracted: ${capturedAt.toISOString()}`);
+        if (metadata.exif) {
+          const exifReader = require('exif-reader');
+          const parsedExif = exifReader(metadata.exif);
+
+          if (parsedExif && parsedExif.exif) {
+            if (parsedExif.exif.DateTimeOriginal) {
+              capturedAt = parsedExif.exif.DateTimeOriginal;
+            } else if (parsedExif.exif.CreateDate) {
+              capturedAt = parsedExif.exif.CreateDate;
+            }
+          }
+          // Fallback to 'image' tags if not in standard exif block
+          if (!capturedAt && parsedExif.image && parsedExif.image.DateTime) {
+            capturedAt = parsedExif.image.DateTime;
+          }
+
+          if (capturedAt) {
+            console.log(`📅 EXIF date extracted: ${capturedAt.toISOString()}`);
+          }
         }
       } catch (exifError) {
-        console.log(`⚠️ No EXIF date found for ${file.originalname}`);
+        console.log(`⚠️ No EXIF date found or parse error for ${file.originalname}:`, exifError);
       }
 
       // Create photo record

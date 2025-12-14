@@ -8,18 +8,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { getObjectStreamFromS3 } from '../src/utils/s3Storage';
+import { getPartialObjectFromS3 } from '../src/utils/s3Storage';
 
 const prisma = new PrismaClient();
 
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
-    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
+// EXIF data is typically in the first 64KB of a JPEG/image file
+const EXIF_BYTES = 65536;
 
 async function extractExifDate(photoUrl: string): Promise<Date | null> {
   try {
@@ -29,31 +23,46 @@ async function extractExifDate(photoUrl: string): Promise<Date | null> {
     const bucketName = pathParts[0];
     const key = decodeURIComponent(pathParts.slice(1).join('/'));
 
-    console.log(`  📥 Downloading from B2: ${key}`);
+    console.log(`  📥 Downloading first ${EXIF_BYTES / 1024}KB from B2: ${key}`);
 
-    // Download photo from B2
-    const { stream } = await getObjectStreamFromS3(key, bucketName);
-    const buffer = await streamToBuffer(stream);
+    // Download only the first 64KB (EXIF metadata lives in the header)
+    const buffer = await getPartialObjectFromS3(key, EXIF_BYTES, bucketName);
 
-    console.log(`  📊 Downloaded ${buffer.length} bytes`);
+    console.log(`  📊 Downloaded ${buffer.length} bytes (partial)`);
 
-    // Extract EXIF data
-    const exifParser = require('exif-parser');
-    const parser = exifParser.create(buffer);
-    const result = parser.parse();
+    // Extract EXIF data using sharp + exif-reader
+    const sharp = require('sharp');
+    const exifReader = require('exif-reader');
 
-    if (result.tags && result.tags.DateTimeOriginal) {
-      const capturedAt = new Date(result.tags.DateTimeOriginal * 1000);
-      console.log(`  ✅ EXIF date found: ${capturedAt.toISOString()}`);
-      return capturedAt;
-    } else if (result.tags && result.tags.CreateDate) {
-      const capturedAt = new Date(result.tags.CreateDate * 1000);
-      console.log(`  ✅ EXIF create date found: ${capturedAt.toISOString()}`);
-      return capturedAt;
-    } else {
-      console.log(`  ⚠️ No EXIF date found`);
-      return null;
+    const metadata = await sharp(buffer).metadata();
+
+    if (metadata.exif) {
+      const parsedExif = exifReader(metadata.exif);
+
+      let capturedAt: Date | null = null;
+
+      if (parsedExif.exif) {
+        if (parsedExif.exif.DateTimeOriginal) {
+          capturedAt = parsedExif.exif.DateTimeOriginal;
+        } else if (parsedExif.exif.CreateDate) {
+          capturedAt = parsedExif.exif.CreateDate;
+        }
+      }
+
+      // Fallback to 'image' tags
+      if (!capturedAt && parsedExif.image && parsedExif.image.DateTime) {
+        capturedAt = parsedExif.image.DateTime;
+      }
+
+      if (capturedAt) {
+        console.log(`  ✅ EXIF date found: ${capturedAt.toISOString()}`);
+        return capturedAt;
+      }
     }
+
+    console.log(`  ⚠️ No EXIF date found`);
+    return null;
+
   } catch (error) {
     console.error(`  ❌ Error extracting EXIF:`, error instanceof Error ? error.message : error);
     return null;

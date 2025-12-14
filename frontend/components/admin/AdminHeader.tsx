@@ -4,17 +4,21 @@ import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "next-themes";
-import { 
-  Menu, 
-  X, 
-  LogOut, 
-  Settings, 
-  User, 
-  Shield, 
-  Moon, 
+import { AdminSearch } from "./AdminSearch";
+import { AdminNotifications } from "./AdminNotifications";
+import {
+  Menu,
+  X,
+  LogOut,
+  Settings,
+  User,
+  Shield,
+  Moon,
   Sun,
   Bell,
-  Search
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface AdminHeaderProps {
   onToggleSidebar: () => void;
@@ -34,8 +39,8 @@ interface AdminHeaderProps {
 
 export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) {
   const { user, adminLogout } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  
+  const { setTheme, resolvedTheme } = useTheme();
+
   // Get session info from localStorage
   const getSessionInfo = () => {
     try {
@@ -63,64 +68,42 @@ export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) 
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-      <div className="flex items-center justify-between h-full px-4">
-        {/* Left Section - Logo and Sidebar Toggle */}
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleSidebar}
-            className="hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-          
-          <Link href="/admin" className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <Shield className="h-6 w-6 text-[#425146]" />
-              <span className="text-[#425146] font-semibold text-lg font-['Lato'] hidden sm:block">
-                Yarrow Admin
-              </span>
-            </div>
-          </Link>
-        </div>
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-16 items-center px-4 gap-4">
+        {/* Sidebar Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleSidebar}
+          className="mr-2 text-muted-foreground hover:text-foreground"
+        >
+          {sidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+        </Button>
 
-        {/* Center Section - Search (hidden on mobile) */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search users, galleries, or settings..."
-              className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-            />
+        {/* Breadcrumb Placeholder or Page Title could go here */}
+        <div className="flex-1 flex items-center gap-4">
+          <Link href="/admin" className="flex items-center gap-2 md:hidden">
+            <Shield className="h-5 w-5 text-primary" />
+            <span className="font-audrey font-bold text-lg">Yarrow</span>
+          </Link>
+
+          {/* Search (hidden on mobile) */}
+          <div className="hidden md:flex max-w-sm w-full lg:max-w-md">
+            <AdminSearch />
           </div>
         </div>
 
-        {/* Right Section - Actions and User Menu */}
-        <div className="flex items-center space-x-2">
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <Bell className="h-5 w-5" />
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-            >
-              3
-            </Badge>
-          </Button>
+          <AdminNotifications />
 
           {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            className="hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="text-muted-foreground hover:text-foreground"
           >
             {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
@@ -130,64 +113,48 @@ export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) 
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-700 px-3"
+                className="flex items-center gap-2 pl-2 pr-4 rounded-full border border-border/0 hover:bg-muted/50 hover:border-border/50 transition-all"
               >
-                <div className="flex items-center space-x-2">
-                  <div className="h-8 w-8 rounded-full bg-[#425146] flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="hidden sm:block text-left">
-                    <div className="text-sm font-medium">{user?.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Administrator</div>
-                  </div>
+                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/20">
+                  <User className="h-4 w-4" />
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium leading-none">{user?.name}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Admin</div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <div className="px-2 py-1.5">
-                <div className="text-sm font-medium">{user?.name}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</div>
-                <div className="flex items-center justify-between mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    <Shield className="h-3 w-3 mr-1" />
-                    Administrator
-                  </Badge>
-                  {sessionInfo && (
-                    <Badge 
-                      variant={sessionInfo.minutesLeft < 15 ? "destructive" : "outline"} 
-                      className="text-xs"
-                    >
-                      {sessionInfo.minutesLeft}m left
-                    </Badge>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="flex items-center justify-start gap-2 p-2">
+                <div className="flex flex-col space-y-1 leading-none">
+                  {user?.name && <p className="font-medium">{user.name}</p>}
+                  {user?.email && (
+                    <p className="w-[200px] truncate text-sm text-muted-foreground">
+                      {user.email}
+                    </p>
                   )}
                 </div>
               </div>
               <DropdownMenuSeparator />
-              
               <DropdownMenuItem>
                 <User className="mr-2 h-4 w-4" />
-                <span>Profile Settings</span>
+                <span>Profile</span>
               </DropdownMenuItem>
-              
               <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Admin Preferences</span>
+                <span>Preferences</span>
               </DropdownMenuItem>
-              
               <DropdownMenuSeparator />
-              
-              <Link href="/" className="block">
-                <DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/" className="cursor-pointer">
                   <span className="mr-2">🏠</span>
-                  <span>View Main Site</span>
-                </DropdownMenuItem>
-              </Link>
-              
+                  <span>View Site</span>
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600 dark:text-red-400">
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Secure Sign Out</span>
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

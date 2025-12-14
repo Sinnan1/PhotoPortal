@@ -40,7 +40,6 @@ interface GalleryWithStats {
     totalFolders: number
     totalLikes: number
     totalFavorites: number
-    totalViews: number
     storageUsed: number
     clientsWithAccess: number
     lastActivity?: Date
@@ -140,22 +139,14 @@ export const getAllGalleries = async (req: AdminAuthRequest, res: Response) => {
           select: { id: true, name: true, email: true }
         },
         folders: {
-          include: {
-            photos: {
-              select: {
-                id: true,
-                fileSize: true,
-                downloadCount: true,
-                createdAt: true
-              }
-            },
+          select: {
             _count: { select: { photos: true } }
           }
         },
         likedBy: { select: { userId: true } },
         favoritedBy: { select: { userId: true } },
-        accessibleBy: { 
-          select: { 
+        accessibleBy: {
+          select: {
             userId: true,
             user: { select: { name: true, email: true } }
           }
@@ -177,21 +168,35 @@ export const getAllGalleries = async (req: AdminAuthRequest, res: Response) => {
     // Get total count for pagination
     const totalCount = await prisma.gallery.count({ where })
 
+    // Get storage stats for all galleries at once using raw SQL
+    const galleryIds = galleries.map(g => g.id)
+    let storageStats = new Map()
+
+    if (galleryIds.length > 0) {
+      const stats = await prisma.$queryRaw`
+        SELECT 
+          f."galleryId" as "galleryId",
+          COALESCE(SUM(p."fileSize"), 0) as "storageUsed",
+          MAX(p."createdAt") as "lastPhotoDate"
+        FROM folders f
+        LEFT JOIN photos p ON p."folderId" = f.id
+        WHERE f."galleryId" = ANY(${galleryIds})
+        GROUP BY f."galleryId"
+      ` as any[]
+
+      stats.forEach(s => {
+        storageStats.set(s.galleryId, {
+          storageUsed: Number(s.storageUsed),
+          lastPhotoDate: s.lastPhotoDate
+        })
+      })
+    }
+
     // Transform galleries to include statistics and status
     const galleriesWithStats: GalleryWithStats[] = galleries.map(gallery => {
       const now = new Date()
       const totalPhotos = gallery.folders.reduce((sum, folder) => sum + folder._count.photos, 0)
-      const storageUsed = gallery.folders.reduce((sum, folder) => 
-        sum + folder.photos.reduce((photoSum, photo) => photoSum + photo.fileSize, 0), 0
-      )
-      
-      // Calculate last activity from photo uploads
-      const lastPhotoDate = gallery.folders
-        .flatMap(folder => folder.photos)
-        .reduce((latest, photo) => 
-          !latest || photo.createdAt > latest ? photo.createdAt : latest, 
-          null as Date | null
-        )
+      const storage = storageStats.get(gallery.id) || { storageUsed: 0, lastPhotoDate: null }
 
       // Determine gallery status
       let status: 'active' | 'expired' | 'password_protected' | 'public' = 'active'
@@ -220,10 +225,9 @@ export const getAllGalleries = async (req: AdminAuthRequest, res: Response) => {
           totalFolders: gallery._count.folders,
           totalLikes: gallery._count.likedBy,
           totalFavorites: gallery._count.favoritedBy,
-          totalViews: 0, // Would need separate tracking for views
-          storageUsed,
+          storageUsed: storage.storageUsed,
           clientsWithAccess: gallery._count.accessibleBy,
-          lastActivity: lastPhotoDate || gallery.updatedAt
+          lastActivity: storage.lastPhotoDate || gallery.updatedAt
         },
         status
       }
@@ -288,22 +292,22 @@ export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) =>
           include: {
             photos: {
               include: {
-                likedBy: { 
-                  select: { 
+                likedBy: {
+                  select: {
                     userId: true,
                     user: { select: { name: true, email: true } },
                     createdAt: true
                   }
                 },
-                favoritedBy: { 
-                  select: { 
+                favoritedBy: {
+                  select: {
                     userId: true,
                     user: { select: { name: true, email: true } },
                     createdAt: true
                   }
                 },
-                postBy: { 
-                  select: { 
+                postBy: {
+                  select: {
                     userId: true,
                     user: { select: { name: true, email: true } },
                     createdAt: true
@@ -319,22 +323,22 @@ export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) =>
             _count: { select: { photos: true, children: true } }
           }
         },
-        likedBy: { 
-          select: { 
+        likedBy: {
+          select: {
             userId: true,
             user: { select: { name: true, email: true } },
             createdAt: true
           }
         },
-        favoritedBy: { 
-          select: { 
+        favoritedBy: {
+          select: {
             userId: true,
             user: { select: { name: true, email: true } },
             createdAt: true
           }
         },
-        accessibleBy: { 
-          select: { 
+        accessibleBy: {
+          select: {
             userId: true,
             user: { select: { name: true, email: true } },
             createdAt: true
@@ -352,7 +356,7 @@ export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) =>
 
     // Calculate comprehensive statistics
     const totalPhotos = gallery.folders.reduce((sum, folder) => sum + folder._count.photos, 0)
-    const storageUsed = gallery.folders.reduce((sum, folder) => 
+    const storageUsed = gallery.folders.reduce((sum, folder) =>
       sum + folder.photos.reduce((photoSum, photo) => photoSum + photo.fileSize, 0), 0
     )
 
@@ -382,8 +386,8 @@ export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) =>
         clientsWithAccess: gallery.accessibleBy.length,
         recentActivity
       },
-      status: gallery.expiresAt && gallery.expiresAt < new Date() ? 'expired' : 
-              gallery.password ? 'password_protected' : 'public'
+      status: gallery.expiresAt && gallery.expiresAt < new Date() ? 'expired' :
+        gallery.password ? 'password_protected' : 'public'
     }
 
     await logAdminAction(
@@ -459,9 +463,9 @@ export const updateGallerySettings = async (req: AdminAuthRequest, res: Response
     if (password !== undefined) {
       const newHashedPassword = password ? await bcrypt.hash(password, 12) : null
       updateData.password = newHashedPassword
-      changes.password = { 
-        from: existingGallery.password ? 'protected' : 'public', 
-        to: password ? 'protected' : 'public' 
+      changes.password = {
+        from: existingGallery.password ? 'protected' : 'public',
+        to: password ? 'protected' : 'public'
       }
     }
 
@@ -1005,7 +1009,7 @@ export const bulkGalleryOperations = async (req: AdminAuthRequest, res: Response
           where: { id: { in: galleryIds } },
           data: { expiresAt: new Date() }
         })
-        
+
         await logBulkAdminAction(
           req,
           'ADMIN_GALLERY_BULK_EXPIRE',
@@ -1026,7 +1030,7 @@ export const bulkGalleryOperations = async (req: AdminAuthRequest, res: Response
           where: { id: { in: galleryIds } },
           data: { expiresAt: null }
         })
-        
+
         await logBulkAdminAction(
           req,
           'ADMIN_GALLERY_BULK_ACTIVATE',
@@ -1062,7 +1066,7 @@ export const bulkGalleryOperations = async (req: AdminAuthRequest, res: Response
           where: { id: { in: galleryIds } },
           data: updateData
         })
-        
+
         await logBulkAdminAction(
           req,
           'ADMIN_GALLERY_BULK_UPDATE',

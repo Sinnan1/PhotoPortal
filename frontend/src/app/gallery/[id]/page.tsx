@@ -6,6 +6,9 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useGallery, useUpdateGallery } from "@/hooks/queries/useGalleries";
+import { useFolder, useSetFolderCover } from "@/hooks/queries/useFolders";
+import { useDeletePhoto } from "@/hooks/queries/usePhotos";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +27,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, Folder, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
+import { Lock, LockOpen, Download, Calendar, User, Images, Loader2, Trash2, Heart, Star, ChevronRight, ChevronDown, Folder as FolderIcon, Grid3X3, RectangleHorizontal, Menu, X, Settings } from "lucide-react";
+import type { Photo, Folder, Gallery } from "@/types";
 import Image from "next/image";
-import { PhotoLightbox } from "@/components/photo-lightbox";
+import { PhotoLightbox } from "@/components/photo/photo-lightbox";
 
-import { PhotoGrid } from "@/components/photo-grid";
-import { FolderGrid } from "@/components/folder-grid";
-import { FolderTiles } from "@/components/folder-tiles";
-import { BreadcrumbNavigation } from "@/components/breadcrumb-navigation";
-import { CompactFolderTree } from "@/components/compact-folder-tree";
+import { PhotoGrid } from "@/components/photo/photo-grid";
+import { FolderGrid } from "@/components/gallery/folder-grid";
+import { FolderTiles } from "@/components/gallery/folder-tiles";
+import { BreadcrumbNavigation } from "@/components/layout/breadcrumb-navigation";
+import { CompactFolderTree } from "@/components/gallery/compact-folder-tree";
 import { useAuth } from "@/lib/auth-context";
 import { DownloadFilteredPhotos } from "@/components/ui/download-filtered-photos";
 import { DownloadProgress } from "@/components/ui/download-progress";
@@ -74,44 +78,6 @@ function getAuthToken() {
   return null
 }
 
-interface Photo {
-  id: string;
-  filename: string;
-  thumbnailUrl: string;
-  originalUrl: string;
-  createdAt: string;
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
-  postBy: { userId: string }[];
-}
-
-interface Folder {
-  id: string;
-  name: string;
-  children: Folder[];
-  photos: Photo[];
-  coverPhoto?: Photo;
-  _count: {
-    photos: number;
-    children: number;
-  };
-}
-
-interface Gallery {
-  id: string;
-  title: string;
-  description: string;
-  expiresAt: string | null;
-  downloadLimit: number | null;
-  downloadCount: number;
-  isExpired: boolean;
-  canDownload?: boolean;
-  photographer: {
-    name: string;
-  };
-  folders: Folder[];
-}
-
 function GalleryPage() {
   const params = useParams();
   const galleryId = params.id as string;
@@ -119,9 +85,7 @@ function GalleryPage() {
   const { user } = useAuth();
 
 
-  const [gallery, setGallery] = useState<Gallery | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [passwordRequired, setPasswordRequired] = useState(false);
+
   const [password, setPassword] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
@@ -133,6 +97,20 @@ function GalleryPage() {
   const [showFolderTree, setShowFolderTree] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
+
+  // React Query hooks
+  const { data: gallery, isLoading: galleryLoading, error: galleryError } = useGallery(galleryId, { password });
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const { data: folderData, isLoading: folderLoading } = useFolder(currentFolderId || "");
+
+  const setFolderCoverMutation = useSetFolderCover();
+  const deletePhotoMutation = useDeletePhoto();
+  const updateGalleryMutation = useUpdateGallery();
+
+  // Derived state
+  const loading = galleryLoading || (!!currentFolderId && folderLoading);
+  const currentFolder = folderData || (gallery?.folders?.find(f => f.id === currentFolderId) ?? null);
+  const passwordRequired = galleryError?.message?.toLowerCase().includes("password") || (galleryError as any)?.response?.status === 401 || (galleryError as any)?.response?.status === 403;
 
   // Download progress hooks
   const downloadAllProgress = useDownloadProgress();
@@ -149,7 +127,7 @@ function GalleryPage() {
   }>({});
 
   // Folder navigation state
-  const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
+  // const [currentFolder, setCurrentFolder] = useState<Folder | null>(null); // Replaced by derived state
   const [breadcrumbItems, setBreadcrumbItems] = useState<Array<{ id: string, name: string, type: 'gallery' | 'folder' }>>([]);
 
   // Type alias for breadcrumb items
@@ -164,116 +142,11 @@ function GalleryPage() {
   const currentFolderSelectionCounterRef = useRef<{ refreshCounts: () => void } | null>(null);
 
   // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
+  // Keep gallery photos in sync when a photo's like/favorite status changes without re-fetching
+  // React Query handles this via invalidation, but we can keep this empty or remove it if not used by children
+  // The children components might expect this prop, so we'll keep a dummy or update children
   const handlePhotoStatusChange = (photoId: string, status: { liked?: boolean; favorited?: boolean; posted?: boolean }) => {
-
-    // Update current folder state
-    setCurrentFolder((prevFolder) => {
-      if (!prevFolder) return prevFolder;
-
-      return {
-        ...prevFolder,
-        photos: prevFolder.photos.map((p) => {
-          if (p.id !== photoId) return p;
-          const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
-          const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
-          const currentPosted = (p.postBy ?? []).some((post) => post.userId === user?.id);
-          return {
-            ...p,
-            likedBy:
-              status.liked === undefined
-                ? p.likedBy
-                : status.liked
-                  ? [...(p.likedBy ?? []), { userId: user!.id }]
-                  : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
-            favoritedBy:
-              status.favorited === undefined
-                ? p.favoritedBy
-                : status.favorited
-                  ? [...(p.favoritedBy ?? []), { userId: user!.id }]
-                  : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
-            postBy:
-              status.posted === undefined
-                ? p.postBy
-                : status.posted
-                  ? [...(p.postBy ?? []), { userId: user!.id }]
-                  : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
-          } as Photo;
-        })
-      };
-    });
-
-    // Update selection counts for the current folder
-    if (currentFolder) {
-      setSelectionCounts(prev => {
-        const currentCounts = prev[currentFolder.id] || { selectedCount: 0, likedCount: 0, favoritedCount: 0, postedCount: 0 };
-        const newCounts = { ...currentCounts };
-
-        // Update individual counts based on status changes
-        if (status.liked !== undefined) {
-          newCounts.likedCount += status.liked ? 1 : -1;
-        }
-        if (status.favorited !== undefined) {
-          newCounts.favoritedCount += status.favorited ? 1 : -1;
-        }
-        if (status.posted !== undefined) {
-          newCounts.postedCount += status.posted ? 1 : -1;
-        }
-
-        // Recalculate selected count (photos with any selection)
-        // This is an approximation - for exact counts, the SelectionCounter will refresh from API
-        newCounts.selectedCount = Math.max(0, Math.max(newCounts.likedCount, newCounts.favoritedCount, newCounts.postedCount));
-
-        return {
-          ...prev,
-          [currentFolder.id]: newCounts
-        };
-      });
-    }
-
-    // Update gallery state to keep everything in sync
-    setGallery((prev) => {
-      if (!prev) return prev;
-      const updatedFolders = prev.folders.map((folder) => ({
-        ...folder,
-        photos: folder.photos.map((p) => {
-          if (p.id !== photoId) return p;
-          const currentLiked = (p.likedBy ?? []).some((l) => l.userId === user?.id);
-          const currentFav = (p.favoritedBy ?? []).some((f) => f.userId === user?.id);
-          const currentPosted = (p.postBy ?? []).some((post) => post.userId === user?.id);
-          return {
-            ...p,
-            likedBy:
-              status.liked === undefined
-                ? p.likedBy
-                : status.liked
-                  ? [...(p.likedBy ?? []), { userId: user!.id }]
-                  : (p.likedBy ?? []).filter((l) => l.userId !== user?.id),
-            favoritedBy:
-              status.favorited === undefined
-                ? p.favoritedBy
-                : status.favorited
-                  ? [...(p.favoritedBy ?? []), { userId: user!.id }]
-                  : (p.favoritedBy ?? []).filter((f) => f.userId !== user?.id),
-            postBy:
-              status.posted === undefined
-                ? p.postBy
-                : status.posted
-                  ? [...(p.postBy ?? []), { userId: user!.id }]
-                  : (p.postBy ?? []).filter((post) => post.userId !== user?.id),
-          } as Photo;
-        })
-      }));
-      return { ...prev, folders: updatedFolders };
-    });
-
-    // Trigger refreshes of selection counter components
-    // This ensures the counters update immediately with accurate data from the API
-    if (gallerySelectionSummaryRef.current) {
-      gallerySelectionSummaryRef.current.refreshData();
-    }
-    if (currentFolderSelectionCounterRef.current) {
-      currentFolderSelectionCounterRef.current.refreshCounts();
-    }
+    // React Query invalidation handles the updates
   };
 
   useEffect(() => {
@@ -286,9 +159,66 @@ function GalleryPage() {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
-
-    fetchGallery();
   }, [galleryId]);
+
+  // Initialize current folder and breadcrumbs when gallery loads
+  useEffect(() => {
+    if (gallery && gallery.folders && gallery.folders.length > 0 && !currentFolderId) {
+      const rootFolder = gallery.folders[0];
+      setCurrentFolderId(rootFolder.id);
+    }
+  }, [gallery, currentFolderId]);
+
+  // Update breadcrumbs when currentFolder changes
+  useEffect(() => {
+    if (gallery && currentFolder) {
+      // Build complete breadcrumb path by traversing folder hierarchy
+      const buildBreadcrumbPath = (targetFolder: any): Array<{ id: string, name: string, type: BreadcrumbItemType }> => {
+        // Find the folder in the gallery structure to build the path
+        const findFolderPath = (folders: any[], targetId: string, currentPath: string[] = []): string[] | null => {
+          for (const folder of folders) {
+            if (folder.id === targetId) {
+              return [...currentPath, folder.id];
+            }
+            if (folder.children && folder.children.length > 0) {
+              const childPath = findFolderPath(folder.children, targetId, [...currentPath, folder.id]);
+              if (childPath) {
+                return childPath;
+              }
+            }
+          }
+          return null;
+        };
+
+        const folderPath = findFolderPath(gallery.folders || [], targetFolder.id);
+        if (folderPath) {
+          // Build path from gallery root to current folder
+          let currentFolders = gallery.folders || [];
+          const breadcrumbItems: Array<{ id: string, name: string, type: BreadcrumbItemType }> = [{ id: gallery.id, name: gallery.title, type: 'gallery' as BreadcrumbItemType }];
+
+          for (let i = 0; i < folderPath.length; i++) {
+            const folderId = folderPath[i];
+            const folder = currentFolders.find(f => f.id === folderId);
+            if (folder) {
+              breadcrumbItems.push({ id: folder.id, name: folder.name, type: 'folder' as BreadcrumbItemType });
+              currentFolders = folder.children || [];
+            }
+          }
+
+          return breadcrumbItems;
+        }
+
+        // Fallback: just show gallery and current folder
+        return [
+          { id: gallery.id, name: gallery.title, type: 'gallery' as BreadcrumbItemType },
+          { id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }
+        ];
+      };
+
+      const newBreadcrumbs = buildBreadcrumbPath(currentFolder);
+      setBreadcrumbItems(newBreadcrumbs);
+    }
+  }, [gallery, currentFolder]);
 
   // Set initial sidebar state - collapsed by default for slideout behavior
   useEffect(() => {
@@ -307,53 +237,12 @@ function GalleryPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [sidebarCollapsed]);
 
-  const fetchGallery = async () => {
-    try {
-      // Add cache-busting parameter if refresh is requested
-      const searchParams = new URLSearchParams(window.location.search);
-      const shouldRefresh = searchParams.get('refresh');
 
-      const response = await api.getGallery(galleryId, shouldRefresh ? { refresh: shouldRefresh } : {});
-      const galleryData = response.data;
-
-
-
-      setGallery(galleryData);
-
-      // Set up initial folder navigation
-      if (galleryData.folders && galleryData.folders.length > 0) {
-        const rootFolder = galleryData.folders[0]; // Use first folder as default
-        setCurrentFolder(rootFolder);
-        setBreadcrumbItems([
-          { id: galleryData.id, name: galleryData.title, type: 'gallery' },
-          { id: rootFolder.id, name: rootFolder.name, type: 'folder' }
-        ]);
-      }
-    } catch (error: any) {
-      if (error.message.toLowerCase().includes("password")) {
-        setPasswordRequired(true);
-      } else {
-        showToast("Failed to load gallery", "error");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setVerifying(true);
-
-    try {
-      // Re-fetch gallery providing password header so backend authorizes
-      const response = await api.getGallery(galleryId, { password });
-      setGallery(response.data);
-      setPasswordRequired(false);
-    } catch (error) {
-      showToast("Incorrect password", "error");
-    } finally {
-      setVerifying(false);
-    }
+    // setVerifying(true); // Handled by useGallery loading state when password changes
+    // Just triggering re-render with new password will cause useGallery to refetch
   };
 
   const handleDownload = async (photoId: string) => {
@@ -394,21 +283,7 @@ function GalleryPage() {
 
   const handleDelete = async (photoId: string) => {
     try {
-      await api.deletePhoto(photoId);
-      setGallery((prevGallery) => {
-        if (!prevGallery) return null;
-        return {
-          ...prevGallery,
-          folders: prevGallery.folders?.map(folder => ({
-            ...folder,
-            photos: folder.photos.filter((p) => p.id !== photoId),
-            _count: {
-              ...folder._count,
-              photos: folder.photos.filter((p) => p.id !== photoId).length
-            }
-          }))
-        };
-      });
+      await deletePhotoMutation.mutateAsync(photoId);
       showToast("Photo deleted", "success");
     } catch (error) {
       console.error("Failed to delete photo", error);
@@ -418,11 +293,8 @@ function GalleryPage() {
 
   const handleSetCoverPhoto = async (folderId: string, photoId: string) => {
     try {
-      await api.setFolderCover(folderId, photoId || undefined);
+      await setFolderCoverMutation.mutateAsync({ folderId, photoId: photoId || undefined });
       showToast(photoId ? "Cover photo set successfully" : "Cover photo removed", "success");
-      
-      // Refresh the gallery to update cover photos
-      await fetchGallery();
     } catch (error) {
       console.error("Failed to set cover photo", error);
       showToast("Failed to set cover photo", "error");
@@ -436,67 +308,8 @@ function GalleryPage() {
 
   // Folder navigation functions
   const handleFolderSelect = async (folderId: string) => {
-    try {
-      const response = await api.getFolder(folderId);
-      const folder = response.data;
-
-      // Update current folder
-      setCurrentFolder(folder);
-
-      // Build complete breadcrumb path by traversing folder hierarchy
-      const buildBreadcrumbPath = (targetFolder: any): Array<{ id: string, name: string, type: BreadcrumbItemType }> => {
-        const path = [{ id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }];
-
-        // Find the folder in the gallery structure to build the path
-        const findFolderPath = (folders: any[], targetId: string, currentPath: string[] = []): string[] | null => {
-          for (const folder of folders) {
-            if (folder.id === targetId) {
-              return [...currentPath, folder.id];
-            }
-            if (folder.children && folder.children.length > 0) {
-              const childPath = findFolderPath(folder.children, targetId, [...currentPath, folder.id]);
-              if (childPath) {
-                return childPath;
-              }
-            }
-          }
-          return null;
-        };
-
-        const folderPath = findFolderPath(gallery!.folders, targetFolder.id);
-        if (folderPath) {
-          // Build path from gallery root to current folder
-          let currentFolders = gallery!.folders;
-          const breadcrumbItems: Array<{ id: string, name: string, type: BreadcrumbItemType }> = [{ id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType }];
-
-          for (let i = 0; i < folderPath.length; i++) {
-            const folderId = folderPath[i];
-            const folder = currentFolders.find(f => f.id === folderId);
-            if (folder) {
-              breadcrumbItems.push({ id: folder.id, name: folder.name, type: 'folder' as BreadcrumbItemType });
-              currentFolders = folder.children || [];
-            }
-          }
-
-          return breadcrumbItems;
-        }
-
-        // Fallback: just show gallery and current folder
-        return [
-          { id: gallery!.id, name: gallery!.title, type: 'gallery' as BreadcrumbItemType },
-          { id: targetFolder.id, name: targetFolder.name, type: 'folder' as BreadcrumbItemType }
-        ];
-      };
-
-      const newBreadcrumbs = buildBreadcrumbPath(folder);
-      setBreadcrumbItems(newBreadcrumbs);
-
-      // Reset to page 1 for new folder
-      setCurrentPage(1);
-
-    } catch (error) {
-      showToast("Failed to load folder", "error");
-    }
+    setCurrentFolderId(folderId);
+    setCurrentPage(1);
   };
 
   const handleBreadcrumbNavigate = async (itemId: string, type: 'gallery' | 'folder') => {
@@ -504,11 +317,7 @@ function GalleryPage() {
       // Navigate back to gallery root
       if (gallery && gallery.folders && gallery.folders.length > 0) {
         const rootFolder = gallery.folders[0];
-        setCurrentFolder(rootFolder);
-        setBreadcrumbItems([
-          { id: gallery.id, name: gallery.title, type: 'gallery' },
-          { id: rootFolder.id, name: rootFolder.name, type: 'folder' }
-        ]);
+        setCurrentFolderId(rootFolder.id);
         setCurrentPage(1);
       }
     } else {
@@ -520,12 +329,12 @@ function GalleryPage() {
   const filteredPhotos = useMemo(() => {
     if (!currentFolder) return [];
     if (filter === "liked") {
-      return currentFolder.photos.filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
+      return (currentFolder.photos || []).filter((p) => p.likedBy?.some((like) => like.userId === user?.id));
     }
     if (filter === "favorited") {
-      return currentFolder.photos.filter((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id));
+      return (currentFolder.photos || []).filter((p) => p.favoritedBy?.some((fav) => fav.userId === user?.id));
     }
-    return currentFolder.photos;
+    return currentFolder.photos || [];
   }, [currentFolder, filter, user]);
 
   // Paginated photos
@@ -602,8 +411,8 @@ function GalleryPage() {
                 placeholder="Enter gallery password"
                 required
               />
-              <Button type="submit" className="w-full" disabled={verifying}>
-                {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" className="w-full" disabled={galleryLoading}>
+                {galleryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Access Gallery
               </Button>
             </CardContent>
@@ -684,8 +493,8 @@ function GalleryPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Selection Progress</span>
                       <Badge variant="secondary" className="text-xs">
-                        {currentFolder && currentFolder.photos.length > 0
-                          ? Math.round((currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / currentFolder.photos.length) * 100)
+                        {currentFolder && (currentFolder.photos || []).length > 0
+                          ? Math.round(((currentFolder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / (currentFolder.photos || []).length) * 100)
                           : 0}%
                       </Badge>
                     </div>
@@ -694,8 +503,8 @@ function GalleryPage() {
                       <div
                         className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-300"
                         style={{
-                          width: currentFolder && currentFolder.photos.length > 0
-                            ? `${Math.round((currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / currentFolder.photos.length) * 100)}%`
+                          width: currentFolder && (currentFolder.photos || []).length > 0
+                            ? `${Math.round(((currentFolder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length / (currentFolder.photos || []).length) * 100)}%`
                             : '0%'
                         }}
                       />
@@ -703,7 +512,7 @@ function GalleryPage() {
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
                         {currentFolder
-                          ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length
+                          ? (currentFolder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id) || p.favoritedBy?.some((fav) => fav.userId === user?.id)).length
                           : 0} photos selected
                       </span>
                       <span>of {currentFolder?._count?.photos || 0} total</span>
@@ -731,8 +540,8 @@ function GalleryPage() {
                 <div className="space-y-1">
                   {gallery.folders?.map((folder, index) => {
                     const isActive = currentFolder?.id === folder.id;
-                    const likedCount = folder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length;
-                    const favoritedCount = folder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length;
+                    const likedCount = (folder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length;
+                    const favoritedCount = (folder.photos || []).filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length;
 
                     return (
                       <div key={folder.id}>
@@ -742,7 +551,7 @@ function GalleryPage() {
                           className={`w-full flex items-center justify-between p-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <Folder
+                            <FolderIcon
                               className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
                             />
                             <span className="font-medium truncate">{folder.name}</span>
@@ -830,6 +639,19 @@ function GalleryPage() {
         </div>
       </div>
 
+      {/* Locked Gallery Banner for Clients */}
+      {gallery.isLocked && user?.role === 'CLIENT' && (
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20 rounded-xl p-6 mb-6 text-center">
+          <Lock className="mx-auto h-8 w-8 text-primary mb-3" />
+          <h3 className="text-lg font-semibold text-primary mb-2">
+            Thank You for Your Selection
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            You can view your images anytime with your provided credentials.
+          </p>
+        </div>
+      )}
+
       {/* Modern Gallery Header Section */}
       <div className="mb-6 sm:mb-8 space-y-4 sm:space-y-6">
         {/* Top Bar: Title + Main Actions */}
@@ -857,60 +679,93 @@ function GalleryPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[60]">
-              {/* Show message if no photos available */}
-              {(!currentFolder?.photos || currentFolder.photos.length === 0) && 
-               (!gallery.folders?.flatMap(f => f?.photos || []).length) && (
-                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  No photos available to download
-                </div>
-              )}
-
-              {/* Current Folder Download */}
-              {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
-                <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
-                  {isDownloadingCurrent ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Folder className="mr-2 h-4 w-4" />
+                {/* Show message if no photos available */}
+                {(!currentFolder?.photos || currentFolder.photos.length === 0) &&
+                  (!(gallery.folders?.flatMap(f => f?.photos || []) || []).length) && (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      No photos available to download
+                    </div>
                   )}
-                  Current Folder ({currentFolder.photos.length})
-                </DropdownMenuItem>
-              )}
 
-              {/* Download All */}
-              {gallery.folders?.flatMap(f => f?.photos || []).length > 0 && (
-                <DropdownMenuItem onClick={handleDownloadAll} disabled={isDownloadingAll}>
-                  {isDownloadingAll ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Images className="mr-2 h-4 w-4" />
-                  )}
-                  All Photos ({gallery.folders?.flatMap(f => f?.photos || []).length})
-                </DropdownMenuItem>
-              )}
+                {/* Current Folder Download */}
+                {currentFolder && currentFolder.photos && currentFolder.photos.length > 0 && (
+                  <DropdownMenuItem onClick={handleDownloadCurrentFolder} disabled={isDownloadingCurrent}>
+                    {isDownloadingCurrent ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FolderIcon className="mr-2 h-4 w-4" />
+                    )}
+                    Current Folder ({currentFolder.photos.length})
+                  </DropdownMenuItem>
+                )}
 
-              {/* Divider */}
-              {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
-                <div className="my-1 h-px bg-border" />
-              )}
+                {/* Download All */}
+                {(gallery.folders?.flatMap(f => f?.photos || []) || []).length > 0 && (
+                  <DropdownMenuItem onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                    {isDownloadingAll ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Images className="mr-2 h-4 w-4" />
+                    )}
+                    All Photos ({(gallery.folders?.flatMap(f => f?.photos || []) || []).length})
+                  </DropdownMenuItem>
+                )}
 
-              {/* Download Liked */}
-              {user && galleryPhotoCounts.liked > 0 && (
-                <DropdownMenuItem>
-                  <Heart className="mr-2 h-4 w-4 text-red-500" />
-                  Liked Photos ({galleryPhotoCounts.liked})
-                </DropdownMenuItem>
-              )}
+                {/* Divider */}
+                {user && (galleryPhotoCounts.liked > 0 || galleryPhotoCounts.favorited > 0) && (
+                  <div className="my-1 h-px bg-border" />
+                )}
 
-              {/* Download Favorited */}
-              {user && galleryPhotoCounts.favorited > 0 && (
-                <DropdownMenuItem>
-                  <Star className="mr-2 h-4 w-4 text-yellow-500" />
-                  Favorited Photos ({galleryPhotoCounts.favorited})
-                </DropdownMenuItem>
-              )}
+                {/* Download Liked */}
+                {user && galleryPhotoCounts.liked > 0 && (
+                  <DropdownMenuItem>
+                    <Heart className="mr-2 h-4 w-4 text-red-500" />
+                    Liked Photos ({galleryPhotoCounts.liked})
+                  </DropdownMenuItem>
+                )}
+
+                {/* Download Favorited */}
+                {user && galleryPhotoCounts.favorited > 0 && (
+                  <DropdownMenuItem>
+                    <Star className="mr-2 h-4 w-4 text-yellow-500" />
+                    Favorited Photos ({galleryPhotoCounts.favorited})
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {/* Lock Toggle Button - Only for Photographers */}
+          {user?.role === 'PHOTOGRAPHER' && (
+            <Button
+              variant={gallery.isLocked ? "default" : "outline"}
+              className={`shadow-sm flex-shrink-0 h-9 px-3 sm:h-10 sm:px-4 ${gallery.isLocked ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+              onClick={async () => {
+                try {
+                  await updateGalleryMutation.mutateAsync({
+                    id: galleryId,
+                    data: { isLocked: !gallery.isLocked }
+                  });
+                  showToast(
+                    gallery.isLocked ? 'Selection unlocked' : 'Selection locked',
+                    'success'
+                  );
+                } catch (error) {
+                  showToast('Failed to update lock status', 'error');
+                }
+              }}
+              disabled={updateGalleryMutation.isPending}
+              title={gallery.isLocked ? 'Click to unlock selection' : 'Click to lock selection'}
+            >
+              {updateGalleryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+              ) : gallery.isLocked ? (
+                <Lock className="h-4 w-4 sm:mr-2" />
+              ) : (
+                <LockOpen className="h-4 w-4 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">{gallery.isLocked ? 'Locked' : 'Lock'}</span>
+            </Button>
           )}
         </div>
 
@@ -937,7 +792,7 @@ function GalleryPage() {
             <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground flex-wrap">
               <div className="flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">{gallery.photographer.name}</span>
+                <span className="truncate">{gallery.photographer?.name}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Images className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -960,6 +815,64 @@ function GalleryPage() {
             </div>
           </label>
         </div>
+
+        {/* Folder Selector Dropdown */}
+        {gallery.folders && gallery.folders.length > 0 && (
+          <DropdownMenu modal={true}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto justify-between gap-2 h-11 px-4 bg-background border-2 hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <FolderIcon className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span className="font-medium truncate">{currentFolder?.name || "Select Folder"}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant="secondary" className="ml-1">
+                    {currentFolder?._count?.photos || 0}
+                  </Badge>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[280px] sm:w-[320px] max-h-[400px] overflow-y-auto z-[60]">
+              {/* Recursively render all folders */}
+              {(() => {
+                const renderFolderItems = (folders: Folder[], level: number = 0): React.ReactNode => {
+                  return folders.map((folder) => {
+                    const isActive = currentFolder?.id === folder.id;
+                    const indent = level * 16; // 16px indent per level
+
+                    return (
+                      <div key={folder.id}>
+                        <DropdownMenuItem
+                          onClick={() => handleFolderSelect(folder.id)}
+                          className={`cursor-pointer ${isActive ? 'bg-primary/10 font-semibold' : ''}`}
+                          style={{ paddingLeft: `${12 + indent}px` }}
+                        >
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FolderIcon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <span className="truncate">{folder.name}</span>
+                            </div>
+                            <Badge variant={isActive ? "default" : "secondary"} className="flex-shrink-0 text-xs">
+                              {folder._count?.photos || 0}
+                            </Badge>
+                          </div>
+                        </DropdownMenuItem>
+                        {/* Render child folders if they exist */}
+                        {folder.children && folder.children.length > 0 && renderFolderItems(folder.children, level + 1)}
+                      </div>
+                    );
+                  });
+                };
+
+                return renderFolderItems(gallery.folders || []);
+              })()}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {/* Control Bar: View Mode + Filters */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -996,7 +909,7 @@ function GalleryPage() {
               <span className="hidden sm:inline">All</span>
               <span className="sm:hidden">All</span>
               <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
-                {currentFolder ? currentFolder.photos.length : 0}
+                {currentFolder ? (currentFolder.photos || []).length : 0}
               </Badge>
             </Button>
             <Button
@@ -1008,7 +921,7 @@ function GalleryPage() {
               <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Liked</span>
               <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
-                {currentFolder ? currentFolder.photos.filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0}
+                {currentFolder ? (currentFolder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0}
               </Badge>
             </Button>
             <Button
@@ -1020,7 +933,7 @@ function GalleryPage() {
               <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Favorited</span>
               <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
-                {currentFolder ? currentFolder.photos.filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
+                {currentFolder ? (currentFolder.photos || []).filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
               </Badge>
             </Button>
           </div>
@@ -1083,7 +996,7 @@ function GalleryPage() {
               <SelectionCounter
                 ref={currentFolderSelectionCounterRef}
                 folderId={currentFolder.id}
-                totalPhotos={currentFolder.photos.length}
+                totalPhotos={(currentFolder.photos || []).length}
                 compact={true}
                 showBreakdown={true}
                 className="text-xs sm:text-sm"
@@ -1120,6 +1033,7 @@ function GalleryPage() {
                   photos: paginatedPhotos
                 }}
                 isPhotographer={user?.role === "PHOTOGRAPHER"}
+                isLocked={gallery.isLocked && user?.role === 'CLIENT'}
                 onPhotoView={(photo) => setSelectedPhoto(photo)}
                 onFolderSelect={handleFolderSelect}
                 onPhotoStatusChange={handlePhotoStatusChange}

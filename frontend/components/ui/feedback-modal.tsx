@@ -94,8 +94,8 @@ export function FeedbackModal({
           >
             <Star
               className={`h-10 w-10 transition-all duration-200 ${star <= value
-                  ? "fill-yellow-400 text-yellow-400 drop-shadow-lg"
-                  : "text-gray-300 hover:text-gray-400"
+                ? "fill-yellow-400 text-yellow-400 drop-shadow-lg"
+                : "text-gray-300 hover:text-gray-400"
                 }`}
             />
           </button>

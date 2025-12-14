@@ -34,6 +34,23 @@ const DIRECT_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL
   ? `${process.env.NEXT_PUBLIC_DIRECT_DOWNLOAD_URL}/api`
   : API_BASE_URL
 
+// Helper function to check if localStorage is available
+function isStorageAvailable(): boolean {
+  if (typeof window === 'undefined') return false
+  if (typeof localStorage === 'undefined') return false
+
+  try {
+    // Test if we can actually access localStorage
+    const test = '__storage_test__'
+    localStorage.setItem(test, test)
+    localStorage.removeItem(test)
+    return true
+  } catch (e) {
+    // localStorage is not available or restricted
+    return false
+  }
+}
+
 function getAuthToken() {
   if (typeof document === "undefined") return null
 
@@ -45,17 +62,19 @@ function getAuthToken() {
 
   if (cookieToken) return cookieToken
 
-  // Fallback: try to get token from localStorage
-  try {
-    const user = localStorage.getItem("user")
-    if (user) {
-      const userData = JSON.parse(user)
-      // Check if we have a token stored somewhere else
-      const storedToken = localStorage.getItem("auth-token")
-      if (storedToken) return storedToken
+  // Fallback: try to get token from localStorage only if available
+  if (isStorageAvailable()) {
+    try {
+      const user = localStorage.getItem("user")
+      if (user) {
+        const userData = JSON.parse(user)
+        // Check if we have a token stored somewhere else
+        const storedToken = localStorage.getItem("auth-token")
+        if (storedToken) return storedToken
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage:", error)
     }
-  } catch (error) {
-    console.error("Error reading from localStorage:", error)
   }
 
   return null
@@ -109,7 +128,64 @@ export const api = {
   // Gallery APIs - Fixed endpoints to match your backend
   getGalleries: () => apiRequest("/galleries"),
 
+  getGalleriesTimeline: () => apiRequest("/galleries/timeline"),
+
+  getGalleriesByYearMonth: (year: number, month: number) =>
+    apiRequest(`/galleries/timeline/${year}/${month}`),
+
+  getUncategorizedGalleries: () => apiRequest("/galleries/uncategorized"),
+
+  updateGalleryDate: (id: string, shootDate: string | null) =>
+    apiRequest(`/galleries/${id}/date`, {
+      method: "PATCH",
+      body: JSON.stringify({ shootDate }),
+    }),
+
+
+
   getClientGalleries: () => apiRequest("/galleries/client/accessible"),
+
+  searchGalleries: (query: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (query) params.append("q", query);
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    return apiRequest(`/galleries/search?${params.toString()}`);
+  },
+
+  // Gallery Group APIs
+  getGalleryGroups: () => apiRequest("/gallery-groups"),
+
+  getGalleryGroup: (id: string) => apiRequest(`/gallery-groups/${id}`),
+
+  createGalleryGroup: (data: any) =>
+    apiRequest("/gallery-groups", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGalleryGroup: (id: string, data: any) =>
+    apiRequest(`/gallery-groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteGalleryGroup: (id: string) =>
+    apiRequest(`/gallery-groups/${id}`, {
+      method: "DELETE",
+    }),
+
+  assignGalleriesToGroup: (groupId: string, galleryIds: string[]) =>
+    apiRequest(`/gallery-groups/${groupId}/galleries`, {
+      method: "POST",
+      body: JSON.stringify({ galleryIds }),
+    }),
+
+  removeGalleriesFromGroup: (groupId: string, galleryIds: string[]) =>
+    apiRequest(`/gallery-groups/${groupId}/galleries`, {
+      method: "DELETE",
+      body: JSON.stringify({ galleryIds }),
+    }),
 
   createGallery: (galleryData: any) =>
     apiRequest("/galleries", {
@@ -181,28 +257,28 @@ export const api = {
   // New function for downloading photo data directly
   downloadPhotoData: async (id: string, filename: string, galleryPassword?: string) => {
     const token = getAuthToken();
-    
+
     // Create a temporary form to POST credentials (more secure than URL params)
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `${API_BASE_URL}/photos/${id}/download`;
     form.target = '_blank';
     form.style.display = 'none';
-    
+
     if (token) {
       const tokenInput = document.createElement('input');
       tokenInput.name = 'token';
       tokenInput.value = token;
       form.appendChild(tokenInput);
     }
-    
+
     if (galleryPassword) {
       const passwordInput = document.createElement('input');
       passwordInput.name = 'password';
       passwordInput.value = galleryPassword;
       form.appendChild(passwordInput);
     }
-    
+
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);
@@ -462,6 +538,56 @@ export const api = {
     return {
       blob: await response.blob(),
       filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'favorited_photos.xlsx'
+    };
+  },
+
+  exportLikedPhotosToCSV: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export-csv/liked`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export liked photos to CSV");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'liked_photos.csv'
+    };
+  },
+
+  exportFavoritedPhotosToCSV: async (galleryId: string, galleryPassword?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await fetch(`${DIRECT_DOWNLOAD_URL}/photos/gallery/${galleryId}/export-csv/favorited`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(galleryPassword && { 'x-gallery-password': galleryPassword }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to export favorited photos to CSV");
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'favorited_photos.csv'
     };
   },
 

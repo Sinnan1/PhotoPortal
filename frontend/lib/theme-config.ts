@@ -17,22 +17,22 @@ export interface ColorScheme {
   primary: string;
   primaryLight: string;
   primaryDark: string;
-  
+
   // Secondary/accent colors
   secondary: string;
-  
+
   // Background colors
   background: string;
   surface: string;
-  
+
   // Text colors
   text: string;
   textSecondary: string;
   textMuted: string;
-  
+
   // Border colors
   border: string;
-  
+
   // Status colors
   success: string;
   warning: string;
@@ -90,14 +90,14 @@ export const BASE_COLORS = {
     accentLight: '#a39680',  // Lighter accent
     accentDark: '#7d7459',   // Darker accent
   },
-  
+
   // Navigation standardized colors
   navigation: {
     background: '#505c51',   // Standardized nav background
     text: '#ffffff',         // White text
     hover: 'rgba(255, 255, 255, 0.1)', // White hover overlay
   },
-  
+
   // Status colors
   status: {
     success: '#10b981',
@@ -105,7 +105,7 @@ export const BASE_COLORS = {
     error: '#ef4444',
     info: '#3b82f6',
   },
-  
+
   // Neutral colors for light mode
   light: {
     background: '#ffffff',
@@ -115,7 +115,7 @@ export const BASE_COLORS = {
     textMuted: '#64748b',
     border: '#e2e8f0',
   },
-  
+
   // Neutral colors for dark mode
   dark: {
     background: '#0f172a',
@@ -256,15 +256,15 @@ export function applyThemeToDocument(
   const colorScheme = getColorScheme(portal, mode);
   const navigation = getNavigationTheme();
   const properties = generateCSSCustomProperties(colorScheme, navigation);
-  
+
   Object.entries(properties).forEach(([property, value]) => {
     element.style.setProperty(property, value);
   });
-  
+
   // Set portal-specific class for additional styling
   element.classList.remove('portal-admin', 'portal-photographer', 'portal-client');
   element.classList.add(`portal-${portal}`);
-  
+
   // Set theme mode class
   element.classList.toggle('dark', mode === 'dark');
   element.classList.toggle('light', mode === 'light');
@@ -293,28 +293,30 @@ export const THEME_CLASSES = {
     background: 'bg-[var(--theme-nav-background)]',
     text: 'text-[var(--theme-nav-text)]',
     hover: 'hover:bg-[var(--theme-nav-hover)]',
+    logo: 'text-[var(--theme-nav-text)]',
+    active: 'bg-[var(--theme-nav-hover)]',
   },
-  
+
   // Button classes
   button: {
     primary: 'bg-[var(--theme-primary)] text-[var(--theme-nav-text)] hover:bg-[var(--theme-primary-dark)]',
     secondary: 'bg-[var(--theme-secondary)] text-[var(--theme-text)]',
     ghost: 'hover:bg-[var(--theme-surface)] text-[var(--theme-text)]',
   },
-  
+
   // Surface classes
   surface: {
     primary: 'bg-[var(--theme-background)] text-[var(--theme-text)]',
     card: 'bg-[var(--theme-surface)] border-[var(--theme-border)] text-[var(--theme-text)]',
   },
-  
+
   // Text classes
   text: {
     primary: 'text-[var(--theme-text)]',
     secondary: 'text-[var(--theme-text-secondary)]',
     muted: 'text-[var(--theme-text-muted)]',
   },
-  
+
   // Status classes
   status: {
     success: 'text-[var(--theme-success)] bg-[var(--theme-success)]/10 border-[var(--theme-success)]/20',

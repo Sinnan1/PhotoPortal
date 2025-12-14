@@ -5,18 +5,10 @@ import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { useAuth } from "@/lib/auth-context"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import {
   Form,
   FormControl,
@@ -28,7 +20,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { Loader2, Download, Heart, ShieldCheck } from "lucide-react"
+import { Loader2, Download, Heart, ShieldCheck, ArrowRight } from "lucide-react"
 
 // 1. Validation Schema
 const formSchema = z.object({
@@ -38,7 +30,7 @@ const formSchema = z.object({
 
 export default function ClientLoginPage() {
   const { clientLogin } = useAuth()
-  const { toast } = useToast()
+  const { showToast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,65 +40,75 @@ export default function ClientLoginPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       await clientLogin(values.email, values.password)
-      toast({ title: "Success!", description: "Welcome to your gallery." })
+      showToast("Welcome to your gallery.", "success")
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Please check your credentials.",
-      })
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Please check your credentials.",
+        "error"
+      )
     }
   }
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center p-6 bg-black/40">
-      {/* Background Image */}
-      <Image
-        src="/Client-Login.jpg"
-        alt="Client Login Background"
-        fill
-        className="object-cover -z-20 brightness-[0.55]"
-        priority
-      />
-
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/40 via-black/30 to-black/60" />
-
-      {/* Glassmorphism Card */}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black pt-16 md:pt-0">
+      {/* Cinematic Background with Slow Zoom */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-md"
+        initial={{ scale: 1.1 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 20, ease: "linear", repeat: Infinity, repeatType: "reverse" }}
+        className="absolute inset-0 z-0"
       >
-        <Card className="border border-white/20 bg-white/15 backdrop-blur-2xl shadow-2xl rounded-2xl">
-          <CardHeader className="text-center space-y-2">
-            <CardTitle className="text-3xl font-semibold tracking-tight text-white drop-shadow">
-              Client Lounge
-            </CardTitle>
-            <CardDescription className="text-gray-200">
-              Welcome. Sign in to access your private gallery.
-            </CardDescription>
-          </CardHeader>
+        <Image
+          src="/Client-Login.jpg"
+          alt="Client Login Background"
+          fill
+          className="object-cover opacity-60"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+      </motion.div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="grid gap-4">
-                {/* Email */}
+      {/* Main Content Container */}
+      <div className="relative z-10 w-full max-w-md px-6">
+        <motion.div
+          initial={{ opacity: 1, y: 0 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="space-y-8"
+        >
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <motion.div
+              initial={{ opacity: 1, scale: 1 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+            >
+              <h1 className="text-5xl md:text-6xl font-serif text-white tracking-wide drop-shadow-lg">
+                The Lounge
+              </h1>
+            </motion.div>
+            <p className="text-gray-300 font-light tracking-widest uppercase text-xs md:text-sm">
+              Private Gallery Access
+            </p>
+          </div>
+
+          {/* Minimal Form */}
+          <div className="backdrop-blur-md bg-white/5 border border-white/10 p-8 rounded-2xl shadow-2xl ring-1 ring-white/5">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-100">Email</FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs uppercase tracking-wider text-gray-400 pl-1">Email Address</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="name@example.com"
                           {...field}
-                          className="bg-white/20 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-[#d1b98b]"
+                          className="!bg-transparent !border-0 !border-b !border-white/20 !rounded-none px-1 py-6 text-lg !text-white placeholder:!text-gray-500 focus-visible:!ring-0 focus-visible:!border-white/60 transition-colors [&:-webkit-autofill]:transition-colors [&:-webkit-autofill]:duration-[50000s]"
                         />
                       </FormControl>
                       <FormMessage />
@@ -114,28 +116,19 @@ export default function ClientLoginPage() {
                   )}
                 />
 
-                {/* Password */}
                 <FormField
                   control={form.control}
                   name="password"
                   render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center">
-                        <FormLabel className="text-gray-100">
-                          Password
-                        </FormLabel>
-                        <Link
-                          href="/forgot-password-client"
-                          className="ml-auto text-sm text-gray-300 underline hover:text-white transition"
-                        >
-                          Forgot?
-                        </Link>
+                    <FormItem className="space-y-1">
+                      <div className="flex justify-between items-center pl-1">
+                        <FormLabel className="text-xs uppercase tracking-wider text-gray-400">Password</FormLabel>
                       </div>
                       <FormControl>
                         <PasswordInput
                           placeholder="••••••••"
                           {...field}
-                          className="bg-white/20 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-[#d1b98b]"
+                          className="!bg-transparent !border-0 !border-b !border-white/20 !rounded-none px-1 py-6 text-lg !text-white placeholder:!text-gray-500 focus-visible:!ring-0 focus-visible:!border-white/60 transition-colors [&:-webkit-autofill]:transition-colors [&:-webkit-autofill]:duration-[50000s]"
                         />
                       </FormControl>
                       <FormMessage />
@@ -143,49 +136,71 @@ export default function ClientLoginPage() {
                   )}
                 />
 
-                {/* Icons */}
-                <ul className="grid grid-cols-3 gap-3 pt-4 text-center text-xs text-gray-200">
-                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
-                    <Download className="h-4 w-4" />
-                    <span>Download</span>
-                  </li>
-                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
-                    <Heart className="h-4 w-4" />
-                    <span>Favorites</span>
-                  </li>
-                  <li className="flex flex-col items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 hover:bg-white/20 transition">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>Secure</span>
-                  </li>
-                </ul>
-              </CardContent>
-
-              <CardFooter className="flex flex-col gap-4 pb-6">
-                <Button
-                  type="submit"
-                  className="w-full bg-[#b19b75] hover:bg-[#a18c67] text-white"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Access Your Gallery
-                </Button>
-
-                <p className="text-center text-sm text-gray-300">
-                  Are you a photographer?{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-[#d1b98b] underline hover:text-[#f1d8a2] transition"
+                <div className="pt-4">
+                  <Button
+                    type="submit"
+                    className="group w-full h-14 bg-white text-black hover:bg-gray-200 text-lg font-medium tracking-wide transition-all duration-300 rounded-xl"
+                    disabled={form.formState.isSubmitting}
                   >
-                    Sign in here
-                  </Link>
-                </p>
-              </CardFooter>
-            </form>
-          </Form>
-        </Card>
-      </motion.div>
+                    {form.formState.isSubmitting ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        Enter Gallery <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </div>
+
+          {/* Feature Icons */}
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 1 }}
+            className="flex justify-center gap-8 text-gray-400"
+          >
+            <div className="flex flex-col items-center gap-2 group cursor-default">
+              <div className="p-3 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+                <Download className="h-4 w-4 text-gray-300" />
+              </div>
+              <span className="text-[10px] uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">High-Res</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 group cursor-default">
+              <div className="p-3 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+                <Heart className="h-4 w-4 text-gray-300" />
+              </div>
+              <span className="text-[10px] uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Favorites</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 group cursor-default">
+              <div className="p-3 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+                <ShieldCheck className="h-4 w-4 text-gray-300" />
+              </div>
+              <span className="text-[10px] uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Secure</span>
+            </div>
+          </motion.div>
+
+          {/* Footer */}
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="text-center"
+          >
+            <p className="text-sm text-gray-500">
+              Are you a photographer?{" "}
+              <Link
+                href="/login"
+                className="text-gray-300 hover:text-white transition-colors underline underline-offset-4 decoration-gray-500 hover:decoration-white"
+              >
+                Sign in here
+              </Link>
+            </p>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   )
 }

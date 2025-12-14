@@ -37,7 +37,7 @@ class ParallelThumbnailQueue {
         // Use all available CPU cores (or limit to 8 for safety)
         const cpuCount = os.cpus().length
         this.maxWorkers = Math.min(cpuCount, 8)
-        
+
         console.log(`🚀 Parallel Thumbnail Queue initialized with ${this.maxWorkers} workers (${cpuCount} CPUs available)`)
 
         // Prepare S3 config for workers
@@ -162,8 +162,14 @@ class ParallelThumbnailQueue {
         dimensions: { width: number; height: number }
     ): Promise<WorkerResult> {
         return new Promise((resolve, reject) => {
-            const workerPath = path.join(__dirname, '../workers/thumbnailWorker.js')
-            
+            // Determine correct worker path based on environment (development vs production)
+            const extension = __filename.endsWith('.ts') ? 'ts' : 'js';
+            const workerPath = path.join(__dirname, `../workers/thumbnailWorker.${extension}`);
+
+            // If we are in TypeScript (dev), we need to ensure the worker can run TS
+            // This is often handled automatically if running via ts-node, but pointing to the right file is step 1.
+
+
             const worker = new Worker(workerPath, {
                 workerData: {
                     photoId: job.photoId,

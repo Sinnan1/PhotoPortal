@@ -5,7 +5,11 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { useGallery, useUpdateGallery } from "@/hooks/queries/useGalleries"
+import { useCreateFolder, useRenameFolder, useDeleteFolder } from "@/hooks/queries/useFolders"
+import { useDeletePhoto } from "@/hooks/queries/usePhotos"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,65 +19,46 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder, FileSpreadsheet, Heart, Star, Eye, FolderPlus, Search, Calendar, Lock, Download as DownloadIcon } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Upload, Save, ArrowLeft, Images, Settings, Loader2, Folder as FolderIcon, FileSpreadsheet, Heart, Star, Eye, FolderPlus, Search, Calendar, Lock, Download as DownloadIcon, LockKeyhole } from "lucide-react"
 import Link from "next/link"
-import { FolderTree } from "@/components/folder-tree"
-import { FileList } from "@/components/file-list"
+import { FolderTree } from "@/components/gallery/folder-tree"
+import { FileList } from "@/components/gallery/file-list"
 import { uploadManager } from "@/lib/upload-manager"
 import { UploadProgressPanel } from "@/components/ui/upload-progress-panel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { uploadFileToB2 } from '@/lib/uploadUtils'
-
-interface Photo {
-  id: string
-  filename: string
-  thumbnailUrl: string
-  originalUrl: string
-  createdAt: string
-  likedBy: { userId: string }[]
-  favoritedBy: { userId: string }[]
-  postBy: { userId: string }[]
-}
-
-interface Folder {
-  id: string
-  name: string
-  children: Folder[]
-  photos: Photo[]
-  coverPhoto?: Photo
-  _count: {
-    photos: number
-    children: number
-  }
-}
-
-interface Gallery {
-  id: string
-  title: string
-  description: string
-  password: string | null
-  expiresAt: string | null
-  downloadLimit: number | null
-  downloadCount: number
-  folders: Folder[]
-}
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
+import type { Photo, Folder, Gallery } from "@/types"
 
 export default function ManageGalleryPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const galleryId = params.id as string
-  const [gallery, setGallery] = useState<Gallery | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const { data: gallery, isLoading: loading } = useGallery(galleryId)
+  const updateGalleryMutation = useUpdateGallery()
+  const createFolderMutation = useCreateFolder()
+  const renameFolderMutation = useRenameFolder()
+  const deleteFolderMutation = useDeleteFolder()
+  const deletePhotoMutation = useDeletePhoto()
 
   // Folder management state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
-  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null)
   const [compressBeforeUpload, setCompressBeforeUpload] = useState(false)
+
+  // Derived selected folder
+  const selectedFolder = gallery?.folders?.find(f => f.id === selectedFolderId) || null
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -91,11 +76,33 @@ export default function ManageGalleryPage() {
   const [isExportingLiked, setIsExportingLiked] = useState(false)
   const [isExportingFavorited, setIsExportingFavorited] = useState(false)
 
+  // CSV export state
+  const [isExportingLikedCSV, setIsExportingLikedCSV] = useState(false)
+  const [isExportingFavoritedCSV, setIsExportingFavoritedCSV] = useState(false)
 
+  // Lock selection state
+  const [isLocked, setIsLocked] = useState(false)
+
+  useEffect(() => {
+    if (gallery) {
+      setFormData({
+        title: gallery.title,
+        description: gallery.description || "",
+        password: gallery.password || "",
+        expiresAt: gallery.expiresAt ? new Date(gallery.expiresAt).toISOString().slice(0, 16) : "",
+        downloadLimit: gallery.downloadLimit?.toString() || "",
+      })
+      setIsLocked(gallery.isLocked || false)
+
+      // Set default folder if none selected
+      if (!selectedFolderId && gallery.folders && gallery.folders.length > 0) {
+        setSelectedFolderId(gallery.folders[0].id)
+      }
+    }
+  }, [gallery, selectedFolderId])
 
   useEffect(() => {
     if (user?.role === "PHOTOGRAPHER") {
-      fetchGallery()
       fetchPhotoStats()
     }
   }, [user, galleryId])
@@ -123,36 +130,9 @@ export default function ManageGalleryPage() {
     }
   }, [])
 
-  const fetchGallery = async () => {
-    try {
-      const response = await api.getGallery(galleryId)
-      const galleryData = response.data
-      setGallery(galleryData)
-      setFormData({
-        title: galleryData.title,
-        description: galleryData.description || "",
-        password: galleryData.password || "",
-        expiresAt: galleryData.expiresAt ? new Date(galleryData.expiresAt).toISOString().slice(0, 16) : "",
-        downloadLimit: galleryData.downloadLimit?.toString() || "",
-      })
-
-      // Set default folder (first folder or create one)
-      if (galleryData.folders && galleryData.folders.length > 0) {
-        const defaultFolder = galleryData.folders[0]
-        setSelectedFolderId(defaultFolder.id)
-        setSelectedFolder(defaultFolder)
-      }
-    } catch (error) {
-      showToast("Failed to load gallery", "error")
-      router.push("/dashboard")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSaving(true)
+    // setSaving(true) // Handled by mutation
 
     try {
       const updateData = {
@@ -161,15 +141,13 @@ export default function ManageGalleryPage() {
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
+        isLocked: isLocked,
       }
 
-      await api.updateGallery(galleryId, updateData)
+      await updateGalleryMutation.mutateAsync({ id: galleryId, data: updateData })
       showToast("Gallery settings updated successfully", "success")
-      fetchGallery()
     } catch (error) {
       showToast("Failed to update gallery settings", "error")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -251,8 +229,8 @@ export default function ManageGalleryPage() {
         if (!hasActiveUploads && selectedFolderId) {
           clearInterval(checkInterval)
           // Refresh folder to show new photos
-          const response = await api.getFolder(selectedFolderId)
-          setSelectedFolder(response.data)
+          queryClient.invalidateQueries({ queryKey: ["gallery", galleryId] })
+          queryClient.invalidateQueries({ queryKey: ["folder", selectedFolderId] })
         }
       }, 2000)
 
@@ -267,13 +245,7 @@ export default function ManageGalleryPage() {
 
   // Folder management functions
   const handleFolderSelect = async (folderId: string) => {
-    try {
-      const response = await api.getFolder(folderId)
-      setSelectedFolderId(folderId)
-      setSelectedFolder(response.data)
-    } catch (error) {
-      showToast("Failed to load folder", "error")
-    }
+    setSelectedFolderId(folderId)
   }
 
   const handleCreateFolder = async (parentId?: string) => {
@@ -281,12 +253,12 @@ export default function ManageGalleryPage() {
     if (!folderName || !folderName.trim()) return
 
     try {
-      await api.createFolder(galleryId, {
+      await createFolderMutation.mutateAsync({
+        galleryId,
         name: folderName.trim(),
         parentId: parentId || undefined
       })
       showToast("Folder created successfully", "success")
-      fetchGallery() // Refresh to get updated folder structure
     } catch (error) {
       showToast("Failed to create folder", "error")
     }
@@ -294,14 +266,8 @@ export default function ManageGalleryPage() {
 
   const handleRenameFolder = async (folderId: string, newName: string) => {
     try {
-      await api.updateFolder(folderId, { name: newName })
+      await renameFolderMutation.mutateAsync({ folderId, name: newName })
       showToast("Folder renamed successfully", "success")
-      fetchGallery()
-
-      // Update selected folder if it's the one being renamed
-      if (selectedFolderId === folderId) {
-        setSelectedFolder(prev => prev ? { ...prev, name: newName } : null)
-      }
     } catch (error) {
       showToast("Failed to rename folder", "error")
     }
@@ -309,14 +275,12 @@ export default function ManageGalleryPage() {
 
   const handleDeleteFolder = async (folderId: string) => {
     try {
-      await api.deleteFolder(folderId)
+      await deleteFolderMutation.mutateAsync(folderId)
       showToast("Folder deleted successfully", "success")
-      fetchGallery()
 
       // Reset selection if deleted folder was selected
       if (selectedFolderId === folderId) {
         setSelectedFolderId(null)
-        setSelectedFolder(null)
       }
     } catch (error) {
       showToast("Failed to delete folder", "error")
@@ -329,20 +293,8 @@ export default function ManageGalleryPage() {
     if (!confirm("Are you sure you want to delete this photo?")) return
 
     try {
-      await api.deletePhoto(photoId)
+      await deletePhotoMutation.mutateAsync(photoId)
       showToast("Photo deleted successfully", "success")
-
-      // Update local state
-      if (selectedFolder) {
-        setSelectedFolder(prev => prev ? {
-          ...prev,
-          photos: prev.photos.filter(p => p.id !== photoId),
-          _count: {
-            ...prev._count,
-            photos: (prev._count?.photos ?? 0) - 1
-          }
-        } : null)
-      }
     } catch (error) {
       showToast("Failed to delete photo", "error")
     }
@@ -373,6 +325,36 @@ export default function ManageGalleryPage() {
     } catch (error) {
       console.error("Failed to export to Excel:", error)
       showToast("Failed to export to Excel", "error")
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExportToCSV = async (filterType: 'liked' | 'favorited') => {
+    const setExporting = filterType === 'liked' ? setIsExportingLikedCSV : setIsExportingFavoritedCSV
+
+    setExporting(true)
+    try {
+      const exportFunc = filterType === 'liked'
+        ? api.exportLikedPhotosToCSV
+        : api.exportFavoritedPhotosToCSV
+
+      const { blob, filename } = await exportFunc(galleryId)
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      showToast(`CSV file downloaded: ${filename}`, "success")
+    } catch (error) {
+      console.error("Failed to export to CSV:", error)
+      showToast("Failed to export to CSV", "error")
     } finally {
       setExporting(false)
     }
@@ -545,34 +527,62 @@ export default function ManageGalleryPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         {photoStats && photoStats.likedCount > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportToExcel('liked')}
-                            disabled={isExportingLiked}
-                          >
-                            {isExportingLiked ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Heart className="h-4 w-4 mr-2 text-red-500" />
-                            )}
-                            Export Liked ({photoStats.likedCount})
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isExportingLiked || isExportingLikedCSV}
+                              >
+                                {isExportingLiked || isExportingLikedCSV ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Heart className="h-4 w-4 mr-2 text-red-500" />
+                                )}
+                                Export Liked ({photoStats.likedCount})
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleExportToExcel('liked')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                                as Excel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportToCSV('liked')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-600" />
+                                as CSV
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         {photoStats && photoStats.favoritedCount > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportToExcel('favorited')}
-                            disabled={isExportingFavorited}
-                          >
-                            {isExportingFavorited ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Star className="h-4 w-4 mr-2 text-yellow-500" />
-                            )}
-                            Export Starred ({photoStats.favoritedCount})
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isExportingFavorited || isExportingFavoritedCSV}
+                              >
+                                {isExportingFavorited || isExportingFavoritedCSV ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Star className="h-4 w-4 mr-2 text-yellow-500" />
+                                )}
+                                Export Starred ({photoStats.favoritedCount})
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleExportToExcel('favorited')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                                as Excel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportToCSV('favorited')}>
+                                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-600" />
+                                as CSV
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </div>
@@ -593,7 +603,7 @@ export default function ManageGalleryPage() {
                       folder={{
                         ...selectedFolder,
                         photos: searchQuery
-                          ? selectedFolder.photos.filter(photo =>
+                          ? (selectedFolder.photos ?? []).filter(photo =>
                             photo.filename.toLowerCase().includes(searchQuery.toLowerCase())
                           )
                           : selectedFolder.photos
@@ -603,7 +613,7 @@ export default function ManageGalleryPage() {
                       onFolderRename={handleRenameFolder}
                       onFolderDelete={handleDeleteFolder}
                     />
-                    {searchQuery && selectedFolder.photos.filter(photo =>
+                    {searchQuery && (selectedFolder.photos ?? []).filter(photo =>
                       photo.filename.toLowerCase().includes(searchQuery.toLowerCase())
                     ).length === 0 && (
                         <div className="text-center py-8 text-muted-foreground">
@@ -616,7 +626,7 @@ export default function ManageGalleryPage() {
                 <Card>
                   <CardContent className="text-center py-20">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/50 mb-6">
-                      <Folder className="h-10 w-10 text-muted-foreground" />
+                      <FolderIcon className="h-10 w-10 text-muted-foreground" />
                     </div>
                     <h3 className="text-xl font-semibold mb-2">Select a Folder</h3>
                     <p className="text-muted-foreground max-w-sm mx-auto">
@@ -716,10 +726,35 @@ export default function ManageGalleryPage() {
                     </div>
                   </div>
 
+                  {/* Lock Selection */}
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="isLocked" className="flex items-center gap-2 text-sm font-medium">
+                          <LockKeyhole className="h-4 w-4" />
+                          Lock Selection
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          When enabled, clients cannot add or remove likes/favorites
+                        </p>
+                      </div>
+                      <Switch
+                        id="isLocked"
+                        checked={isLocked}
+                        onCheckedChange={setIsLocked}
+                      />
+                    </div>
+                    {isLocked && (
+                      <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
+                        Selection is currently locked. Clients will see a message and cannot modify their selections.
+                      </p>
+                    )}
+                  </div>
+
                   {/* Save Button */}
                   <div className="pt-4">
-                    <Button type="submit" size="lg" disabled={saving} className="w-full sm:w-auto">
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" size="lg" disabled={updateGalleryMutation.isPending} className="w-full sm:w-auto">
+                      {updateGalleryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       <Save className="mr-2 h-4 w-4" />
                       Save Settings
                     </Button>

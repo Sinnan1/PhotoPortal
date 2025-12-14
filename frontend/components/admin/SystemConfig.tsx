@@ -99,80 +99,76 @@ export default function SystemConfig({
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="space-y-6">
             {/* Header */}
-            <div className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="py-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-900">System Configuration</h1>
-                                <p className="mt-1 text-sm text-gray-500">
-                                    Manage platform settings, security policies, and business rules
-                                </p>
-                            </div>
-
-                            {hasUnsavedChanges && (
-                                <div className="flex items-center space-x-3">
-                                    <span className="text-sm text-amber-600 font-medium">
-                                        {Object.keys(pendingChanges).length} unsaved change(s)
-                                    </span>
-                                    <button
-                                        onClick={handleDiscardChanges}
-                                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-                                    >
-                                        Discard
-                                    </button>
-                                    <button
-                                        onClick={() => handleSaveChanges()}
-                                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                                    >
-                                        Save Changes
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="mt-6">
-                            <nav className="flex space-x-8">
-                                {tabs.map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <span>{tab.icon}</span>
-                                        <span>{tab.name}</span>
-                                    </button>
-                                ))}
-                            </nav>
-                        </div>
+            <div className="border-b border-border pb-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">System Configuration</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Manage platform settings, security policies, and business rules
+                        </p>
                     </div>
+
+                    {hasUnsavedChanges && (
+                        <div className="flex items-center space-x-3">
+                            <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                                {Object.keys(pendingChanges).length} unsaved change(s)
+                            </span>
+                            <button
+                                onClick={handleDiscardChanges}
+                                className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted text-foreground"
+                            >
+                                Discard
+                            </button>
+                            <button
+                                onClick={() => handleSaveChanges()}
+                                className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Tabs */}
+                <div className="mt-6">
+                    <nav className="flex space-x-8">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                                    }`}
+                            >
+                                <span>{tab.icon}</span>
+                                <span>{tab.name}</span>
+                            </button>
+                        ))}
+                    </nav>
                 </div>
             </div>
 
             {/* Content */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div>
                 {activeTab === 'settings' && (
                     <div className="flex gap-8">
                         {/* Sidebar */}
                         <div className="w-64 flex-shrink-0">
-                            <div className="bg-white rounded-lg shadow-sm border">
-                                <div className="p-4 border-b">
+                            <div className="bg-card rounded-lg shadow-sm border border-border">
+                                <div className="p-4 border-b border-border">
                                     <div className="relative">
                                         <input
                                             type="text"
                                             placeholder="Search settings..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-full pl-8 pr-4 py-2 border border-border bg-background text-foreground rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
                                         />
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-gray-400">🔍</span>
+                                            <span className="text-muted-foreground">🔍</span>
                                         </div>
                                     </div>
                                 </div>
@@ -183,8 +179,8 @@ export default function SystemConfig({
                                             key={category.id}
                                             onClick={() => setSelectedCategory(category.id)}
                                             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium ${selectedCategory === category.id
-                                                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500'
-                                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                ? 'bg-primary/10 text-primary border-r-2 border-primary'
+                                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                                 }`}
                                         >
                                             <span>{category.icon}</span>

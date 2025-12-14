@@ -40,12 +40,12 @@ export function ClientWelcomeModal({
             Welcome to Your Gallery
           </AlertDialogTitle>
         </AlertDialogHeader>
-        
+
         <div className="space-y-4 px-6 overflow-y-auto flex-1">
           <div className="text-center text-muted-foreground">
             For the best experience viewing and downloading your photos:
           </div>
-          
+
           <div className="space-y-3">
             <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
               <Monitor className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
@@ -82,9 +82,9 @@ export function ClientWelcomeModal({
             Following these tips will ensure smooth downloads and the best viewing experience.
           </div>
         </div>
-        
+
         <AlertDialogFooter>
-          <AlertDialogAction onClick={handleDismiss} className="w-full">
+          <AlertDialogAction onClick={handleDismiss} className="w-full h-12 text-base">
             Got it, thanks!
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import type { PhotoWithCounts, Gallery } from "@/types";
 
 interface Totals {
   photos: number;
@@ -33,29 +34,12 @@ interface Totals {
   clients: number;
 }
 
-interface Photo {
-  id: string;
-  filename: string;
-  thumbnailUrl: string;
-  originalUrl: string;
-  _count: {
-    likedBy?: number;
-    favoritedBy?: number;
-  };
-}
-
-interface Gallery {
-  id: string;
-  title: string;
-  downloadCount: number;
-}
-
 export default function AnalyticsPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [totals, setTotals] = useState<Totals | null>(null);
-  const [mostLikedPhotos, setMostLikedPhotos] = useState<Photo[]>([]);
-  const [mostFavoritedPhotos, setMostFavoritedPhotos] = useState<Photo[]>([]);
+  const [mostLikedPhotos, setMostLikedPhotos] = useState<PhotoWithCounts[]>([]);
+  const [mostFavoritedPhotos, setMostFavoritedPhotos] = useState<PhotoWithCounts[]>([]);
   const [mostViewedGalleries, setMostViewedGalleries] = useState<Gallery[]>([]);
   const [loading, setLoading] = useState(true);
 

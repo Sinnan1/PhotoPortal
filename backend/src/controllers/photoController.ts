@@ -30,7 +30,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
 	uploadToS3,
 	deleteFromS3,
@@ -524,7 +524,7 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 				stream.removeListener("error", errorHandler);
 				stream.removeListener("end", endHandler);
 				res.removeListener("close", closeHandler);
-				
+
 				if (stream && typeof stream.destroy === 'function' && !stream.destroyed) {
 					stream.destroy();
 					console.log("🧹 Stream destroyed and cleaned up");
@@ -602,9 +602,9 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 			const originalUrl = new URL(photo.originalUrl);
 			const pathParts = originalUrl.pathname.split("/").filter(p => p.length > 0);
 			const originalKey = pathParts.slice(1).join("/"); // Skip bucket name
-			
+
 			console.log(`🗑️ Deleting photo ${id}: ${originalKey}`);
-			
+
 			const deletePromises = [
 				deleteFromS3(originalKey).catch((err) => {
 					console.warn("Failed to delete original:", err);
@@ -617,9 +617,9 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 				const thumbnailUrl = new URL(photo.thumbnailUrl);
 				const thumbnailPathParts = thumbnailUrl.pathname.split("/").filter(p => p.length > 0);
 				const thumbnailKey = thumbnailPathParts.slice(1).join("/"); // Skip bucket name
-				
+
 				console.log(`🗑️ Deleting thumbnail: ${thumbnailKey}`);
-				
+
 				deletePromises.push(
 					deleteFromS3(thumbnailKey).catch((err) => {
 						console.warn("Failed to delete thumbnail:", err);
@@ -730,6 +730,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists
 		const photo = await prisma.photo.findUnique({
@@ -738,7 +739,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -746,6 +747,14 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot like photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Sync likes across photographer and all clients with access to this gallery
@@ -791,6 +800,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists to derive gallery
 		const photo = await prisma.photo.findUnique({
@@ -799,7 +809,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -807,6 +817,14 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot unlike photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Get gallery owner and all clients with access
@@ -843,6 +861,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		const photo = await prisma.photo.findUnique({
 			where: { id },
@@ -850,7 +869,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -858,6 +877,14 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot favorite photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Sync favorites across photographer and all clients with access
@@ -898,6 +925,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params;
 		const userId = req.user!.id;
+		const userRole = req.user!.role;
 
 		// Ensure photo exists to derive gallery
 		const photo = await prisma.photo.findUnique({
@@ -906,7 +934,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true },
+							select: { id: true, photographerId: true, isLocked: true },
 						},
 					},
 				},
@@ -914,6 +942,14 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 		});
 		if (!photo) {
 			return res.status(404).json({ success: false, error: "Photo not found" });
+		}
+
+		// Check if gallery is locked (clients cannot unfavorite photos in locked galleries)
+		if (photo.folder.gallery.isLocked && userRole !== 'PHOTOGRAPHER' && userRole !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Selection is locked for this gallery"
+			});
 		}
 
 		// Get gallery owner and all clients with access
@@ -1556,6 +1592,11 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 					}
 				},
 				likedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
 					select: {
 						user: {
 							select: {
@@ -1594,32 +1635,41 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 			})
 		);
 
-		// Create workbook and worksheet
-		const workbook = XLSX.utils.book_new();
-		const worksheet = XLSX.utils.json_to_sheet(excelData);
+		// Create workbook and worksheet using ExcelJS
+		const workbook = new ExcelJS.Workbook();
+		const worksheet = workbook.addWorksheet('Liked Photos');
 
-		// Set column widths
-		worksheet['!cols'] = [
-			{ wch: 5 },  // #
-			{ wch: 50 }, // Filename
-			{ wch: 20 }, // Folder
-			{ wch: 30 }, // Liked By
-			{ wch: 15 }  // Liked Date
+		// Set column headers and widths
+		worksheet.columns = [
+			{ header: '#', key: 'num', width: 5 },
+			{ header: 'Filename', key: 'filename', width: 50 },
+			{ header: 'Folder', key: 'folder', width: 20 },
+			{ header: 'Liked By', key: 'likedBy', width: 30 },
+			{ header: 'Liked Date', key: 'likedDate', width: 15 }
 		];
 
-		XLSX.utils.book_append_sheet(workbook, worksheet, 'Liked Photos');
+		// Add data rows
+		excelData.forEach(row => {
+			worksheet.addRow({
+				num: row['#'],
+				filename: row['Filename'],
+				folder: row['Folder'],
+				likedBy: row['Liked By'],
+				likedDate: row['Liked Date']
+			});
+		});
 
 		// Generate Excel file buffer
-		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		const excelBuffer = await workbook.xlsx.writeBuffer();
 
 		// Set response headers
 		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_liked_photos.xlsx`;
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-		res.setHeader('Content-Length', excelBuffer.length);
+		res.setHeader('Content-Length', excelBuffer.byteLength);
 
 		// Send the file
-		res.send(excelBuffer);
+		res.send(Buffer.from(excelBuffer));
 
 	} catch (error) {
 		console.error("Export liked photos to Excel error:", error);
@@ -1689,6 +1739,11 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 					}
 				},
 				favoritedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
 					select: {
 						user: {
 							select: {
@@ -1727,35 +1782,319 @@ export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Respon
 			})
 		);
 
-		// Create workbook and worksheet
-		const workbook = XLSX.utils.book_new();
-		const worksheet = XLSX.utils.json_to_sheet(excelData);
+		// Create workbook and worksheet using ExcelJS
+		const workbook = new ExcelJS.Workbook();
+		const worksheet = workbook.addWorksheet('Favorited Photos');
 
-		// Set column widths
-		worksheet['!cols'] = [
-			{ wch: 5 },  // #
-			{ wch: 50 }, // Filename
-			{ wch: 20 }, // Folder
-			{ wch: 30 }, // Favorited By
-			{ wch: 15 }  // Favorited Date
+		// Set column headers and widths
+		worksheet.columns = [
+			{ header: '#', key: 'num', width: 5 },
+			{ header: 'Filename', key: 'filename', width: 50 },
+			{ header: 'Folder', key: 'folder', width: 20 },
+			{ header: 'Favorited By', key: 'favoritedBy', width: 30 },
+			{ header: 'Favorited Date', key: 'favoritedDate', width: 15 }
 		];
 
-		XLSX.utils.book_append_sheet(workbook, worksheet, 'Favorited Photos');
+		// Add data rows
+		excelData.forEach(row => {
+			worksheet.addRow({
+				num: row['#'],
+				filename: row['Filename'],
+				folder: row['Folder'],
+				favoritedBy: row['Favorited By'],
+				favoritedDate: row['Favorited Date']
+			});
+		});
 
 		// Generate Excel file buffer
-		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		const excelBuffer = await workbook.xlsx.writeBuffer();
 
 		// Set response headers
 		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_favorited_photos.xlsx`;
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-		res.setHeader('Content-Length', excelBuffer.length);
+		res.setHeader('Content-Length', excelBuffer.byteLength);
 
 		// Send the file
-		res.send(excelBuffer);
+		res.send(Buffer.from(excelBuffer));
 
 	} catch (error) {
 		console.error("Export favorited photos to Excel error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
+		}
+	}
+};
+
+// Helper function to convert data to CSV format
+const convertToCSV = (data: any[]): string => {
+	if (data.length === 0) return '';
+
+	// Get headers from first object
+	const headers = Object.keys(data[0]);
+
+	// Escape CSV fields (handle commas, quotes, newlines)
+	const escapeCSVField = (field: any): string => {
+		if (field === null || field === undefined) return '';
+		const str = String(field);
+		// If field contains comma, quote, or newline, wrap in quotes and escape quotes
+		if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+			return `"${str.replace(/"/g, '""')}"`;
+		}
+		return str;
+	};
+
+	// Create header row
+	const headerRow = headers.map(escapeCSVField).join(',');
+
+	// Create data rows
+	const dataRows = data.map(row =>
+		headers.map(header => escapeCSVField(row[header])).join(',')
+	);
+
+	return [headerRow, ...dataRows].join('\n');
+};
+
+// Export liked photos filenames to CSV (Photographer/Admin only)
+export const exportLikedPhotosToCSV = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Access denied. Photographers only.",
+			});
+		}
+
+		// Get gallery info and verify ownership
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				title: true,
+				photographerId: true
+			}
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL liked photos from ALL clients
+		const likedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				likedBy: {
+					some: {}  // Get all liked photos
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				},
+				likedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (likedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No liked photos found",
+			});
+		}
+
+		// Prepare data for CSV - one row per client like
+		let rowNumber = 0;
+		const csvData = likedPhotos.flatMap(photo =>
+			photo.likedBy.map((like) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Liked By': like.user.name || like.user.email,
+					'Liked Date': like.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
+
+		// Convert to CSV
+		const csv = convertToCSV(csvData);
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_liked_photos.csv`;
+		res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
+
+		// Send the file
+		res.send(csv);
+
+	} catch (error) {
+		console.error("Export liked photos to CSV error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				error: error instanceof Error ? error.message : "Internal server error",
+			});
+		}
+	}
+};
+
+// Export favorited photos filenames to CSV (Photographer/Admin only)
+export const exportFavoritedPhotosToCSV = async (req: AuthRequest, res: Response) => {
+	try {
+		const { galleryId } = req.params;
+		const userId = req.user!.id;
+
+		// Verify user is photographer or admin
+		if (req.user!.role !== 'PHOTOGRAPHER' && req.user!.role !== 'ADMIN') {
+			return res.status(403).json({
+				success: false,
+				error: "Access denied. Photographers only.",
+			});
+		}
+
+		// Get gallery info and verify ownership
+		const gallery = await prisma.gallery.findUnique({
+			where: { id: galleryId },
+			select: {
+				title: true,
+				photographerId: true
+			}
+		});
+
+		if (!gallery) {
+			return res.status(404).json({
+				success: false,
+				error: "Gallery not found",
+			});
+		}
+
+		// Verify ownership (unless admin)
+		if (req.user!.role !== 'ADMIN' && gallery.photographerId !== userId) {
+			return res.status(403).json({
+				success: false,
+				error: "You don't have permission to export this gallery's data",
+			});
+		}
+
+		// Get ALL favorited photos from ALL clients
+		const favoritedPhotos = await prisma.photo.findMany({
+			where: {
+				folder: {
+					galleryId: galleryId
+				},
+				favoritedBy: {
+					some: {}  // Get all favorited photos
+				},
+			},
+			select: {
+				filename: true,
+				createdAt: true,
+				folder: {
+					select: {
+						name: true
+					}
+				},
+				favoritedBy: {
+					where: {
+						userId: {
+							not: gallery.photographerId
+						}
+					},
+					select: {
+						user: {
+							select: {
+								name: true,
+								email: true
+							}
+						},
+						createdAt: true
+					}
+				}
+			},
+			orderBy: {
+				filename: 'asc'
+			}
+		});
+
+		if (favoritedPhotos.length === 0) {
+			return res.status(404).json({
+				success: false,
+				error: "No favorited photos found",
+			});
+		}
+
+		// Prepare data for CSV - one row per client favorite
+		let rowNumber = 0;
+		const csvData = favoritedPhotos.flatMap(photo =>
+			photo.favoritedBy.map((favorite) => {
+				rowNumber++;
+				return {
+					'#': rowNumber,
+					'Filename': photo.filename,
+					'Folder': photo.folder?.name || 'Root',
+					'Favorited By': favorite.user.name || favorite.user.email,
+					'Favorited Date': favorite.createdAt.toISOString().split('T')[0]
+				};
+			})
+		);
+
+		// Convert to CSV
+		const csv = convertToCSV(csvData);
+
+		// Set response headers
+		const filename = `${gallery.title.replace(/[^a-z0-9]/gi, '_')}_favorited_photos.csv`;
+		res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
+
+		// Send the file
+		res.send(csv);
+
+	} catch (error) {
+		console.error("Export favorited photos to CSV error:", error);
 		if (!res.headersSent) {
 			res.status(500).json({
 				success: false,

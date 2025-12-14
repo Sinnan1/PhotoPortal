@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { deleteFromS3 } from '../utils/s3Storage'
 import jwt from 'jsonwebtoken'
@@ -98,18 +98,9 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 						}
 						: undefined,
 				folders: {
+					orderBy: { createdAt: 'asc' },
+					take: 1, // Only get first folder for cover
 					include: {
-						photos: {
-							select: {
-								fileSize: true,
-								_count: {
-									select: {
-										likedBy: true,
-										favoritedBy: true
-									}
-								}
-							}
-						},
 						coverPhoto: {
 							select: {
 								id: true,
@@ -119,6 +110,15 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 								largeUrl: true,
 								originalUrl: true,
 								createdAt: true
+							}
+						},
+						photos: {
+							take: 1, // Fallback for cover
+							select: {
+								fileSize: true,
+								thumbnailUrl: true,
+								originalUrl: true,
+								mediumUrl: true
 							}
 						},
 						_count: {
@@ -133,25 +133,39 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 			orderBy: { createdAt: 'desc' }
 		})
 
+		// Fetch stats efficiently using raw query
+		const galleryIds = galleries.map(g => g.id);
+		let statsMap = new Map();
+
+		if (galleryIds.length > 0) {
+			const stats = await prisma.$queryRaw`
+				SELECT 
+					g.id as "galleryId",
+					COALESCE(SUM(p."fileSize"), 0) as "totalSize",
+					COUNT(DISTINCT lp."photoId") as "likedCount",
+					COUNT(DISTINCT fp."photoId") as "favoritedCount"
+				FROM galleries g
+				JOIN folders f ON f."galleryId" = g.id
+				JOIN photos p ON p."folderId" = f.id
+				LEFT JOIN liked_photos lp ON lp."photoId" = p.id
+				LEFT JOIN favorited_photos fp ON fp."photoId" = p.id
+				WHERE g.id IN (${Prisma.join(galleryIds)})
+				GROUP BY g.id
+			` as any[];
+
+			stats.forEach(stat => {
+				statsMap.set(stat.galleryId, {
+					totalSize: Number(stat.totalSize),
+					likedCount: Number(stat.likedCount),
+					favoritedCount: Number(stat.favoritedCount)
+				});
+			});
+		}
+
 		const galleriesWithStats = galleries.map((gallery) => {
-			let uniqueLikedPhotos = 0;
-			let uniqueFavoritedPhotos = 0;
+			const stats = statsMap.get(gallery.id) || { totalSize: 0, likedCount: 0, favoritedCount: 0 };
 
-			const totalSize = gallery.folders.reduce((acc, folder) => {
-				const folderSize = folder.photos.reduce((photoAcc, photo) => {
-					// Count unique photos that have at least one like/favorite
-					if (photo._count.likedBy > 0) {
-						uniqueLikedPhotos++;
-					}
-					if (photo._count.favoritedBy > 0) {
-						uniqueFavoritedPhotos++;
-					}
-					return photoAcc + (photo.fileSize || 0);
-				}, 0);
-				return acc + folderSize;
-			}, 0);
-
-			// remove photos from response to keep payload light
+			// Remove photos to match response type expected by frontend
 			gallery.folders.forEach(f => {
 				// @ts-ignore
 				delete f.photos;
@@ -159,11 +173,11 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 
 			return {
 				...gallery,
-				totalSize,
+				totalSize: stats.totalSize,
 				_count: {
 					...gallery._count,
-					likedBy: uniqueLikedPhotos,
-					favoritedBy: uniqueFavoritedPhotos,
+					likedBy: stats.likedCount,
+					favoritedBy: stats.favoritedCount,
 				},
 			};
 		});
@@ -190,6 +204,7 @@ export const getGallery = async (req: Request, res: Response) => {
 			include: {
 				folders: {
 					where: { parentId: null }, // Only get root folders
+					orderBy: { createdAt: 'asc' },
 					include: {
 						photos: {
 							include: {
@@ -277,13 +292,13 @@ export const getGallery = async (req: Request, res: Response) => {
 			try {
 				const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
 				const userId = decoded.userId as string
-				
+
 				// Get user's download permission
 				const user = await prisma.user.findUnique({
 					where: { id: userId },
 					select: { canDownload: true, role: true }
 				})
-				
+
 				// Only restrict downloads for clients, not photographers
 				if (user && user.role === 'CLIENT') {
 					canDownload = user.canDownload
@@ -404,7 +419,7 @@ export const verifyGalleryPassword = async (req: Request, res: Response) => {
 export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const { title, description, password, expiresAt, downloadLimit } = req.body
+		const { title, description, password, expiresAt, downloadLimit, groupId, isLocked } = req.body
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -431,6 +446,8 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 		if (title !== undefined) updateData.title = title
 		if (description !== undefined) updateData.description = description
 		if (downloadLimit !== undefined) updateData.downloadLimit = downloadLimit
+		if (groupId !== undefined) updateData.groupId = groupId
+		if (isLocked !== undefined) updateData.isLocked = isLocked
 
 		// Handle password update
 		if (password !== undefined) {
@@ -634,10 +651,145 @@ export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
 
 		res.json({ success: true, message: 'Gallery unfavorited' });
 	} catch (error) {
-		console.error('Unfavorite gallery error:', error);
 		res.status(500).json({ success: false, error: 'Internal server error' });
 	}
 };
+
+export const searchGalleries = async (req: AuthRequest, res: Response) => {
+	try {
+		const userId = req.user!.id
+		const userRole = req.user!.role
+		const { q, startDate, endDate } = req.query
+
+		// Build where clause
+		const where: any = {}
+
+		// Role-based access control
+		if (userRole === 'PHOTOGRAPHER') {
+			where.photographerId = userId
+		} else if (userRole === 'CLIENT') {
+			// Clients can only search galleries they have access to
+			const accessibleGalleries = await prisma.galleryAccess.findMany({
+				where: { userId },
+				select: { galleryId: true }
+			})
+			where.id = { in: accessibleGalleries.map(a => a.galleryId) }
+		}
+
+		// Text search
+		if (q) {
+			const query = q.toString()
+			where.OR = [
+				{ title: { contains: query, mode: 'insensitive' } },
+				{ description: { contains: query, mode: 'insensitive' } }
+			]
+		}
+
+		// Date range filter
+		if (startDate || endDate) {
+			where.shootDate = {}
+			if (startDate) {
+				where.shootDate.gte = new Date(startDate as string)
+			}
+			if (endDate) {
+				where.shootDate.lte = new Date(endDate as string)
+			}
+		}
+
+		const galleries = await prisma.gallery.findMany({
+			where,
+			select: {
+				id: true,
+				title: true,
+				description: true,
+				shootDate: true,
+				createdAt: true,
+				folders: {
+					orderBy: { createdAt: 'asc' },
+					select: {
+						coverPhoto: {
+							select: {
+								thumbnailUrl: true,
+								mediumUrl: true,
+								largeUrl: true,
+								originalUrl: true,
+							}
+						},
+						photos: {
+							select: {
+								fileSize: true,
+								_count: {
+									select: {
+										likedBy: true,
+										favoritedBy: true
+									}
+								}
+							}
+						},
+						_count: {
+							select: { photos: true }
+						}
+					}
+				},
+				_count: {
+					select: {
+						folders: true
+					}
+				}
+			},
+			orderBy: { shootDate: 'desc' },
+			take: 50 // Limit results
+		})
+
+		const formattedGalleries = galleries.map(gallery => {
+			// Count unique photos with likes/favorites (like getGalleries does)
+			let uniqueLikedPhotos = 0;
+			let uniqueFavoritedPhotos = 0;
+			let totalPhotos = 0;
+			let totalSize = 0;
+
+			gallery.folders.forEach(folder => {
+				totalPhotos += folder._count?.photos || 0;
+				folder.photos?.forEach(photo => {
+					totalSize += photo.fileSize || 0;
+					if (photo._count.likedBy > 0) {
+						uniqueLikedPhotos++;
+					}
+					if (photo._count.favoritedBy > 0) {
+						uniqueFavoritedPhotos++;
+					}
+				});
+			});
+
+			const coverPhoto = gallery.folders[0]?.coverPhoto;
+
+			return {
+				id: gallery.id,
+				title: gallery.title,
+				description: gallery.description,
+				shootDate: gallery.shootDate,
+				createdAt: gallery.createdAt,
+				coverPhoto: coverPhoto?.thumbnailUrl || coverPhoto?.mediumUrl || coverPhoto?.largeUrl || coverPhoto?.originalUrl || null,
+				folderCount: gallery._count.folders,
+				photoCount: totalPhotos,
+				likedBy: uniqueLikedPhotos,
+				favoritedBy: uniqueFavoritedPhotos,
+				totalSize,
+			}
+		})
+
+		res.json({
+			success: true,
+			data: formattedGalleries
+		})
+	} catch (error) {
+		console.error('Search galleries error:', error)
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
+		})
+	}
+}
 
 export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 	try {

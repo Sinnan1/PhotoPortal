@@ -1,60 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
-import { PhotoGrid } from "@/components/photo-grid";
-import { PhotoLightbox } from "@/components/photo-lightbox";
+import { PhotoGrid } from "@/components/photo/photo-grid";
+import { PhotoLightbox } from "@/components/photo/photo-lightbox";
 import { Share2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface Photo {
-  id: string;
-  filename: string;
-  thumbnailUrl: string;
-  originalUrl: string;
-  createdAt: string;
-  likedBy: { userId: string }[];
-  favoritedBy: { userId: string }[];
-  folder: {
-    id: string;
-    name: string;
-    gallery: {
-      id: string;
-      title: string;
-      photographer: {
-        name: string;
-      };
-    };
-  };
-}
+import type { PhotoWithContext } from "@/types";
+import { usePostedPhotos } from "@/hooks/queries/usePhotos";
+import { usePhotoActions } from "@/hooks/usePhotoActions";
 
 export default function PostsPage() {
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const { data: photos = [], isLoading: loading } = usePostedPhotos();
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithContext | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchPosts();
-  }, []);
-
-  const fetchPosts = async () => {
-    try {
-      setLoading(true);
-      const response = await api.getPosts();
-      setPhotos(response.data);
-    } catch (error) {
-      console.error("Failed to fetch posts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load posts",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const { handlePostPhoto } = usePhotoActions({
+    photos,
+    onPhotoStatusChange: () => {
+      // React Query handles invalidation
     }
-  };
+  });
 
   const handleDownload = async (photoId: string) => {
     let blobUrl: string | null = null;
@@ -91,24 +58,6 @@ export default function PostsPage() {
       if (blobUrl) {
         URL.revokeObjectURL(blobUrl);
       }
-    }
-  };
-
-  const handleUnpostPhoto = async (photoId: string) => {
-    try {
-      await api.unpostPhoto(photoId);
-      setPhotos(photos.filter(p => p.id !== photoId));
-      toast({
-        title: "Photo unmarked",
-        description: "Photo removed from posts collection",
-      });
-    } catch (error) {
-      console.error("Unpost failed", error);
-      toast({
-        title: "Failed to unmark photo",
-        description: "Please try again",
-        variant: "destructive",
-      });
     }
   };
 
@@ -161,10 +110,10 @@ export default function PostsPage() {
         </div>
       ) : (
         <PhotoGrid
-          photos={photos as any}
-          onView={(p) => setSelectedPhoto(p as any)}
+          photos={photos}
+          onView={(p) => setSelectedPhoto(p as PhotoWithContext)}
           onDownload={handleDownload}
-          onUnpost={handleUnpostPhoto}
+          onUnpost={handlePostPhoto}
           columns={{ sm: 2, md: 3, lg: 4 }}
         />
       )}
@@ -191,10 +140,9 @@ export default function PostsPage() {
             setSelectedPhoto(photos[prevIndex]);
           }}
           onDownload={() => handleDownload(selectedPhoto.id)}
-          onUnpost={() => handleUnpostPhoto(selectedPhoto.id)}
+          onUnpost={() => handlePostPhoto(selectedPhoto.id)}
         />
       )}
     </div>
   );
 }
-

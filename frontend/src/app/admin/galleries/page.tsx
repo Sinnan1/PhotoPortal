@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { 
-  FolderOpen, 
-  Search, 
+import {
+  FolderOpen,
+  Search,
   MoreHorizontal,
   Eye,
   Download,
@@ -21,29 +21,11 @@ import {
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 import { TotalPhotoCount, PhotoCount } from "@/components/admin/PhotoCount";
-
-interface Gallery {
-  id: string;
-  title: string;
-  photographer: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  isPublic: boolean;
-  _count?: {
-    folders: number;
-  };
-  stats?: {
-    totalPhotos: number;
-    totalFolders: number;
-    storageUsed: number;
-    clientsWithAccess: number;
-  };
-}
+import { ClientActivityMetrics } from "@/components/admin/ClientActivityMetrics";
+import type { AdminGallery } from "@/types";
 
 export default function AdminGalleriesPage() {
-  const [galleries, setGalleries] = useState<Gallery[]>([]);
+  const [galleries, setGalleries] = useState<AdminGallery[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [totalGalleries, setTotalGalleries] = useState(0);
@@ -60,7 +42,7 @@ export default function AdminGalleriesPage() {
         search: searchQuery || undefined,
         limit: 50,
       });
-      
+
       setGalleries(response.data.galleries);
       setTotalGalleries(response.data.pagination?.total || 0);
     } catch (error: any) {
@@ -76,7 +58,7 @@ export default function AdminGalleriesPage() {
   };
 
   const storageStats = {
-    used: parseFloat((totalGalleries * 0.1).toFixed(1)), // Estimate 100MB per gallery
+    used: parseFloat((totalGalleries * 0.1).toFixed(1)),
     total: 10,
     percentage: Math.min(Math.round((totalGalleries * 0.1 / 10) * 100), 100)
   };
@@ -256,8 +238,8 @@ export default function AdminGalleriesPage() {
                           {gallery.photographer.name}
                         </div>
                         <div className="flex items-center">
-                          <PhotoCount 
-                            initialCount={gallery.stats?.totalPhotos} 
+                          <PhotoCount
+                            initialCount={gallery.stats?.totalPhotos}
                             showLabel={false}
                             className="text-sm text-gray-500 dark:text-gray-400"
                           />
@@ -277,6 +259,12 @@ export default function AdminGalleriesPage() {
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                         Photographer: {gallery.photographer.email}
                       </p>
+
+                      {/* Client Activity Metrics */}
+                      <ClientActivityMetrics
+                        totalLikes={gallery.stats?.totalLikes}
+                        totalFavorites={gallery.stats?.totalFavorites}
+                      />
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

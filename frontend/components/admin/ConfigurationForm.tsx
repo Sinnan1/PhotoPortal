@@ -88,9 +88,9 @@ export default function ConfigurationForm({
                 type="checkbox"
                 checked={currentValue || false}
                 onChange={(e) => handleChange(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-primary focus:ring-primary border-border rounded bg-background"
               />
-              <span className="ml-2 text-sm text-gray-600">
+              <span className="ml-2 text-sm text-muted-foreground">
                 {currentValue ? 'Enabled' : 'Disabled'}
               </span>
             </div>
@@ -105,10 +105,10 @@ export default function ConfigurationForm({
                 onChange={(e) => handleChange(Number(e.target.value))}
                 min={configSchema.min}
                 max={configSchema.max}
-                className="block w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-32 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
               />
               {configSchema.min !== undefined && configSchema.max !== undefined && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   ({configSchema.min} - {configSchema.max})
                 </span>
               )}
@@ -121,7 +121,7 @@ export default function ConfigurationForm({
               <select
                 value={currentValue || ''}
                 onChange={(e) => handleChange(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
               >
                 <option value="">Select...</option>
                 {configSchema.enum.map((option: string) => (
@@ -140,7 +140,7 @@ export default function ConfigurationForm({
                   type="color"
                   value={currentValue || '#000000'}
                   onChange={(e) => handleChange(e.target.value)}
-                  className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
+                  className="h-10 w-16 border border-border rounded cursor-pointer bg-background"
                 />
                 <input
                   type="text"
@@ -148,7 +148,7 @@ export default function ConfigurationForm({
                   onChange={(e) => handleChange(e.target.value)}
                   placeholder="#000000"
                   pattern="^#[0-9A-Fa-f]{6}$"
-                  className="block w-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono"
+                  className="block w-24 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm font-mono"
                 />
               </div>
             )
@@ -159,7 +159,7 @@ export default function ConfigurationForm({
               type="text"
               value={currentValue || ''}
               onChange={(e) => handleChange(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
             />
           )
 
@@ -177,14 +177,14 @@ export default function ConfigurationForm({
                       newArray[index] = e.target.value
                       handleChange(newArray)
                     }}
-                    className="block flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="block flex-1 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
                   />
                   <button
                     onClick={() => {
                       const newArray = arrayValue.filter((_: any, i: number) => i !== index)
                       handleChange(newArray)
                     }}
-                    className="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+                    className="px-2 py-1 text-destructive hover:bg-destructive/10 rounded"
                   >
                     ✕
                   </button>
@@ -192,7 +192,7 @@ export default function ConfigurationForm({
               ))}
               <button
                 onClick={() => handleChange([...arrayValue, ''])}
-                className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded border border-blue-300"
+                className="px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded border border-primary/30"
               >
                 + Add Item
               </button>
@@ -205,42 +205,42 @@ export default function ConfigurationForm({
               type="text"
               value={currentValue || ''}
               onChange={(e) => handleChange(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
             />
           )
       }
     }
 
     return (
-      <div key={configKey} className={`p-4 border rounded-lg ${hasChanges ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'}`}>
+      <div key={configKey} className={`p-4 border rounded-lg ${hasChanges ? 'border-amber-500/50 bg-amber-500/5 dark:border-amber-400/30 dark:bg-amber-500/10' : 'border-border bg-card'}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-medium text-gray-900">
+              <h3 className="text-sm font-medium text-foreground">
                 {configKey.split('.').pop()}
               </h3>
               {hasChanges && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
                   Modified
                 </span>
               )}
               {isDefault && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
                   Default
                 </span>
               )}
             </div>
-            
-            <p className="mt-1 text-xs text-gray-500">
+
+            <p className="mt-1 text-xs text-muted-foreground">
               {configSchema.description}
             </p>
-            
+
             <div className="mt-3">
               {renderInput()}
             </div>
 
             {config.metadata && !config.metadata.isDefault && (
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-muted-foreground">
                 Last updated: {new Date(config.metadata.updatedAt).toLocaleString()}
                 {config.metadata.updatedBy && (
                   <span> by {config.metadata.updatedBy.name}</span>
@@ -252,7 +252,7 @@ export default function ConfigurationForm({
           <div className="ml-4 flex-shrink-0">
             <button
               onClick={() => handleResetWithReason(configKey)}
-              className="text-xs text-gray-500 hover:text-red-600"
+              className="text-xs text-muted-foreground hover:text-destructive"
               title="Reset to default"
             >
               Reset
@@ -267,16 +267,16 @@ export default function ConfigurationForm({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b">
+      <div className="bg-card rounded-lg shadow-sm border border-border">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-foreground">
               {categoryTitles[category] || category}
             </h2>
             {Object.keys(pendingChanges).length > 0 && (
               <button
                 onClick={handleSaveWithReason}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90"
               >
                 Save Changes ({Object.keys(pendingChanges).length})
               </button>
@@ -286,12 +286,12 @@ export default function ConfigurationForm({
 
         <div className="p-6">
           {configEntries.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               No configurations found for this category.
             </div>
           ) : (
             <div className="space-y-4">
-              {configEntries.map(([configKey, config]) => 
+              {configEntries.map(([configKey, config]) =>
                 renderConfigInput(configKey, config)
               )}
             </div>
@@ -301,22 +301,22 @@ export default function ConfigurationForm({
 
       {/* Reason Modal */}
       {showReasonModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border border-border w-96 shadow-lg rounded-md bg-card">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
+              <h3 className="text-lg font-medium text-foreground mb-4">
                 {reasonModalType === 'save' ? 'Save Configuration Changes' : 'Reset Configuration'}
               </h3>
-              
+
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Reason for change (optional):
                 </label>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm placeholder:text-muted-foreground"
                   placeholder="Describe why you're making this change..."
                 />
               </div>
@@ -329,14 +329,14 @@ export default function ConfigurationForm({
                     setResetConfigKey('')
                   }}
                   disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-muted border border-border rounded-md hover:bg-muted/80 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleModalSubmit}
                   disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-md hover:bg-primary/90 disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : (reasonModalType === 'save' ? 'Save Changes' : 'Reset Configuration')}
                 </button>

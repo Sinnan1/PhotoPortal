@@ -1,29 +1,48 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
+// Helper function to check if localStorage is available
+function isStorageAvailable(): boolean {
+  if (typeof window === 'undefined') return false
+  if (typeof localStorage === 'undefined') return false
+
+  try {
+    // Test if we can actually access localStorage
+    const test = '__storage_test__'
+    localStorage.setItem(test, test)
+    localStorage.removeItem(test)
+    return true
+  } catch (e) {
+    // localStorage is not available or restricted
+    return false
+  }
+}
+
 function getAuthToken() {
   if (typeof document === "undefined") return null
-  
+
   // First try to get token from cookie
   const cookieToken = document.cookie
     .split("; ")
     .find((row) => row.startsWith("auth-token="))
     ?.split("=")[1]
-  
+
   if (cookieToken) return cookieToken
-  
-  // Fallback: try to get token from localStorage
-  try {
-    const user = localStorage.getItem("user")
-    if (user) {
-      const userData = JSON.parse(user)
-      // Check if we have a token stored somewhere else
-      const storedToken = localStorage.getItem("auth-token")
-      if (storedToken) return storedToken
+
+  // Fallback: try to get token from localStorage only if available
+  if (isStorageAvailable()) {
+    try {
+      const user = localStorage.getItem("user")
+      if (user) {
+        const userData = JSON.parse(user)
+        // Check if we have a token stored somewhere else
+        const storedToken = localStorage.getItem("auth-token")
+        if (storedToken) return storedToken
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage:", error)
     }
-  } catch (error) {
-    console.error("Error reading from localStorage:", error)
   }
-  
+
   return null
 }
 
@@ -39,12 +58,12 @@ export enum AdminErrorType {
 // Get CSRF token from cookie
 function getCSRFToken() {
   if (typeof document === "undefined") return null
-  
+
   const csrfToken = document.cookie
     .split("; ")
     .find((row) => row.startsWith("csrf-token="))
     ?.split("=")[1]
-  
+
   return csrfToken
 }
 
@@ -71,17 +90,19 @@ async function adminApiRequest(endpoint: string, options: RequestInit = {}) {
     error.status = response.status
     error.errorType = data.errorType
     error.details = data.details
-    
+
     // Handle specific admin error types
     if (data.errorType === AdminErrorType.ADMIN_SESSION_EXPIRED) {
       // Clear admin session data
       if (typeof document !== "undefined") {
         document.cookie = "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-        localStorage.removeItem("user")
-        localStorage.removeItem("admin-session")
+        if (isStorageAvailable()) {
+          localStorage.removeItem("user")
+          localStorage.removeItem("admin-session")
+        }
       }
     }
-    
+
     throw error
   }
 
@@ -316,7 +337,7 @@ export const adminApi = {
       });
     }
     const queryString = queryParams.toString();
-    const endpoint = configKey 
+    const endpoint = configKey
       ? `/system-config/${configKey}/history${queryString ? `?${queryString}` : ''}`
       : `/system-config/history/all${queryString ? `?${queryString}` : ''}`;
     return adminApiRequest(endpoint);

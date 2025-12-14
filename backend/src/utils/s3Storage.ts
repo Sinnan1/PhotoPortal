@@ -198,7 +198,7 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 
 		// Add timeout to prevent hanging
 		const deletePromise = s3Client.send(deleteCommand)
-		const timeoutPromise = new Promise((_, reject) => 
+		const timeoutPromise = new Promise((_, reject) =>
 			setTimeout(() => reject(new Error('Delete operation timed out after 30 seconds')), 30000)
 		)
 
@@ -214,7 +214,7 @@ export const deleteFromS3 = async (filename: string): Promise<void> => {
 		// Don't throw error if file doesn't exist (404) or NoSuchKey
 		const httpCode = (error as any)?.$metadata?.httpStatusCode
 		const errorCode = (error as any)?.Code
-		
+
 		if (httpCode === 404 || errorCode === 'NoSuchKey') {
 			console.log(`ℹ️ File not found (already deleted): ${filename}`)
 			return
@@ -262,6 +262,37 @@ export const getObjectFromS3 = async (key: string, bucketName?: string): Promise
 	}
 }
 
+// Function to get partial object from S3 (for EXIF extraction - only download first N bytes)
+export const getPartialObjectFromS3 = async (key: string, bytes: number = 65536, bucketName?: string): Promise<Buffer> => {
+	try {
+		const targetBucket = bucketName || process.env.S3_BUCKET_NAME!
+
+		const command = new GetObjectCommand({
+			Bucket: targetBucket,
+			Key: key,
+			Range: `bytes=0-${bytes - 1}` // Download only first N bytes
+		})
+
+		const response = await s3Client.send(command)
+		const chunks: Buffer[] = []
+
+		if (response.Body) {
+			for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+				chunks.push(Buffer.from(chunk))
+			}
+		}
+
+		return Buffer.concat(chunks)
+	} catch (error) {
+		console.error('S3 partial read error:', {
+			message: (error as Error)?.message,
+			bucket: bucketName || process.env.S3_BUCKET_NAME,
+			key
+		})
+		throw new Error(`Failed to read partial object ${key} from storage`)
+	}
+}
+
 // Function to get S3 object as stream for direct piping (much faster!)
 export const getObjectStreamFromS3 = async (key: string, bucketName?: string): Promise<{ stream: any, contentLength: number }> => {
 	try {
@@ -299,13 +330,13 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
 		const chunks: any[] = []
 		const maxSize = 200 * 1024 * 1024 // 200MB limit
 		let totalSize = 0
-		
+
 		const cleanup = () => {
 			try {
 				stream.removeListener('data', dataHandler)
 				stream.removeListener('error', errorHandler)
 				stream.removeListener('end', endHandler)
-				
+
 				if (stream && typeof stream.destroy === 'function' && !stream.destroyed) {
 					stream.destroy()
 				}
@@ -313,25 +344,25 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
 				console.warn('Stream cleanup error:', err)
 			}
 		}
-		
+
 		const dataHandler = (chunk: any) => {
 			totalSize += chunk.length
-			
+
 			// Prevent memory exhaustion from extremely large files
 			if (totalSize > maxSize) {
 				cleanup()
 				reject(new Error(`File too large: exceeds ${maxSize} bytes`))
 				return
 			}
-			
+
 			chunks.push(chunk)
 		}
-		
+
 		const errorHandler = (error: any) => {
 			cleanup()
 			reject(error)
 		}
-		
+
 		const endHandler = () => {
 			cleanup()
 			try {
@@ -340,17 +371,17 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
 				reject(error)
 			}
 		}
-		
+
 		stream.on('data', dataHandler)
 		stream.on('error', errorHandler)
 		stream.on('end', endHandler)
-		
+
 		// Add timeout to prevent hanging streams
 		const timeout = setTimeout(() => {
 			cleanup()
 			reject(new Error('Stream timeout: no data received for 30 seconds'))
 		}, 30000)
-		
+
 		// Clear timeout when stream ends
 		stream.once('end', () => clearTimeout(timeout))
 		stream.once('error', () => clearTimeout(timeout))
