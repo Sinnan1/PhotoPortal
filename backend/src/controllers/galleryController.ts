@@ -69,7 +69,7 @@ export const createGallery = async (req: AuthRequest, res: Response) => {
 
 		res.status(201).json({
 			success: true,
-			data: gallery
+			data: { ...gallery, totalSize: Number(gallery.totalSize) }
 		})
 	} catch (error) {
 		console.error('Create gallery error:', error)
@@ -352,7 +352,7 @@ export const getGallery = async (req: Request, res: Response) => {
 
 		res.json({
 			success: true,
-			data: { ...gallery, canDownload }
+			data: { ...gallery, totalSize: Number(gallery.totalSize), canDownload }
 		})
 	} catch (error) {
 		console.error('Get gallery error:', error)
@@ -483,7 +483,7 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 
 		res.json({
 			success: true,
-			data: gallery
+			data: { ...gallery, totalSize: Number(gallery.totalSize) }
 		})
 	} catch (error) {
 		console.error('Update gallery error:', error)
@@ -965,6 +965,7 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 
 			return {
 				...access.gallery,
+				totalSize: Number(access.gallery.totalSize), // Convert BigInt to Number for JSON serialization
 				photoCount: totalPhotoCount,
 				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false,
 				_count: {
