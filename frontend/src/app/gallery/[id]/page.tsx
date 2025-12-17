@@ -281,6 +281,38 @@ function GalleryPage() {
     }
   };
 
+  const handleDownloadLiked = async () => {
+    try {
+      console.log("Starting liked photos download for gallery:", galleryId);
+      const response = await api.createDownloadTicket(galleryId, { filter: 'liked' });
+      console.log("Download ticket response:", response);
+      if (response && response.downloadUrl) {
+        window.location.href = response.downloadUrl;
+      } else {
+        showToast("Failed to get download URL", "error");
+      }
+    } catch (error) {
+      console.error("Failed to start liked photos download:", error);
+      showToast(error instanceof Error ? error.message : "Failed to start download", "error");
+    }
+  };
+
+  const handleDownloadFavorited = async () => {
+    try {
+      console.log("Starting favorited photos download for gallery:", galleryId);
+      const response = await api.createDownloadTicket(galleryId, { filter: 'favorited' });
+      console.log("Download ticket response:", response);
+      if (response && response.downloadUrl) {
+        window.location.href = response.downloadUrl;
+      } else {
+        showToast("Failed to get download URL", "error");
+      }
+    } catch (error) {
+      console.error("Failed to start favorited photos download:", error);
+      showToast(error instanceof Error ? error.message : "Failed to start download", "error");
+    }
+  };
+
   const handleDelete = async (photoId: string) => {
     try {
       await deletePhotoMutation.mutateAsync(photoId);
@@ -718,7 +750,7 @@ function GalleryPage() {
 
                 {/* Download Liked */}
                 {user && galleryPhotoCounts.liked > 0 && (
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadLiked}>
                     <Heart className="mr-2 h-4 w-4 text-red-500" />
                     Liked Photos ({galleryPhotoCounts.liked})
                   </DropdownMenuItem>
@@ -726,7 +758,7 @@ function GalleryPage() {
 
                 {/* Download Favorited */}
                 {user && galleryPhotoCounts.favorited > 0 && (
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadFavorited}>
                     <Star className="mr-2 h-4 w-4 text-yellow-500" />
                     Favorited Photos ({galleryPhotoCounts.favorited})
                   </DropdownMenuItem>

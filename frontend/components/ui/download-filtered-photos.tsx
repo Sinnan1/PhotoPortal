@@ -37,18 +37,39 @@ export function DownloadFilteredPhotos({
   };
 
   const handleConfirmDownload = async () => {
-    if (!pendingDownload) return;
+    if (!pendingDownload) {
+      console.error("No pending download found");
+      return;
+    }
 
     const filterType = pendingDownload.type;
     const setDownloading = filterType === 'liked' ? setIsDownloadingLiked : setIsDownloadingFavorited;
-    
+
+    // Close the modal first
+    setShowWarningModal(false);
     setDownloading(true);
+
+    console.log(`Starting ${filterType} download for gallery: ${galleryId}`);
+
     try {
       const response = await api.createDownloadTicket(galleryId, { filter: filterType });
-      window.location.href = response.downloadUrl;
+      console.log("Download ticket response:", response);
+
+      if (response && response.downloadUrl) {
+        console.log("Redirecting to download URL:", response.downloadUrl);
+        // Use window.open as a fallback if window.location.href doesn't work
+        const newWindow = window.open(response.downloadUrl, '_blank');
+        if (!newWindow) {
+          // If popup was blocked, try direct navigation
+          window.location.href = response.downloadUrl;
+        }
+      } else {
+        console.error("No downloadUrl in response:", response);
+        showToast("Failed to get download URL", "error");
+      }
     } catch (error) {
       console.error("Failed to start download:", error);
-      showToast("Failed to start download", "error");
+      showToast(error instanceof Error ? error.message : "Failed to start download", "error");
     } finally {
       setDownloading(false);
       setPendingDownload(null);

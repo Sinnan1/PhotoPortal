@@ -16,7 +16,7 @@ import { Download, AlertTriangle } from "lucide-react";
 interface DownloadWarningModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   downloadType: string;
   photoCount: number;
 }
@@ -28,9 +28,9 @@ export function DownloadWarningModal({
   downloadType,
   photoCount,
 }: DownloadWarningModalProps) {
-  const handleConfirm = () => {
-    onConfirm();
+  const handleConfirm = async () => {
     onOpenChange(false);
+    await onConfirm();
   };
 
   return (
@@ -49,7 +49,7 @@ export function DownloadWarningModal({
             You're about to download <strong>{photoCount}</strong> photo{photoCount !== 1 ? 's' : ''}.
             This may take a few moments depending on the file sizes.
           </AlertDialogDescription>
-          
+
           {photoCount > 50 && (
             <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
