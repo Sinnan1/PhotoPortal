@@ -73,7 +73,7 @@ export class DownloadService {
             createdAt: new Date(),
             updatedAt: new Date()
         }
-        
+
         downloadProgress.set(downloadId, progress)
         return downloadId
     }
@@ -86,12 +86,12 @@ export class DownloadService {
                 ...updates,
                 updatedAt: new Date()
             }
-            
+
             // Calculate progress percentage
             if (updated.totalPhotos > 0) {
                 updated.progress = Math.round((updated.processedPhotos / updated.totalPhotos) * 100)
             }
-            
+
             downloadProgress.set(downloadId, updated)
         }
     }
@@ -125,7 +125,8 @@ export class DownloadService {
                             select: {
                                 id: true,
                                 filename: true,
-                                originalUrl: true
+                                originalUrl: true,
+                                fileSize: true
                             }
                         }
                     }
@@ -162,29 +163,41 @@ export class DownloadService {
             throw new Error(`No photos found for ${downloadType} download`)
         }
 
+        // Calculate total size for Content-Length header
+        const totalPhotoSize = photos.reduce((sum: number, p: any) => sum + (p.fileSize || 0), 0)
+        const zipOverhead = photos.length * 76 + 22 // Approximate ZIP overhead
+        const estimatedZipSize = totalPhotoSize + zipOverhead
+
         // Create download tracking
         const downloadId = this.createDownload(zipFilename, photos.length)
 
-        console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos)`)
+        console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos, estimated: ${Math.round(estimatedZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         try {
+            // Always use store mode (no compression) so browser can show total download size
+            const useCompression = false
+
             // Set response headers for zip download
             if (res) {
                 res.setHeader('Content-Type', 'application/zip')
                 res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
                 res.setHeader('X-Download-ID', downloadId)
                 res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
+
+                // Set Content-Length so browser shows total download size
+                if (totalPhotoSize > 0) {
+                    res.setHeader('Content-Length', estimatedZipSize)
+                    console.log(`📦 Content-Length set to ${estimatedZipSize} bytes`)
+                }
             }
 
             // Create zip archive with optimized settings for streaming
-            // Use store mode (no compression) for large galleries to reduce CPU and memory
-            const useCompression = photos.length < 500
             const archive = archiver('zip', {
                 zlib: { level: useCompression ? 1 : 0 }, // No compression for large galleries
                 store: !useCompression, // Store mode for large galleries
                 highWaterMark: 1024 * 1024 // 1MB buffer to prevent memory buildup
             })
-            
+
             console.log(`📦 Archive mode: ${useCompression ? 'compressed' : 'stored'} for ${photos.length} photos`)
 
             // Handle archive events
@@ -194,7 +207,7 @@ export class DownloadService {
                     status: 'error',
                     error: err.message
                 })
-                
+
                 // Destroy archive to free resources
                 if (archive && typeof archive.destroy === 'function') {
                     try {
@@ -204,7 +217,7 @@ export class DownloadService {
                         console.warn('Failed to destroy archive:', destroyError)
                     }
                 }
-                
+
                 if (res && !res.headersSent) {
                     res.status(500).json({ success: false, error: 'Failed to create archive' })
                 } else if (res) {
@@ -226,7 +239,7 @@ export class DownloadService {
                     status: 'error',
                     error: 'Client disconnected'
                 })
-                
+
                 // Destroy archive to stop processing
                 if (archive && typeof archive.destroy === 'function') {
                     try {
@@ -240,7 +253,7 @@ export class DownloadService {
 
             archive.on('error', archiveErrorHandler)
             archive.on('progress', archiveProgressHandler)
-            
+
             // Handle client disconnect
             if (res) {
                 res.on('close', clientDisconnectHandler)
@@ -256,23 +269,23 @@ export class DownloadService {
 
             // Add photos to archive - process all at once and let archiver handle backpressure
             let processedCount = 0
-            
+
             console.log(`📦 Processing ${photos.length} photos with archiver managing backpressure`)
-            
+
             // Track entry completion
             let entriesProcessed = 0
             const totalEntries = photos.length
-            
+
             // Listen to archive entry events to track progress
             archive.on('entry', (entry: any) => {
                 entriesProcessed++
                 console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
-                
+
                 this.updateProgress(downloadId, {
                     processedPhotos: entriesProcessed
                 })
             })
-            
+
             // Add all photos to archive - archiver will handle backpressure internally
             for (const photo of photos) {
                 try {
@@ -286,12 +299,12 @@ export class DownloadService {
 
                     // Get photo stream from S3
                     const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
-                    
+
                     // Add to archive - archiver will manage the stream
                     archive.append(stream, { name: photo.filename })
-                    
+
                     processedCount++
-                    
+
                 } catch (error) {
                     console.error(`Failed to queue photo ${photo.filename}:`, error)
                     processedCount++ // Still count as processed to continue
@@ -351,8 +364,8 @@ export class DownloadService {
             throw new Error('Gallery has expired')
         }
 
-        // Get filtered photos
-        const photoQuery = filterType === 'liked' 
+        // Get filtered photos with fileSize for Content-Length calculation
+        const photoQuery = filterType === 'liked'
             ? prisma.likedPhoto.findMany({
                 where: {
                     userId,
@@ -367,7 +380,8 @@ export class DownloadService {
                         select: {
                             id: true,
                             filename: true,
-                            originalUrl: true
+                            originalUrl: true,
+                            fileSize: true
                         }
                     }
                 }
@@ -386,7 +400,8 @@ export class DownloadService {
                         select: {
                             id: true,
                             filename: true,
-                            originalUrl: true
+                            originalUrl: true,
+                            fileSize: true
                         }
                     }
                 }
@@ -398,26 +413,38 @@ export class DownloadService {
             throw new Error(`No ${filterType} photos found in this gallery`)
         }
 
+        // Calculate total size for Content-Length header
+        // ZIP overhead: ~30 bytes local header per file + ~46 bytes central directory per file + 22 bytes end record
+        const totalPhotoSize = filteredPhotos.reduce((sum, fp) => sum + (fp.photo.fileSize || 0), 0)
+        const zipOverhead = filteredPhotos.length * 76 + 22 // Approximate ZIP overhead per file
+        const estimatedZipSize = totalPhotoSize + zipOverhead
+
         // Create download tracking
         const zipFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_${filterType}_photos.zip`
         const downloadId = this.createDownload(zipFilename, filteredPhotos.length)
 
-        console.log(`📦 Starting ${filterType} photos download: ${downloadId}`)
+        console.log(`📦 Starting ${filterType} photos download: ${downloadId} (estimated size: ${Math.round(estimatedZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         // Set response headers for zip download
         res.setHeader('Content-Type', 'application/zip')
         res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
         res.setHeader('X-Download-ID', downloadId)
 
-        // Create zip archive with optimized settings
-        const useCompression = filteredPhotos.length < 500
+        // Always use store mode (no compression) so browser can show total download size
+        const useCompression = false
+        if (totalPhotoSize > 0) {
+            res.setHeader('Content-Length', estimatedZipSize)
+            console.log(`📦 Content-Length set to ${estimatedZipSize} bytes`)
+        }
+
+        // Create zip archive with store mode (no compression for accurate Content-Length)
         const archive = archiver('zip', {
-            zlib: { level: useCompression ? 6 : 0 },
-            store: !useCompression,
+            zlib: { level: 0 },
+            store: true,
             highWaterMark: 1024 * 1024 // 1MB buffer
         })
-        
-        console.log(`📦 Archive mode: ${useCompression ? 'compressed' : 'stored'} for ${filteredPhotos.length} photos`)
+
+        console.log(`📦 Archive mode: stored for ${filteredPhotos.length} photos`)
 
         // Handle archive events
         const archiveErrorHandler = (err: any) => {
@@ -426,7 +453,7 @@ export class DownloadService {
                 status: 'error',
                 error: err.message
             })
-            
+
             // Destroy archive to free resources
             if (archive && typeof archive.destroy === 'function') {
                 try {
@@ -436,7 +463,7 @@ export class DownloadService {
                     console.warn('Failed to destroy archive:', destroyError)
                 }
             }
-            
+
             if (!res.headersSent) {
                 res.status(500).json({ success: false, error: 'Failed to create archive' })
             }
@@ -457,7 +484,7 @@ export class DownloadService {
                 status: 'error',
                 error: 'Client disconnected'
             })
-            
+
             // Destroy archive to stop processing
             if (archive && typeof archive.destroy === 'function') {
                 try {
@@ -481,23 +508,23 @@ export class DownloadService {
 
         // Add photos to archive - let archiver handle backpressure
         let processedCount = 0
-        
+
         console.log(`📦 Processing ${filteredPhotos.length} photos with archiver managing backpressure`)
-        
+
         // Track entry completion
         let entriesProcessed = 0
         const totalEntries = filteredPhotos.length
-        
+
         // Listen to archive entry events to track progress
         archive.on('entry', (entry: any) => {
             entriesProcessed++
             console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
-            
+
             this.updateProgress(downloadId, {
                 processedPhotos: entriesProcessed
             })
         })
-        
+
         // Add all photos to archive - archiver will handle backpressure internally
         for (const filteredPhoto of filteredPhotos) {
             try {
@@ -512,12 +539,12 @@ export class DownloadService {
 
                 // Get photo stream from S3
                 const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
-                
+
                 // Add to archive - archiver will manage the stream
                 archive.append(stream, { name: photo.filename })
-                
+
                 processedCount++
-                
+
             } catch (error) {
                 console.error(`Failed to queue photo ${filteredPhoto.photo.filename}:`, error)
                 processedCount++ // Continue with next photo
@@ -569,7 +596,7 @@ export class DownloadService {
             const hasAccess = await prisma.galleryAccess.findUnique({
                 where: { userId_galleryId: { userId, galleryId } }
             })
-            
+
             if (hasAccess) {
                 return true
             }
