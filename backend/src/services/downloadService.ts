@@ -163,15 +163,22 @@ export class DownloadService {
             throw new Error(`No photos found for ${downloadType} download`)
         }
 
-        // Calculate total size for Content-Length header
-        const totalPhotoSize = photos.reduce((sum: number, p: any) => sum + (p.fileSize || 0), 0)
-        const zipOverhead = photos.length * 76 + 22 // Approximate ZIP overhead
-        const estimatedZipSize = totalPhotoSize + zipOverhead
+        // Calculate exact size for Content-Length header
+        // Archiver "store" mode with streaming input uses data descriptors
+        // Overhead per file = Local Header (30) + Name + Data Descriptor (16) + Central Directory (46) + Name
+        // Global Overhead = End of Central Directory (22)
+        let exactZipSize = 22; // Start with EOCD size
+
+        for (const photo of photos) {
+            const filenameLength = Buffer.byteLength(photo.filename);
+            const fileOverhead = 92 + (2 * filenameLength); // 30 + 16 + 46 = 92
+            exactZipSize += (photo.fileSize || 0) + fileOverhead;
+        }
 
         // Create download tracking
         const downloadId = this.createDownload(zipFilename, photos.length)
 
-        console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos, estimated: ${Math.round(estimatedZipSize / 1024 / 1024 * 10) / 10} MB)`)
+        console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos, exact size: ${Math.round(exactZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         try {
             // Always use store mode (no compression) so browser can show total download size
@@ -185,9 +192,9 @@ export class DownloadService {
                 res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
 
                 // Set Content-Length so browser shows total download size
-                if (totalPhotoSize > 0) {
-                    res.setHeader('Content-Length', estimatedZipSize)
-                    console.log(`📦 Content-Length set to ${estimatedZipSize} bytes`)
+                if (exactZipSize > 0) {
+                    res.setHeader('Content-Length', exactZipSize)
+                    console.log(`📦 Content-Length set to ${exactZipSize} bytes`)
                 }
             }
 
@@ -413,17 +420,23 @@ export class DownloadService {
             throw new Error(`No ${filterType} photos found in this gallery`)
         }
 
-        // Calculate total size for Content-Length header
-        // ZIP overhead: ~30 bytes local header per file + ~46 bytes central directory per file + 22 bytes end record
-        const totalPhotoSize = filteredPhotos.reduce((sum, fp) => sum + (fp.photo.fileSize || 0), 0)
-        const zipOverhead = filteredPhotos.length * 76 + 22 // Approximate ZIP overhead per file
-        const estimatedZipSize = totalPhotoSize + zipOverhead
+        // Calculate exact size for Content-Length header
+        // Archiver "store" mode with streaming input uses data descriptors
+        // Overhead per file = Local Header (30) + Name + Data Descriptor (16) + Central Directory (46) + Name
+        // Global Overhead = End of Central Directory (22)
+        let exactZipSize = 22; // Start with EOCD size
+
+        for (const item of filteredPhotos) {
+            const filenameLength = Buffer.byteLength(item.photo.filename);
+            const fileOverhead = 92 + (2 * filenameLength); // 30 + 16 + 46 = 92
+            exactZipSize += (item.photo.fileSize || 0) + fileOverhead;
+        }
 
         // Create download tracking
         const zipFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_${filterType}_photos.zip`
         const downloadId = this.createDownload(zipFilename, filteredPhotos.length)
 
-        console.log(`📦 Starting ${filterType} photos download: ${downloadId} (estimated size: ${Math.round(estimatedZipSize / 1024 / 1024 * 10) / 10} MB)`)
+        console.log(`📦 Starting ${filterType} photos download: ${downloadId} (exact size: ${Math.round(exactZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         // Set response headers for zip download
         res.setHeader('Content-Type', 'application/zip')
@@ -432,9 +445,9 @@ export class DownloadService {
 
         // Always use store mode (no compression) so browser can show total download size
         const useCompression = false
-        if (totalPhotoSize > 0) {
-            res.setHeader('Content-Length', estimatedZipSize)
-            console.log(`📦 Content-Length set to ${estimatedZipSize} bytes`)
+        if (exactZipSize > 0) {
+            res.setHeader('Content-Length', exactZipSize)
+            console.log(`📦 Content-Length set to ${exactZipSize} bytes`)
         }
 
         // Create zip archive with store mode (no compression for accurate Content-Length)
