@@ -340,39 +340,22 @@ function GalleryPage() {
       const response = await api.createDownloadTicket(galleryId, options);
       console.log("Download ticket response:", response);
       if (response && response.downloadUrl) {
-        // Check if the download will be multipart by inspecting headers
-        try {
-            // We use a fetch request to check the Content-Type header.
-            // If it's JSON, it's a multipart manifest.
-            // If it's ZIP, it's a direct download (start via window.location)
-
-            // Note: We abort this fetch immediately if it's a zip to avoid downloading 5GB!
-            const controller = new AbortController();
-            const checkResponse = await fetch(response.downloadUrl, {
-                method: 'GET',
-                signal: controller.signal
-            });
-
-            const contentType = checkResponse.headers.get('content-type');
-
-            if (contentType && contentType.includes('application/json')) {
-                // It's a multipart manifest
-                const data = await checkResponse.json();
+        if (response.strategy === 'MULTIPART_MANIFEST') {
+            // It's a multipart download, fetch the manifest
+            try {
+                const manifestResponse = await fetch(response.downloadUrl);
+                const data = await manifestResponse.json();
                 setMultipartModal({
                     open: true,
                     parts: data.parts
                 });
-            } else {
-                // It's a zip file (or error, handled by browser)
-                // Abort the fetch to stop downloading
-                controller.abort();
-                // Trigger actual browser download
-                window.location.href = response.downloadUrl;
+            } catch (error) {
+                console.error("Failed to fetch multipart manifest:", error);
+                showToast("Failed to prepare download", "error");
             }
-        } catch (fetchError) {
-             console.error("Error checking download type:", fetchError);
-             // Fallback to direct download attempt
-             window.location.href = response.downloadUrl;
+        } else {
+            // Direct stream, use standard browser download
+            window.location.href = response.downloadUrl;
         }
       } else {
         showToast("Failed to get download URL", "error");

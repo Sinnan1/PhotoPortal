@@ -1301,7 +1301,24 @@ export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
 		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${protocol}://${req.get('host')}`;
 		const downloadUrl = `${baseUrl}/api/photos/download-zip?ticket=${ticket}`;
 
-		res.json({ success: true, downloadUrl });
+		// Determine download strategy
+		const { strategy, totalSize, estimatedParts } = await DownloadService.getDownloadStrategy(
+			galleryId,
+			userId,
+			filter as any,
+			folderId
+		);
+
+		res.json({
+			success: true,
+			ticket,
+			strategy,
+			downloadUrl,
+			meta: {
+				totalSize,
+				estimatedParts
+			}
+		});
 
 	} catch (error) {
 		console.error("Create download ticket error:", error);

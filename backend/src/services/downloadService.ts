@@ -46,6 +46,13 @@ export interface DownloadProgress {
     updatedAt: Date
 }
 
+export interface DownloadStrategy {
+    strategy: 'DIRECT_STREAM' | 'MULTIPART_MANIFEST'
+    totalSize: number
+    chunkSize: number
+    estimatedParts?: number
+}
+
 // In-memory storage for download progress (in production, use Redis or database)
 const downloadProgress = new Map<string, DownloadProgress>()
 
@@ -116,6 +123,61 @@ export class DownloadService {
 
     static cleanupDownload(downloadId: string): void {
         downloadProgress.delete(downloadId)
+    }
+
+    /**
+     * Determines the download strategy (Single Zip vs Multipart) based on size
+     */
+    static async getDownloadStrategy(
+        galleryId: string,
+        userId: string,
+        downloadType: 'all' | 'folder' | 'liked' | 'favorited',
+        folderId?: string
+    ): Promise<DownloadStrategy> {
+        // Fetch configuration
+        const downloadMode = await getSystemConfig('download.mode', 'single')
+        const chunkSizeMB = await getSystemConfig('download.chunkSize', 2000)
+        const chunkSizeBytes = chunkSizeMB * 1024 * 1024
+
+        // Helper to query file size sum
+        let totalSize = 0
+
+        if (downloadType === 'all') {
+            const result = await prisma.photo.aggregate({
+                where: { folder: { galleryId } },
+                _sum: { fileSize: true }
+            })
+            totalSize = result._sum.fileSize || 0
+        } else if (downloadType === 'folder' && folderId) {
+            const result = await prisma.photo.aggregate({
+                where: { folderId },
+                _sum: { fileSize: true }
+            })
+            totalSize = result._sum.fileSize || 0
+        } else if (downloadType === 'liked') {
+            const photos = await prisma.likedPhoto.findMany({
+                where: { userId, photo: { folder: { galleryId } } },
+                include: { photo: { select: { fileSize: true } } }
+            })
+            totalSize = photos.reduce((sum, p) => sum + (p.photo.fileSize || 0), 0)
+        } else if (downloadType === 'favorited') {
+            const photos = await prisma.favoritedPhoto.findMany({
+                where: { userId, photo: { folder: { galleryId } } },
+                include: { photo: { select: { fileSize: true } } }
+            })
+            totalSize = photos.reduce((sum, p) => sum + (p.photo.fileSize || 0), 0)
+        }
+
+        const strategy = (downloadMode === 'multipart' && totalSize > chunkSizeBytes)
+            ? 'MULTIPART_MANIFEST'
+            : 'DIRECT_STREAM'
+
+        return {
+            strategy,
+            totalSize,
+            chunkSize: chunkSizeBytes,
+            estimatedParts: strategy === 'MULTIPART_MANIFEST' ? Math.ceil(totalSize / chunkSizeBytes) : 1
+        }
     }
 
     // Helper to process photos sequentially to avoid VPS crashes
@@ -598,5 +660,50 @@ export class DownloadService {
         setTimeout(() => {
             this.cleanupDownload(downloadId)
         }, 300000)
+    }
+
+    static async verifyGalleryAccess(
+        galleryId: string,
+        userId: string,
+        userRole: string,
+        password?: string
+    ): Promise<boolean> {
+        const gallery = await prisma.gallery.findUnique({
+            where: { id: galleryId },
+            select: {
+                password: true,
+                photographerId: true
+            }
+        })
+
+        if (!gallery) {
+            return false
+        }
+
+        // Check if gallery has password protection
+        if (gallery.password) {
+            // Check if user is photographer owner or client with access
+            if (userRole === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
+                return true
+            }
+
+            const hasAccess = await prisma.galleryAccess.findUnique({
+                where: { userId_galleryId: { userId, galleryId } }
+            })
+
+            if (hasAccess) {
+                return true
+            }
+
+            // Validate provided password
+            if (!password) {
+                return false
+            }
+
+            const bcrypt = await import('bcryptjs')
+            return await bcrypt.default.compare(password, gallery.password)
+        }
+
+        return true
     }
 }
