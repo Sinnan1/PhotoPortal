@@ -134,6 +134,21 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         max: 1000,
         description: 'Default download limit per gallery (0 = unlimited)'
     },
+
+    // Download settings
+    'download.mode': {
+        type: 'string',
+        required: true,
+        enum: ['single', 'multipart'],
+        description: 'Download mode (single zip or split multipart zips)'
+    },
+    'download.chunkSize': {
+        type: 'number',
+        required: true,
+        min: 100,
+        max: 10000,
+        description: 'Multipart chunk size in MB'
+    },
     
     // Branding settings
     'branding.siteName': {
@@ -193,6 +208,8 @@ const DEFAULT_CONFIG: Record<string, any> = {
     'registration.defaultRole': 'CLIENT',
     'gallery.maxPhotosPerGallery': 1000,
     'gallery.defaultDownloadLimit': 0,
+    'download.mode': 'single',
+    'download.chunkSize': 2000,
     'branding.siteName': 'Yarrow Weddings & Co.',
     'email.notificationsEnabled': true
 }

@@ -1239,12 +1239,21 @@ export const downloadLikedPhotos = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'liked'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createFilteredPhotoZip(
 			galleryId,
 			userId,
 			"liked",
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download liked photos error:", error);
@@ -1292,6 +1301,35 @@ export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
 		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${protocol}://${req.get('host')}`;
 		const downloadUrl = `${baseUrl}/api/photos/download-zip?ticket=${ticket}`;
 
+		// Check if we should return multipart manifest (pre-check)
+		// This re-uses the logic in DownloadService.createGalleryPhotoZip/createFilteredPhotoZip
+		// by calling it with a fake response object to capture the JSON output if it's multipart.
+		// However, since we are just generating a ticket here, we can't fully know if it will be multipart until we try.
+		// A better approach is to let the frontend use the ticket to GET the download URL.
+		// If that GET request returns JSON (multipart manifest), the browser/frontend handles it.
+		// If it returns a zip stream, the browser downloads it.
+
+		// Wait, the frontend uses `window.location.href = response.downloadUrl`.
+		// If `downloadUrl` points to an endpoint that returns JSON, the browser will display the JSON.
+		// This is bad for user experience.
+
+		// We need to know NOW if it's going to be multipart so we can tell the frontend.
+		// But doing the full calculation here is duplicate work.
+
+		// Alternative: The endpoint `/api/photos/download-zip` should handle this.
+		// If it's multipart, it returns JSON.
+		// The frontend should FETCH this URL first instead of setting window.location.href immediately?
+		// No, `createDownloadTicket` is called by frontend, receives `downloadUrl`.
+		// Then frontend sets window.location.href to `downloadUrl`.
+
+		// If I change `download-zip` to return JSON for multipart:
+		// 1. User clicks download.
+		// 2. Frontend calls `createDownloadTicket`.
+		// 3. Frontend receives `downloadUrl`.
+		// 4. Frontend should probably fetch `downloadUrl` with `HEAD` or just `GET` via fetch first?
+		//    Or we can just return the manifest HERE in `createDownloadTicket` if possible?
+		//    Let's stick to the plan: modify the frontend to fetch the downloadUrl.
+
 		res.json({ success: true, downloadUrl });
 
 	} catch (error) {
@@ -1314,14 +1352,14 @@ export const downloadWithTicket = async (req: Request, res: Response) => {
 
 		switch (filter) {
 			case 'all':
-				await DownloadService.createGalleryPhotoZip(galleryId, userId, "all", undefined, res);
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "all", undefined, res, undefined, ticket as string);
 				break;
 			case 'folder':
-				await DownloadService.createGalleryPhotoZip(galleryId, userId, "folder", folderId, res);
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "folder", folderId, res, undefined, ticket as string);
 				break;
 			case 'liked':
 			case 'favorited':
-				await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res);
+				await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, undefined, ticket as string);
 				break;
 			default:
 				return res.status(400).json({ success: false, error: "Invalid download filter" });
@@ -1362,12 +1400,21 @@ export const downloadFavoritedPhotos = async (
 			});
 		}
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'favorited'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createFilteredPhotoZip(
 			galleryId,
 			userId,
 			"favorited",
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download favorited photos error:", error);
@@ -1448,13 +1495,22 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 		res.setHeader("Connection", "keep-alive");
 		res.setHeader("Transfer-Encoding", "chunked");
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'all'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
 			galleryId,
 			userId,
 			"all",
 			undefined,
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download all photos error:", error);
@@ -1515,13 +1571,23 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 		res.setHeader("Connection", "keep-alive");
 		res.setHeader("Transfer-Encoding", "chunked");
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'folder',
+			folderId
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
 			galleryId,
 			userId,
 			"folder",
 			folderId,
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download folder photos error:", error);
@@ -2189,3 +2255,71 @@ export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 		});
 	}
 };
+
+// Download a specific part of a gallery/folder (for multipart downloads)
+// GET /photos/download/part?galleryId=...&partIndex=...&photoIds=...&filter=...
+export const downloadPart = async (req: Request, res: Response) => {
+    try {
+        const { galleryId, partIndex, photoIds, filter } = req.query;
+
+        if (!galleryId || !partIndex || !photoIds) {
+            return res.status(400).json({ success: false, error: "Missing parameters" });
+        }
+
+        const ids = (photoIds as string).split(',');
+        const index = parseInt(partIndex as string);
+
+        // We need the user ID.
+        // If this is a direct link click, we rely on the cookie (AuthRequest middleware) or a ticket.
+        const authReq = req as AuthRequest;
+        let userId = authReq.user?.id;
+
+        // If no user (e.g. client download link shared?), try to get ticket from query
+        if (!userId) {
+             const { ticket } = req.query;
+             if (ticket) {
+                 try {
+                     const decoded = jwt.verify(ticket as string, process.env.JWT_SECRET!) as any;
+                     userId = decoded.userId;
+                 } catch (e) {
+                     return res.status(401).json({ success: false, error: "Invalid or expired ticket" });
+                 }
+             }
+        }
+
+        if (!userId) {
+             return res.status(401).json({ success: false, error: "Authentication required" });
+        }
+
+        await processDownloadPart(res, userId, galleryId as string, ids, filter as any, index);
+
+    } catch (error) {
+        console.error("Download part error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: "Failed to download part" });
+        }
+    }
+}
+
+async function processDownloadPart(res: Response, userId: string, galleryId: string, photoIds: string[], filter: string, partIndex: number) {
+    // We reuse createGalleryPhotoZip / createFilteredPhotoZip but pass the specific photoIds
+    // We also need to override the filename to include "Part X"
+
+    // Note: DownloadService methods don't natively take a filename override or "Part X" label yet,
+    // except via the internal logic I added (which was for *generating* the manifest).
+    // I need to update DownloadService to accept `partIds` and use them.
+    // I ALREADY did this in the previous step! :)
+
+    if (filter === 'liked' || filter === 'favorited') {
+        await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, photoIds);
+    } else {
+        // filter is 'all' or 'folder'.
+        // For 'all' or 'folder', we just use createGalleryPhotoZip.
+        // If it was 'folder', we might need folderId, but if we have photoIds, we can probably ignore folderId
+        // or just pass undefined if the service handles it.
+        // The service checks `downloadType`. If 'all', it gets all photos. If 'folder', it gets folder photos.
+        // But then it filters by `partIds`.
+        // So we can pass 'all' safely as long as `partIds` are respected.
+        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, photoIds);
+    }
+}

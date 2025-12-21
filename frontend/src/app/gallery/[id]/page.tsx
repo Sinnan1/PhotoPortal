@@ -43,6 +43,7 @@ import { useDownloadProgress } from "@/hooks/use-download-progress";
 import { SelectionCounter } from "@/components/ui/selection-counter";
 import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summary";
 import { DownloadWarningModal } from "@/components/ui/download-warning-modal";
+import { MultipartDownloadModal } from "@/components/ui/multipart-download-modal";
 import { formatBytes } from "@/lib/utils";
 
 // Import the API base URL and getAuthToken function
@@ -108,6 +109,11 @@ function GalleryPage() {
     folderId?: string;
     folderName?: string;
   }>({ open: false, type: null, count: 0, size: 0 });
+
+  const [multipartModal, setMultipartModal] = useState<{
+    open: boolean;
+    parts: any[];
+  }>({ open: false, parts: [] });
 
   // React Query hooks
   const { data: gallery, isLoading: galleryLoading, error: galleryError } = useGallery(galleryId, { password });
@@ -334,7 +340,40 @@ function GalleryPage() {
       const response = await api.createDownloadTicket(galleryId, options);
       console.log("Download ticket response:", response);
       if (response && response.downloadUrl) {
-        window.location.href = response.downloadUrl;
+        // Check if the download will be multipart by inspecting headers
+        try {
+            // We use a fetch request to check the Content-Type header.
+            // If it's JSON, it's a multipart manifest.
+            // If it's ZIP, it's a direct download (start via window.location)
+
+            // Note: We abort this fetch immediately if it's a zip to avoid downloading 5GB!
+            const controller = new AbortController();
+            const checkResponse = await fetch(response.downloadUrl, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            const contentType = checkResponse.headers.get('content-type');
+
+            if (contentType && contentType.includes('application/json')) {
+                // It's a multipart manifest
+                const data = await checkResponse.json();
+                setMultipartModal({
+                    open: true,
+                    parts: data.parts
+                });
+            } else {
+                // It's a zip file (or error, handled by browser)
+                // Abort the fetch to stop downloading
+                controller.abort();
+                // Trigger actual browser download
+                window.location.href = response.downloadUrl;
+            }
+        } catch (fetchError) {
+             console.error("Error checking download type:", fetchError);
+             // Fallback to direct download attempt
+             window.location.href = response.downloadUrl;
+        }
       } else {
         showToast("Failed to get download URL", "error");
       }
@@ -1260,6 +1299,12 @@ function GalleryPage() {
         }
         photoCount={downloadModal.count}
         estimatedSize={downloadModal.size}
+      />
+
+      <MultipartDownloadModal
+        open={multipartModal.open}
+        onOpenChange={(open) => setMultipartModal(prev => ({ ...prev, open }))}
+        parts={multipartModal.parts}
       />
     </div>
   );
