@@ -1301,35 +1301,6 @@ export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
 		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${protocol}://${req.get('host')}`;
 		const downloadUrl = `${baseUrl}/api/photos/download-zip?ticket=${ticket}`;
 
-		// Check if we should return multipart manifest (pre-check)
-		// This re-uses the logic in DownloadService.createGalleryPhotoZip/createFilteredPhotoZip
-		// by calling it with a fake response object to capture the JSON output if it's multipart.
-		// However, since we are just generating a ticket here, we can't fully know if it will be multipart until we try.
-		// A better approach is to let the frontend use the ticket to GET the download URL.
-		// If that GET request returns JSON (multipart manifest), the browser/frontend handles it.
-		// If it returns a zip stream, the browser downloads it.
-
-		// Wait, the frontend uses `window.location.href = response.downloadUrl`.
-		// If `downloadUrl` points to an endpoint that returns JSON, the browser will display the JSON.
-		// This is bad for user experience.
-
-		// We need to know NOW if it's going to be multipart so we can tell the frontend.
-		// But doing the full calculation here is duplicate work.
-
-		// Alternative: The endpoint `/api/photos/download-zip` should handle this.
-		// If it's multipart, it returns JSON.
-		// The frontend should FETCH this URL first instead of setting window.location.href immediately?
-		// No, `createDownloadTicket` is called by frontend, receives `downloadUrl`.
-		// Then frontend sets window.location.href to `downloadUrl`.
-
-		// If I change `download-zip` to return JSON for multipart:
-		// 1. User clicks download.
-		// 2. Frontend calls `createDownloadTicket`.
-		// 3. Frontend receives `downloadUrl`.
-		// 4. Frontend should probably fetch `downloadUrl` with `HEAD` or just `GET` via fetch first?
-		//    Or we can just return the manifest HERE in `createDownloadTicket` if possible?
-		//    Let's stick to the plan: modify the frontend to fetch the downloadUrl.
-
 		res.json({ success: true, downloadUrl });
 
 	} catch (error) {
