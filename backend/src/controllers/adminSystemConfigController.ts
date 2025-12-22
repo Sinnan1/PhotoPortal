@@ -335,6 +335,7 @@ export const getAllConfigurations = async (req: AdminAuthRequest, res: Response)
             security: {},
             registration: {},
             gallery: {},
+            download: {},
             branding: {},
             email: {}
         }
@@ -1054,6 +1055,7 @@ export const getConfigurationSchema = async (req: AdminAuthRequest, res: Respons
             security: {},
             registration: {},
             gallery: {},
+            download: {},
             branding: {},
             email: {}
         }
