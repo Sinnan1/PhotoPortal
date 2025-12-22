@@ -2248,13 +2248,12 @@ export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 // GET /photos/download/part?galleryId=...&partIndex=...&photoIds=...&filter=...
 export const downloadPart = async (req: Request, res: Response) => {
     try {
-        const { galleryId, partIndex, photoIds, filter } = req.query;
+        const { galleryId, partIndex, filter } = req.query;
 
-        if (!galleryId || !partIndex || !photoIds) {
+        if (!galleryId || !partIndex) {
             return res.status(400).json({ success: false, error: "Missing parameters" });
         }
 
-        const ids = (photoIds as string).split(',');
         const index = parseInt(partIndex as string);
 
         // We need the user ID.
@@ -2279,7 +2278,7 @@ export const downloadPart = async (req: Request, res: Response) => {
              return res.status(401).json({ success: false, error: "Authentication required" });
         }
 
-        await processDownloadPart(res, userId, galleryId as string, ids, filter as any, index);
+        await processDownloadPart(res, userId, galleryId as string, filter as any, index);
 
     } catch (error) {
         console.error("Download part error:", error);
@@ -2289,25 +2288,10 @@ export const downloadPart = async (req: Request, res: Response) => {
     }
 }
 
-async function processDownloadPart(res: Response, userId: string, galleryId: string, photoIds: string[], filter: string, partIndex: number) {
-    // We reuse createGalleryPhotoZip / createFilteredPhotoZip but pass the specific photoIds
-    // We also need to override the filename to include "Part X"
-
-    // Note: DownloadService methods don't natively take a filename override or "Part X" label yet,
-    // except via the internal logic I added (which was for *generating* the manifest).
-    // I need to update DownloadService to accept `partIds` and use them.
-    // I ALREADY did this in the previous step! :)
-
+async function processDownloadPart(res: Response, userId: string, galleryId: string, filter: string, partIndex: number) {
     if (filter === 'liked' || filter === 'favorited') {
-        await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, photoIds);
+        await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, partIndex);
     } else {
-        // filter is 'all' or 'folder'.
-        // For 'all' or 'folder', we just use createGalleryPhotoZip.
-        // If it was 'folder', we might need folderId, but if we have photoIds, we can probably ignore folderId
-        // or just pass undefined if the service handles it.
-        // The service checks `downloadType`. If 'all', it gets all photos. If 'folder', it gets folder photos.
-        // But then it filters by `partIds`.
-        // So we can pass 'all' safely as long as `partIds` are respected.
-        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, photoIds);
+        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, partIndex);
     }
 }

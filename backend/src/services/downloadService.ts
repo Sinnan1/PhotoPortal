@@ -252,7 +252,7 @@ export class DownloadService {
         downloadType: 'all' | 'folder',
         folderId?: string,
         res?: any,
-        partIds?: string[], // Optional: list of photo IDs for a specific part
+        partIndex?: number, // Optional: part index instead of IDs for URL safety
         ticket?: string // Optional: Original ticket to include in part links
     ): Promise<void> {
         // Fetch configuration
@@ -271,6 +271,7 @@ export class DownloadService {
                 folders: {
                     include: {
                         photos: {
+                            orderBy: { id: 'asc' }, // Stable sort required for partitioning
                             select: {
                                 id: true,
                                 filename: true,
@@ -311,52 +312,63 @@ export class DownloadService {
             throw new Error(`No photos found for ${downloadType} download`)
         }
 
-        // If partIds are provided, filter photos to only include those (Downloading a specific part)
-        if (partIds && partIds.length > 0) {
-             photos = photos.filter(p => partIds.includes(p.id));
-             // Don't check multipart logic again, just stream these photos as a single zip
-        } else if (downloadMode === 'multipart' && !partIds) {
-            // Check if splitting is needed
+        // Logic for Multipart:
+        // 1. If partIndex is provided, recalculate chunks and pick the specific one.
+        // 2. If no partIndex but downloadMode is multipart and size exceeds limit, generate manifest.
+
+        let targetPhotos: any[] = photos
+        let targetFilename = `${baseFilename}.zip`
+
+        if (downloadMode === 'multipart') {
             const totalSize = photos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
 
-            if (totalSize > chunkSizeBytes) {
-                // Return multipart manifest JSON instead of zip stream
-                console.log(`📦 Multipart download triggering for ${photos.length} photos (${(totalSize/1024/1024).toFixed(2)} MB)`)
+            // Generate parts list (needed for both manifest and part selection)
+            const parts = []
+            let currentChunk: any[] = []
+            let currentChunkSize = 0
+            let pIndex = 1
 
-                // Group photos into chunks
-                const parts = []
-                let currentChunk: any[] = []
-                let currentChunkSize = 0
-                let partIndex = 1
-
-                for (const photo of photos) {
-                    if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
-                        parts.push({
-                            index: partIndex,
-                            filename: `${baseFilename}_part${partIndex}.zip`,
-                            photoIds: currentChunk.map(p => p.id),
-                            size: currentChunkSize,
-                            count: currentChunk.length
-                        })
-                        partIndex++
-                        currentChunk = []
-                        currentChunkSize = 0
-                    }
-                    currentChunk.push(photo)
-                    currentChunkSize += (photo.fileSize || 0)
-                }
-
-                if (currentChunk.length > 0) {
+            for (const photo of photos) {
+                if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
                     parts.push({
-                        index: partIndex,
-                        filename: `${baseFilename}_part${partIndex}.zip`,
-                        photoIds: currentChunk.map(p => p.id),
+                        index: pIndex,
+                        filename: `${baseFilename}_part${pIndex}.zip`,
+                        photos: currentChunk,
                         size: currentChunkSize,
                         count: currentChunk.length
                     })
+                    pIndex++
+                    currentChunk = []
+                    currentChunkSize = 0
                 }
+                currentChunk.push(photo)
+                currentChunkSize += (photo.fileSize || 0)
+            }
 
-                // Send JSON response
+            if (currentChunk.length > 0) {
+                parts.push({
+                    index: pIndex,
+                    filename: `${baseFilename}_part${pIndex}.zip`,
+                    photos: currentChunk,
+                    size: currentChunkSize,
+                    count: currentChunk.length
+                })
+            }
+
+            // Case A: User requested specific part
+            if (partIndex !== undefined) {
+                const part = parts.find(p => p.index === partIndex)
+                if (!part) {
+                    throw new Error('Part not found')
+                }
+                targetPhotos = part.photos
+                targetFilename = part.filename
+                console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
+            }
+            // Case B: Needs splitting, return manifest
+            else if (totalSize > chunkSizeBytes) {
+                console.log(`📦 Multipart download triggering for ${photos.length} photos (${(totalSize/1024/1024).toFixed(2)} MB)`)
+
                 if (res) {
                     res.json({
                         multipart: true,
@@ -365,7 +377,8 @@ export class DownloadService {
                             filename: p.filename,
                             size: p.size,
                             count: p.count,
-                            downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&photoIds=${p.photoIds.join(',')}${ticket ? `&ticket=${ticket}` : ''}`
+                            // Use partIndex instead of photoIds for robust, short URLs
+                            downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}${ticket ? `&ticket=${ticket}` : ''}`
                         }))
                     })
                 }
@@ -373,28 +386,26 @@ export class DownloadService {
             }
         }
 
-        const zipFilename = `${baseFilename}.zip`
-
         // Calculate exact size for Content-Length header
         let exactZipSize = 22; // Start with EOCD size
 
-        for (const photo of photos) {
+        for (const photo of targetPhotos) {
             const filenameLength = Buffer.byteLength(photo.filename);
             const fileOverhead = 92 + (2 * filenameLength); // 30 + 16 + 46 = 92
             exactZipSize += (photo.fileSize || 0) + fileOverhead;
         }
 
         // Create download tracking
-        const downloadId = this.createDownload(zipFilename, photos.length)
+        const downloadId = this.createDownload(targetFilename, targetPhotos.length)
 
-        console.log(`📦 Starting download: ${downloadId} (${photos.length} photos, exact size: ${Math.round(exactZipSize / 1024 / 1024 * 10) / 10} MB)`)
+        console.log(`📦 Starting download: ${downloadId} (${targetPhotos.length} photos, exact size: ${Math.round(exactZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         try {
             const useCompression = false
 
             if (res) {
                 res.setHeader('Content-Type', 'application/zip')
-                res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
+                res.setHeader('Content-Disposition', `attachment; filename="${targetFilename}"`)
                 res.setHeader('X-Download-ID', downloadId)
                 res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
 
@@ -442,15 +453,14 @@ export class DownloadService {
             }
 
             // USE SEQUENTIAL PROCESSING
-            console.log(`📦 Processing ${photos.length} photos SEQUENTIALLY`)
-            await this.processPhotosSequentially(photos, archive, downloadId)
+            await this.processPhotosSequentially(targetPhotos, archive, downloadId)
 
             // Finalize
             await archive.finalize()
 
             this.updateProgress(downloadId, {
                 status: 'ready',
-                processedPhotos: photos.length
+                processedPhotos: targetPhotos.length
             })
 
         } catch (error) {
@@ -470,7 +480,7 @@ export class DownloadService {
         userId: string,
         filterType: 'liked' | 'favorited',
         res: any,
-        partIds?: string[],
+        partIndex?: number,
         ticket?: string // Optional: Original ticket to include in part links
     ): Promise<void> {
         // Fetch configuration
@@ -504,6 +514,7 @@ export class DownloadService {
                     userId,
                     photo: { folder: { galleryId } }
                 },
+                orderBy: { photoId: 'asc' }, // Stable sort
                 include: {
                     photo: {
                         select: {
@@ -520,6 +531,7 @@ export class DownloadService {
                     userId,
                     photo: { folder: { galleryId } }
                 },
+                orderBy: { photoId: 'asc' }, // Stable sort
                 include: {
                     photo: {
                         select: {
@@ -540,51 +552,58 @@ export class DownloadService {
 
         const baseFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_${filterType}_photos`
 
-         // Filter by partIds if provided
-        if (partIds && partIds.length > 0) {
-            filteredPhotos = filteredPhotos.filter(p => partIds.includes(p.photo.id));
-        } else if (downloadMode === 'multipart' && !partIds) {
-             // Calculate total size
-             const totalSize = filteredPhotos.reduce((sum, p) => sum + (p.photo.fileSize || 0), 0)
+        let targetPhotos: any[] = filteredPhotos.map(item => item.photo)
+        let targetFilename = `${baseFilename}.zip`
 
-             if (totalSize > chunkSizeBytes) {
-                 // Generate parts
-                 console.log(`📦 Multipart download triggering for ${filteredPhotos.length} ${filterType} photos`)
+        if (downloadMode === 'multipart') {
+             const totalSize = targetPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
 
-                 const parts = []
-                 let currentChunk: any[] = []
-                 let currentChunkSize = 0
-                 let partIndex = 1
+             // Generate parts list
+             const parts = []
+             let currentChunk: any[] = []
+             let currentChunkSize = 0
+             let pIndex = 1
 
-                 for (const item of filteredPhotos) {
-                     const photo = item.photo
-                     if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
-                         parts.push({
-                             index: partIndex,
-                             filename: `${baseFilename}_part${partIndex}.zip`,
-                             photoIds: currentChunk.map(p => p.id),
-                             size: currentChunkSize,
-                             count: currentChunk.length
-                         })
-                         partIndex++
-                         currentChunk = []
-                         currentChunkSize = 0
-                     }
-                     currentChunk.push(photo)
-                     currentChunkSize += (photo.fileSize || 0)
-                 }
-
-                 if (currentChunk.length > 0) {
+             for (const photo of targetPhotos) {
+                 if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
                      parts.push({
-                         index: partIndex,
-                         filename: `${baseFilename}_part${partIndex}.zip`,
-                         photoIds: currentChunk.map(p => p.id),
+                         index: pIndex,
+                         filename: `${baseFilename}_part${pIndex}.zip`,
+                         photos: currentChunk,
                          size: currentChunkSize,
                          count: currentChunk.length
                      })
+                     pIndex++
+                     currentChunk = []
+                     currentChunkSize = 0
                  }
+                 currentChunk.push(photo)
+                 currentChunkSize += (photo.fileSize || 0)
+             }
 
-                 // Send JSON response
+             if (currentChunk.length > 0) {
+                 parts.push({
+                     index: pIndex,
+                     filename: `${baseFilename}_part${pIndex}.zip`,
+                     photos: currentChunk,
+                     size: currentChunkSize,
+                     count: currentChunk.length
+                 })
+             }
+
+             // Case A: User requested specific part
+             if (partIndex !== undefined) {
+                 const part = parts.find(p => p.index === partIndex)
+                 if (!part) {
+                     throw new Error('Part not found')
+                 }
+                 targetPhotos = part.photos
+                 targetFilename = part.filename
+                 console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
+             }
+             // Case B: Needs splitting, return manifest
+             else if (totalSize > chunkSizeBytes) {
+                 console.log(`📦 Multipart download triggering for ${filteredPhotos.length} ${filterType} photos`)
                  if (res) {
                      res.json({
                          multipart: true,
@@ -593,7 +612,8 @@ export class DownloadService {
                              filename: p.filename,
                              size: p.size,
                              count: p.count,
-                             downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&photoIds=${p.photoIds.join(',')}&filter=${filterType}${ticket ? `&ticket=${ticket}` : ''}`
+                             // Use partIndex instead of photoIds
+                             downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&filter=${filterType}${ticket ? `&ticket=${ticket}` : ''}`
                          }))
                      })
                  }
@@ -601,21 +621,19 @@ export class DownloadService {
              }
         }
 
-        const zipFilename = `${baseFilename}.zip`
-
         let exactZipSize = 22;
 
-        for (const item of filteredPhotos) {
-            const filenameLength = Buffer.byteLength(item.photo.filename);
+        for (const photo of targetPhotos) {
+            const filenameLength = Buffer.byteLength(photo.filename);
             const fileOverhead = 92 + (2 * filenameLength);
-            exactZipSize += (item.photo.fileSize || 0) + fileOverhead;
+            exactZipSize += (photo.fileSize || 0) + fileOverhead;
         }
 
-        const downloadId = this.createDownload(zipFilename, filteredPhotos.length)
+        const downloadId = this.createDownload(targetFilename, targetPhotos.length)
         console.log(`📦 Starting ${filterType} download: ${downloadId}`)
 
         res.setHeader('Content-Type', 'application/zip')
-        res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
+        res.setHeader('Content-Disposition', `attachment; filename="${targetFilename}"`)
         res.setHeader('X-Download-ID', downloadId)
 
         if (exactZipSize > 0) {
@@ -647,63 +665,17 @@ export class DownloadService {
         archive.pipe(res)
 
         // Process sequentially
-        const photos = filteredPhotos.map(fp => fp.photo)
-        await this.processPhotosSequentially(photos, archive, downloadId)
+        await this.processPhotosSequentially(targetPhotos, archive, downloadId)
 
         await archive.finalize()
 
         this.updateProgress(downloadId, {
             status: 'ready',
-            processedPhotos: filteredPhotos.length
+            processedPhotos: targetPhotos.length
         })
 
         setTimeout(() => {
             this.cleanupDownload(downloadId)
         }, 300000)
-    }
-
-    static async verifyGalleryAccess(
-        galleryId: string,
-        userId: string,
-        userRole: string,
-        password?: string
-    ): Promise<boolean> {
-        const gallery = await prisma.gallery.findUnique({
-            where: { id: galleryId },
-            select: {
-                password: true,
-                photographerId: true
-            }
-        })
-
-        if (!gallery) {
-            return false
-        }
-
-        // Check if gallery has password protection
-        if (gallery.password) {
-            // Check if user is photographer owner or client with access
-            if (userRole === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
-                return true
-            }
-
-            const hasAccess = await prisma.galleryAccess.findUnique({
-                where: { userId_galleryId: { userId, galleryId } }
-            })
-
-            if (hasAccess) {
-                return true
-            }
-
-            // Validate provided password
-            if (!password) {
-                return false
-            }
-
-            const bcrypt = await import('bcryptjs')
-            return await bcrypt.default.compare(password, gallery.password)
-        }
-
-        return true
     }
 }
