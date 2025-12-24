@@ -63,7 +63,7 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         required: true,
         description: 'Allowed file types for uploads'
     },
-    
+
     // Security settings
     'security.sessionTimeout': {
         type: 'number',
@@ -93,7 +93,7 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         max: 60,
         description: 'Account lockout duration in minutes'
     },
-    
+
     // User registration settings
     'registration.enabled': {
         type: 'boolean',
@@ -111,7 +111,7 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         enum: ['CLIENT', 'PHOTOGRAPHER'],
         description: 'Default role for new registrations'
     },
-    
+
     // Gallery settings
     'gallery.defaultExpirationDays': {
         type: 'number',
@@ -149,7 +149,21 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         max: 10000,
         description: 'Multipart chunk size in MB'
     },
-    
+
+    // Upload settings
+    'upload.compressionEnabled': {
+        type: 'boolean',
+        required: true,
+        description: 'Enable compression option for photographers'
+    },
+    'upload.compressionQuality': {
+        type: 'number',
+        required: true,
+        min: 10,
+        max: 100,
+        description: 'Compression quality percentage (10-100, higher = better quality, less compression)'
+    },
+
     // Branding settings
     'branding.siteName': {
         type: 'string',
@@ -173,7 +187,7 @@ const CONFIG_SCHEMA: Record<string, ConfigValidationRule> = {
         pattern: '^#[0-9A-Fa-f]{6}$',
         description: 'Secondary brand color (hex format)'
     },
-    
+
     // Email settings
     'email.fromAddress': {
         type: 'string',
@@ -210,6 +224,8 @@ const DEFAULT_CONFIG: Record<string, any> = {
     'gallery.defaultDownloadLimit': 0,
     'download.mode': 'single',
     'download.chunkSize': 2000,
+    'upload.compressionEnabled': true,
+    'upload.compressionQuality': 90,
     'branding.siteName': 'Yarrow Weddings & Co.',
     'email.notificationsEnabled': true
 }
@@ -336,6 +352,7 @@ export const getAllConfigurations = async (req: AdminAuthRequest, res: Response)
             registration: {},
             gallery: {},
             download: {},
+            upload: {},
             branding: {},
             email: {}
         }
