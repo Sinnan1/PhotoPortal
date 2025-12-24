@@ -35,6 +35,7 @@ export default function ConfigurationForm({
     registration: 'User Registration',
     gallery: 'Gallery Settings',
     download: 'Download Settings',
+    upload: 'Upload Settings',
     branding: 'Branding & UI',
     email: 'Email Settings'
   }

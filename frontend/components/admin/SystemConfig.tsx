@@ -54,6 +54,7 @@ export default function SystemConfig({
         { id: 'registration', name: 'User Registration', icon: '👥' },
         { id: 'gallery', name: 'Gallery Settings', icon: '🖼️' },
         { id: 'download', name: 'Download Settings', icon: '⬇️' },
+        { id: 'upload', name: 'Upload Settings', icon: '⬆️' },
         { id: 'branding', name: 'Branding & UI', icon: '🎨' },
         { id: 'email', name: 'Email Settings', icon: '📧' }
     ]
