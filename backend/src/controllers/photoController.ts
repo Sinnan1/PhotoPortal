@@ -2247,51 +2247,51 @@ export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 // Download a specific part of a gallery/folder (for multipart downloads)
 // GET /photos/download/part?galleryId=...&partIndex=...&photoIds=...&filter=...
 export const downloadPart = async (req: Request, res: Response) => {
-    try {
-        const { galleryId, partIndex, filter } = req.query;
+	try {
+		const { galleryId, partIndex, filter } = req.query;
 
-        if (!galleryId || !partIndex) {
-            return res.status(400).json({ success: false, error: "Missing parameters" });
-        }
+		if (!galleryId || !partIndex) {
+			return res.status(400).json({ success: false, error: "Missing parameters" });
+		}
 
-        const index = parseInt(partIndex as string);
+		const index = parseInt(partIndex as string);
 
-        // We need the user ID.
-        // If this is a direct link click, we rely on the cookie (AuthRequest middleware) or a ticket.
-        const authReq = req as AuthRequest;
-        let userId = authReq.user?.id;
+		// We need the user ID.
+		// If this is a direct link click, we rely on the cookie (AuthRequest middleware) or a ticket.
+		const authReq = req as AuthRequest;
+		let userId = authReq.user?.id;
 
-        // If no user (e.g. client download link shared?), try to get ticket from query
-        if (!userId) {
-             const { ticket } = req.query;
-             if (ticket) {
-                 try {
-                     const decoded = jwt.verify(ticket as string, process.env.JWT_SECRET!) as any;
-                     userId = decoded.userId;
-                 } catch (e) {
-                     return res.status(401).json({ success: false, error: "Invalid or expired ticket" });
-                 }
-             }
-        }
+		// If no user (e.g. client download link shared?), try to get ticket from query
+		if (!userId) {
+			const { ticket } = req.query;
+			if (ticket) {
+				try {
+					const decoded = jwt.verify(ticket as string, process.env.JWT_SECRET!) as any;
+					userId = decoded.userId;
+				} catch (e) {
+					return res.status(401).json({ success: false, error: "Invalid or expired ticket" });
+				}
+			}
+		}
 
-        if (!userId) {
-             return res.status(401).json({ success: false, error: "Authentication required" });
-        }
+		if (!userId) {
+			return res.status(401).json({ success: false, error: "Authentication required" });
+		}
 
-        await processDownloadPart(res, userId, galleryId as string, filter as any, index);
+		await processDownloadPart(res, userId, galleryId as string, filter as any, index);
 
-    } catch (error) {
-        console.error("Download part error:", error);
-        if (!res.headersSent) {
-            res.status(500).json({ success: false, error: "Failed to download part" });
-        }
-    }
+	} catch (error) {
+		console.error("Download part error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({ success: false, error: "Failed to download part" });
+		}
+	}
 }
 
 async function processDownloadPart(res: Response, userId: string, galleryId: string, filter: string, partIndex: number) {
-    if (filter === 'liked' || filter === 'favorited') {
-        await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, partIndex);
-    } else {
-        await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, partIndex);
-    }
+	if (filter === 'liked' || filter === 'favorited') {
+		await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, partIndex);
+	} else {
+		await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, partIndex);
+	}
 }

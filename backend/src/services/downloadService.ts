@@ -126,6 +126,69 @@ export class DownloadService {
     }
 
     /**
+     * Verify user has access to a gallery for downloads
+     */
+    static async verifyGalleryAccess(
+        galleryId: string,
+        userId: string,
+        userRole: string,
+        password?: string
+    ): Promise<boolean> {
+        try {
+            const gallery = await prisma.gallery.findUnique({
+                where: { id: galleryId },
+                select: {
+                    photographerId: true,
+                    password: true
+                }
+            })
+
+            if (!gallery) {
+                return false
+            }
+
+            // Photographer always has access to their own galleries
+            if (userRole === 'PHOTOGRAPHER' && gallery.photographerId === userId) {
+                return true
+            }
+
+            // Admin has access to all galleries
+            if (userRole === 'ADMIN') {
+                return true
+            }
+
+            // For clients, check if they have explicit access
+            if (userRole === 'CLIENT') {
+                const hasAccess = await prisma.galleryAccess.findUnique({
+                    where: {
+                        userId_galleryId: {
+                            userId,
+                            galleryId
+                        }
+                    }
+                })
+
+                if (!hasAccess) {
+                    return false
+                }
+
+                // If gallery has password, verify it matches
+                if (gallery.password && password !== gallery.password) {
+                    return false
+                }
+
+                return true
+            }
+
+            return false
+
+        } catch (error) {
+            console.error('Error verifying gallery access:', error)
+            return false
+        }
+    }
+
+    /**
      * Determines the download strategy (Single Zip vs Multipart) based on size
      */
     static async getDownloadStrategy(
@@ -367,7 +430,7 @@ export class DownloadService {
             }
             // Case B: Needs splitting, return manifest
             else if (totalSize > chunkSizeBytes) {
-                console.log(`📦 Multipart download triggering for ${photos.length} photos (${(totalSize/1024/1024).toFixed(2)} MB)`)
+                console.log(`📦 Multipart download triggering for ${photos.length} photos (${(totalSize / 1024 / 1024).toFixed(2)} MB)`)
 
                 if (res) {
                     res.json({
@@ -426,7 +489,7 @@ export class DownloadService {
                 console.error('Archive error:', err)
                 this.updateProgress(downloadId, { status: 'error', error: err.message })
                 if (archive && typeof archive.destroy === 'function') {
-                    try { archive.destroy() } catch (e) {}
+                    try { archive.destroy() } catch (e) { }
                 }
                 if (res && !res.headersSent) {
                     res.status(500).json({ success: false, error: 'Failed to create archive' })
@@ -437,7 +500,7 @@ export class DownloadService {
                 console.log('⚠️ Client disconnected, aborting archive creation')
                 this.updateProgress(downloadId, { status: 'error', error: 'Client disconnected' })
                 if (archive && typeof archive.destroy === 'function') {
-                    try { archive.destroy() } catch (e) {}
+                    try { archive.destroy() } catch (e) { }
                 }
             }
 
@@ -556,69 +619,69 @@ export class DownloadService {
         let targetFilename = `${baseFilename}.zip`
 
         if (downloadMode === 'multipart') {
-             const totalSize = targetPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
+            const totalSize = targetPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
 
-             // Generate parts list
-             const parts = []
-             let currentChunk: any[] = []
-             let currentChunkSize = 0
-             let pIndex = 1
+            // Generate parts list
+            const parts = []
+            let currentChunk: any[] = []
+            let currentChunkSize = 0
+            let pIndex = 1
 
-             for (const photo of targetPhotos) {
-                 if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
-                     parts.push({
-                         index: pIndex,
-                         filename: `${baseFilename}_part${pIndex}.zip`,
-                         photos: currentChunk,
-                         size: currentChunkSize,
-                         count: currentChunk.length
-                     })
-                     pIndex++
-                     currentChunk = []
-                     currentChunkSize = 0
-                 }
-                 currentChunk.push(photo)
-                 currentChunkSize += (photo.fileSize || 0)
-             }
+            for (const photo of targetPhotos) {
+                if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
+                    parts.push({
+                        index: pIndex,
+                        filename: `${baseFilename}_part${pIndex}.zip`,
+                        photos: currentChunk,
+                        size: currentChunkSize,
+                        count: currentChunk.length
+                    })
+                    pIndex++
+                    currentChunk = []
+                    currentChunkSize = 0
+                }
+                currentChunk.push(photo)
+                currentChunkSize += (photo.fileSize || 0)
+            }
 
-             if (currentChunk.length > 0) {
-                 parts.push({
-                     index: pIndex,
-                     filename: `${baseFilename}_part${pIndex}.zip`,
-                     photos: currentChunk,
-                     size: currentChunkSize,
-                     count: currentChunk.length
-                 })
-             }
+            if (currentChunk.length > 0) {
+                parts.push({
+                    index: pIndex,
+                    filename: `${baseFilename}_part${pIndex}.zip`,
+                    photos: currentChunk,
+                    size: currentChunkSize,
+                    count: currentChunk.length
+                })
+            }
 
-             // Case A: User requested specific part
-             if (partIndex !== undefined) {
-                 const part = parts.find(p => p.index === partIndex)
-                 if (!part) {
-                     throw new Error('Part not found')
-                 }
-                 targetPhotos = part.photos
-                 targetFilename = part.filename
-                 console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
-             }
-             // Case B: Needs splitting, return manifest
-             else if (totalSize > chunkSizeBytes) {
-                 console.log(`📦 Multipart download triggering for ${filteredPhotos.length} ${filterType} photos`)
-                 if (res) {
-                     res.json({
-                         multipart: true,
-                         parts: parts.map(p => ({
-                             part: p.index,
-                             filename: p.filename,
-                             size: p.size,
-                             count: p.count,
-                             // Use partIndex instead of photoIds
-                             downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&filter=${filterType}${ticket ? `&ticket=${ticket}` : ''}`
-                         }))
-                     })
-                 }
-                 return
-             }
+            // Case A: User requested specific part
+            if (partIndex !== undefined) {
+                const part = parts.find(p => p.index === partIndex)
+                if (!part) {
+                    throw new Error('Part not found')
+                }
+                targetPhotos = part.photos
+                targetFilename = part.filename
+                console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
+            }
+            // Case B: Needs splitting, return manifest
+            else if (totalSize > chunkSizeBytes) {
+                console.log(`📦 Multipart download triggering for ${filteredPhotos.length} ${filterType} photos`)
+                if (res) {
+                    res.json({
+                        multipart: true,
+                        parts: parts.map(p => ({
+                            part: p.index,
+                            filename: p.filename,
+                            size: p.size,
+                            count: p.count,
+                            // Use partIndex instead of photoIds
+                            downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&filter=${filterType}${ticket ? `&ticket=${ticket}` : ''}`
+                        }))
+                    })
+                }
+                return
+            }
         }
 
         let exactZipSize = 22;
@@ -649,13 +712,13 @@ export class DownloadService {
         const archiveErrorHandler = (err: any) => {
             console.error('Archive error:', err)
             this.updateProgress(downloadId, { status: 'error', error: err.message })
-            try { archive.destroy() } catch (e) {}
+            try { archive.destroy() } catch (e) { }
         }
 
         const clientDisconnectHandler = () => {
-             console.log('⚠️ Client disconnected')
-             this.updateProgress(downloadId, { status: 'error', error: 'Client disconnected' })
-             try { archive.destroy() } catch (e) {}
+            console.log('⚠️ Client disconnected')
+            this.updateProgress(downloadId, { status: 'error', error: 'Client disconnected' })
+            try { archive.destroy() } catch (e) { }
         }
 
         archive.on('error', archiveErrorHandler)
