@@ -95,6 +95,19 @@ export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) 
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
+          {/* Active Users */}
+          <Link href="/admin/presence">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground relative"
+              title="Active Users"
+            >
+              <User className="h-5 w-5" />
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+            </Button>
+          </Link>
+
           {/* Notifications */}
           <AdminNotifications />
 

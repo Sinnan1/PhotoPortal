@@ -520,4 +520,14 @@ export const adminApi = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  // Presence Tracking APIs
+  getActiveUsers: () =>
+    adminApiRequest("/presence/active"),
+
+  getPresenceStats: () =>
+    adminApiRequest("/presence/stats"),
+
+  getGalleryPresence: (galleryId: string) =>
+    adminApiRequest(`/presence/gallery/${galleryId}`),
 }

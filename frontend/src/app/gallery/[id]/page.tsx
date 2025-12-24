@@ -45,6 +45,7 @@ import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summa
 import { DownloadWarningModal } from "@/components/ui/download-warning-modal";
 import { MultipartDownloadModal } from "@/components/ui/multipart-download-modal";
 import { formatBytes } from "@/lib/utils";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -85,6 +86,9 @@ function GalleryPage() {
   const galleryId = params.id as string;
   const { showToast } = useToast();
   const { user } = useAuth();
+
+  // Track presence while viewing this gallery
+  usePresenceHeartbeat(galleryId);
 
 
 
@@ -341,21 +345,21 @@ function GalleryPage() {
       console.log("Download ticket response:", response);
       if (response && response.downloadUrl) {
         if (response.strategy === 'MULTIPART_MANIFEST') {
-            // It's a multipart download, fetch the manifest
-            try {
-                const manifestResponse = await fetch(response.downloadUrl);
-                const data = await manifestResponse.json();
-                setMultipartModal({
-                    open: true,
-                    parts: data.parts
-                });
-            } catch (error) {
-                console.error("Failed to fetch multipart manifest:", error);
-                showToast("Failed to prepare download", "error");
-            }
+          // It's a multipart download, fetch the manifest
+          try {
+            const manifestResponse = await fetch(response.downloadUrl);
+            const data = await manifestResponse.json();
+            setMultipartModal({
+              open: true,
+              parts: data.parts
+            });
+          } catch (error) {
+            console.error("Failed to fetch multipart manifest:", error);
+            showToast("Failed to prepare download", "error");
+          }
         } else {
-            // Direct stream, use standard browser download
-            window.location.href = response.downloadUrl;
+          // Direct stream, use standard browser download
+          window.location.href = response.downloadUrl;
         }
       } else {
         showToast("Failed to get download URL", "error");

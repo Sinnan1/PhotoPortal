@@ -123,6 +123,12 @@ const navigationItems: NavigationItem[] = [
                 path: "/admin/analytics/users",
             },
             {
+                id: "active-users",
+                label: "Active Users",
+                icon: Activity,
+                path: "/admin/presence",
+            },
+            {
                 id: "performance",
                 label: "Performance",
                 icon: TrendingUp,
