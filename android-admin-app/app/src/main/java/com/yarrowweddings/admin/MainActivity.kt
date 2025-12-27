@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
         errorView = findViewById(R.id.errorView)
         errorText = findViewById(R.id.errorText)
 
+        // Reduce sensitivity - require more pull distance to trigger refresh
+        swipeRefresh.setDistanceToTriggerSync(500) // Default is ~64dp, now requires much more pull
+
         swipeRefresh.setColorSchemeColors(
             getColor(R.color.primary),
             getColor(R.color.primary_dark)
