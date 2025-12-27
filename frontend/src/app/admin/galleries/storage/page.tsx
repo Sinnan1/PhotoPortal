@@ -24,27 +24,23 @@ import { useToast } from "@/hooks/use-toast";
 
 interface StorageData {
   totalStorage: {
-    used: number;
-    total: number;
-    percentage: number;
+    used: number; // Total bytes used in B2
+    totalPhotos: number;
+    totalGalleries: number;
+    avgFileSize: number; // Average photo size in bytes
   };
   galleryStorage: Array<{
     id: string;
     title: string;
     photographer: string;
-    size: number;
+    size: number; // Size in bytes
     photoCount: number;
     lastModified: string;
     status: 'active' | 'archived' | 'large';
   }>;
-  storageBreakdown: {
-    photos: number;
-    thumbnails: number;
-    metadata: number;
-    other: number;
-  };
+  storageByType: Record<string, number>; // File type -> bytes (e.g., "JPEG": 12345678)
   warnings: Array<{
-    type: 'large_gallery' | 'storage_full' | 'old_files';
+    type: 'large_gallery' | 'old_files';
     message: string;
     count: number;
   }>;
@@ -52,9 +48,9 @@ interface StorageData {
 
 export default function GalleryStoragePage() {
   const [storageData, setStorageData] = useState<StorageData>({
-    totalStorage: { used: 0, total: 10, percentage: 0 },
+    totalStorage: { used: 0, totalPhotos: 0, totalGalleries: 0, avgFileSize: 0 },
     galleryStorage: [],
-    storageBreakdown: { photos: 0, thumbnails: 0, metadata: 0, other: 0 },
+    storageByType: {},
     warnings: [],
   });
   const [loading, setLoading] = useState(true);
@@ -70,32 +66,30 @@ export default function GalleryStoragePage() {
     try {
       setLoading(true);
 
-      // Fetch storage analytics
-      const storageResponse = await adminApi.getStorageAnalytics();
-      const storageStats = storageResponse.data;
+      // Fetch real storage analytics from API
+      const [galleriesResponse, storageAnalyticsResponse] = await Promise.all([
+        adminApi.getAllGalleries({ limit: 100 }),
+        adminApi.getStorageAnalytics()
+      ]);
 
-      // Fetch all galleries for storage calculation
-      const galleriesResponse = await adminApi.getAllGalleries({ limit: 100 });
       const galleries = galleriesResponse.data.galleries || [];
+      const storageAnalytics = storageAnalyticsResponse.data;
 
-      // Calculate storage metrics
-      const totalUsed = galleries.length * 0.1; // Estimate 100MB per gallery
-      const totalStorage = 10; // 10GB total
-      const percentage = Math.min((totalUsed / totalStorage) * 100, 100);
+      const LARGE_GALLERY_THRESHOLD = 500 * 1024 * 1024; // 500 MB in bytes
 
-      // Generate gallery storage data
+      // Generate gallery storage data using real totalSize
       const galleryStorage = galleries.map((gallery: any) => {
-        const size = Math.random() * 0.5 + 0.05; // 50MB to 550MB
-        const photoCount = gallery.stats?.totalPhotos || Math.floor(Math.random() * 50) + 10;
+        const sizeInBytes = Number(gallery.totalSize) || 0;
+        const photoCount = gallery.stats?.totalPhotos || 0;
 
         return {
           id: gallery.id,
           title: gallery.title,
           photographer: gallery.photographer.name,
-          size: parseFloat(size.toFixed(2)),
+          size: sizeInBytes,
           photoCount,
           lastModified: gallery.createdAt,
-          status: size > 0.4 ? 'large' : 'active' as 'active' | 'archived' | 'large',
+          status: sizeInBytes > LARGE_GALLERY_THRESHOLD ? 'large' : 'active' as 'active' | 'archived' | 'large',
         };
       }).sort((a: any, b: any) => sortBy === 'size' ? b.size - a.size :
         sortBy === 'name' ? a.title.localeCompare(b.title) :
@@ -109,42 +103,29 @@ export default function GalleryStoragePage() {
         )
         : galleryStorage;
 
-      // Calculate storage breakdown
-      const totalGallerySize = galleryStorage.reduce((sum: number, g: any) => sum + g.size, 0);
-      const storageBreakdown = {
-        photos: parseFloat((totalGallerySize * 0.85).toFixed(2)),
-        thumbnails: parseFloat((totalGallerySize * 0.10).toFixed(2)),
-        metadata: parseFloat((totalGallerySize * 0.03).toFixed(2)),
-        other: parseFloat((totalGallerySize * 0.02).toFixed(2)),
-      };
+      // Calculate total photos from gallery data
+      const totalPhotos = galleryStorage.reduce((sum: number, g: any) => sum + g.photoCount, 0);
 
       // Generate warnings
       const warnings = [];
-      const largeGalleries = galleryStorage.filter((g: any) => g.size > 0.4).length;
+      const largeGalleries = galleryStorage.filter((g: any) => g.size > LARGE_GALLERY_THRESHOLD).length;
       if (largeGalleries > 0) {
         warnings.push({
           type: 'large_gallery' as const,
-          message: `${largeGalleries} galleries are using significant storage`,
+          message: `${largeGalleries} galleries are using significant storage (>500 MB)`,
           count: largeGalleries,
-        });
-      }
-
-      if (percentage > 80) {
-        warnings.push({
-          type: 'storage_full' as const,
-          message: 'Storage usage is approaching capacity',
-          count: 1,
         });
       }
 
       setStorageData({
         totalStorage: {
-          used: parseFloat(totalUsed.toFixed(2)),
-          total: totalStorage,
-          percentage: Math.round(percentage),
+          used: storageAnalytics.totalStorage || 0,
+          totalPhotos,
+          totalGalleries: galleries.length,
+          avgFileSize: storageAnalytics.totalStorage && totalPhotos ? Math.round(storageAnalytics.totalStorage / totalPhotos) : 0,
         },
         galleryStorage: filteredGalleries,
-        storageBreakdown,
+        storageByType: storageAnalytics.storageByType || {},
         warnings,
       });
 
@@ -164,10 +145,11 @@ export default function GalleryStoragePage() {
     fetchStorageData();
   }, [searchQuery, sortBy]);
 
-  const formatSize = (sizeInGB: number) => {
-    if (sizeInGB < 0.001) return `${Math.round(sizeInGB * 1000000)} KB`;
-    if (sizeInGB < 1) return `${Math.round(sizeInGB * 1000)} MB`;
-    return `${sizeInGB.toFixed(2)} GB`;
+  const formatSize = (sizeInBytes: number) => {
+    if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+    if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    if (sizeInBytes < 1024 * 1024 * 1024) return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(sizeInBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
   const getStatusBadge = (status: string, size: number) => {
@@ -208,28 +190,31 @@ export default function GalleryStoragePage() {
       </motion.div>
 
       {/* Storage Overview - Compact 2x2 on Mobile */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {[
           {
-            title: "Total Storage",
+            title: "B2 Storage Used",
             icon: HardDrive,
-            value: `${storageData.totalStorage.used} GB`,
-            progress: storageData.totalStorage.percentage,
-            subtext: `${storageData.totalStorage.percentage}% of ${storageData.totalStorage.total} GB`
+            value: formatSize(storageData.totalStorage.used),
+            subtext: "Total data stored in Backblaze B2"
           },
           {
-            title: "Available",
+            title: "Total Photos",
             icon: Database,
-            value: `${(storageData.totalStorage.total - storageData.totalStorage.used).toFixed(2)} GB`,
-            subtext: `${100 - storageData.totalStorage.percentage}% remaining`
+            value: storageData.totalStorage.totalPhotos.toLocaleString(),
+            subtext: "Across all galleries"
           },
           {
-            title: "Health",
-            icon: storageData.totalStorage.percentage > 80 ? AlertTriangle : CheckCircle,
-            value: storageData.totalStorage.percentage > 80 ? "Warning" : "Good",
-            valueColor: storageData.totalStorage.percentage > 80 ? "text-red-500" : "text-green-500",
-            subtext: storageData.totalStorage.percentage > 80 ? "Approaching capacity" : "Levels are healthy",
-            mobileColSpan: true
+            title: "Avg Photo Size",
+            icon: HardDrive,
+            value: formatSize(storageData.totalStorage.avgFileSize),
+            subtext: "Average file size"
+          },
+          {
+            title: "Total Galleries",
+            icon: FolderOpen,
+            value: storageData.totalStorage.totalGalleries.toLocaleString(),
+            subtext: "Active galleries"
           }
         ].map((stat, index) => (
           <motion.div
@@ -237,12 +222,11 @@ export default function GalleryStoragePage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
-            className={stat.mobileColSpan ? "col-span-2 md:col-span-1" : ""}
           >
             <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                <stat.icon className={`h-3.5 w-3.5 md:h-4 md:w-4 ${stat.valueColor || "text-muted-foreground"} group-hover:scale-110 transition-transform`} />
+                <stat.icon className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:scale-110 transition-transform" />
               </CardHeader>
               <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                 {loading ? (
@@ -251,10 +235,7 @@ export default function GalleryStoragePage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className={`text-xl md:text-2xl font-bold font-audrey ${stat.valueColor || ""}`}>{stat.value}</div>
-                    {stat.progress !== undefined && (
-                      <Progress value={stat.progress} className="h-1.5" />
-                    )}
+                    <div className="text-xl md:text-2xl font-bold font-audrey">{stat.value}</div>
                     <p className="text-[10px] md:text-xs text-muted-foreground">{stat.subtext}</p>
                   </div>
                 )}
@@ -281,25 +262,43 @@ export default function GalleryStoragePage() {
                 <div className="space-y-4 animate-pulse">
                   {[1, 2, 3, 4].map(i => <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded"></div>)}
                 </div>
+              ) : Object.keys(storageData.storageByType).length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-border/50 rounded-xl">
+                  <Database className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No storage data yet</p>
+                </div>
               ) : (
                 <>
-                  {[
-                    { label: "Photos", value: storageData.storageBreakdown.photos, color: "bg-blue-500" },
-                    { label: "Thumbnails", value: storageData.storageBreakdown.thumbnails, color: "bg-purple-500" },
-                    { label: "Metadata", value: storageData.storageBreakdown.metadata, color: "bg-amber-500" },
-                    { label: "Other", value: storageData.storageBreakdown.other, color: "bg-gray-500" }
-                  ].map((item, i) => (
-                    <div key={i} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${item.color}`} />
-                          <span>{item.label}</span>
+                  {Object.entries(storageData.storageByType)
+                    .sort(([, a], [, b]) => b - a) // Sort by size descending
+                    .map(([fileType, bytes], i) => {
+                      // Assign colors based on file type
+                      const colorMap: Record<string, string> = {
+                        'JPEG': 'bg-blue-500',
+                        'PNG': 'bg-emerald-500',
+                        'WEBP': 'bg-purple-500',
+                        'TIFF': 'bg-amber-500',
+                        'Canon RAW': 'bg-red-500',
+                        'Nikon RAW': 'bg-yellow-500',
+                        'Sony RAW': 'bg-orange-500',
+                        'DNG RAW': 'bg-pink-500',
+                        'Other': 'bg-gray-500',
+                      };
+                      const color = colorMap[fileType] || 'bg-gray-400';
+
+                      return (
+                        <div key={fileType} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${color}`} />
+                              <span>{fileType}</span>
+                            </div>
+                            <span className="font-medium font-mono">{formatSize(bytes)}</span>
+                          </div>
+                          <Progress value={storageData.totalStorage.used > 0 ? (bytes / storageData.totalStorage.used) * 100 : 0} className="h-1.5" />
                         </div>
-                        <span className="font-medium font-mono">{formatSize(item.value)}</span>
-                      </div>
-                      <Progress value={storageData.totalStorage.used > 0 ? (item.value / storageData.totalStorage.used) * 100 : 0} className="h-1.5" />
-                    </div>
-                  ))}
+                      );
+                    })}
                 </>
               )}
             </CardContent>

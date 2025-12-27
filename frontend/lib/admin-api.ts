@@ -56,15 +56,25 @@ export enum AdminErrorType {
 }
 
 // Get CSRF token from cookie
+// Get CSRF token from cookie with robust parsing
 function getCSRFToken() {
   if (typeof document === "undefined") return null
 
-  const csrfToken = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("csrf-token="))
-    ?.split("=")[1]
-
-  return csrfToken
+  try {
+    const match = document.cookie.match(new RegExp('(^| )csrf-token=([^;]+)'))
+    const token = match ? match[2] : null
+    if (process.env.NODE_ENV === 'development') {
+      console.log('CSRF Token Retrieval:', {
+        found: !!token,
+        token: token ? token.substring(0, 10) + '...' : 'null',
+        cookieLength: document.cookie.length
+      })
+    }
+    return token
+  } catch (e) {
+    console.error('Error parsing CSRF cookie:', e)
+    return null
+  }
 }
 
 async function adminApiRequest(endpoint: string, options: RequestInit = {}) {
@@ -73,6 +83,7 @@ async function adminApiRequest(endpoint: string, options: RequestInit = {}) {
 
   const config: RequestInit = {
     ...options,
+    credentials: 'include',
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -257,7 +268,7 @@ export const adminApi = {
 
   getGalleryStatistics: (timeRange?: string) => {
     const params = timeRange ? `?timeRange=${timeRange}` : '';
-    return adminApiRequest(`/galleries/statistics${params}`);
+    return adminApiRequest(`/galleries/analytics${params}`);
   },
 
   // Analytics APIs
@@ -268,11 +279,14 @@ export const adminApi = {
 
   getUserAnalytics: (timeRange?: string) => {
     const params = timeRange ? `?timeRange=${timeRange}` : '';
-    return adminApiRequest(`/analytics/users${params}`);
+    return adminApiRequest(`/analytics/user-analytics${params}`);
   },
 
   getStorageAnalytics: () =>
-    adminApiRequest("/analytics/storage"),
+    adminApiRequest("/analytics/storage-analytics"),
+
+  getSystemHealth: () =>
+    adminApiRequest("/analytics/system-health"),
 
   getSecurityLogs: (params?: {
     page?: number;
@@ -288,7 +302,7 @@ export const adminApi = {
       });
     }
     const queryString = queryParams.toString();
-    return adminApiRequest(`/analytics/security${queryString ? `?${queryString}` : ''}`);
+    return adminApiRequest(`/analytics/security-logs${queryString ? `?${queryString}` : ''}`);
   },
 
   // System Configuration APIs

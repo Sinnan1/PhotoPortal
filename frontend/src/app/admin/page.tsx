@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
+import { useStorageData, formatStorageSize } from "@/hooks/use-storage-data";
 import { DashboardStatCard } from "@/components/admin/DashboardStatCard";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -29,8 +30,6 @@ interface DashboardStats {
   activeUsers: number;
   totalGalleries: number;
   pendingApprovals: number;
-  storageUsed: string;
-  storageLimit: string;
 }
 
 interface RecentActivity {
@@ -47,15 +46,17 @@ export default function AdminDashboard() {
     activeUsers: 0,
     totalGalleries: 0,
     pendingApprovals: 0,
-    storageUsed: "0 MB",
-    storageLimit: "10 GB",
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Use centralized storage hook
+  const { totalStorageBytes, fetchStorageData } = useStorageData();
+
   useEffect(() => {
     fetchDashboardData();
+    fetchStorageData(); // Fetch storage separately using the centralized hook
   }, []);
 
   const fetchDashboardData = async () => {
@@ -67,23 +68,18 @@ export default function AdminDashboard() {
       const userStats = userStatsResponse.data;
 
       // Fetch gallery statistics
-      const galleryStatsResponse = await adminApi.getAllGalleries({ limit: 1 });
+      const galleryStatsResponse = await adminApi.getAllGalleries({ limit: 10 });
       const totalGalleries = galleryStatsResponse.data.pagination?.total || 0;
 
       // Fetch pending approvals
       const pendingResponse = await adminApi.getPendingApprovals();
       const pendingApprovals = pendingResponse.data.count || 0;
 
-      // Calculate storage (simplified)
-      const storageUsed = totalGalleries > 0 ? `${(totalGalleries * 0.1).toFixed(1)} GB` : "0 MB";
-
       setStats({
         totalUsers: userStats.overview.totalUsers,
         activeUsers: userStats.overview.activeUsers,
         totalGalleries,
         pendingApprovals,
-        storageUsed,
-        storageLimit: "10 GB",
       });
 
       // Generate recent activity from real data
@@ -208,10 +204,10 @@ export default function AdminDashboard() {
           delay={0.3}
         />
         <DashboardStatCard
-          title="Storage Used"
-          value={stats.storageUsed}
+          title="B2 Storage"
+          value={formatStorageSize(totalStorageBytes)}
           icon={HardDrive}
-          description={`of ${stats.storageLimit} limit`}
+          description="Total data in Backblaze B2"
           delay={0.4}
         />
       </motion.div>

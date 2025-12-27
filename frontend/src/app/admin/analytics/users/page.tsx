@@ -80,54 +80,50 @@ export default function UserAnalyticsPage() {
     try {
       setLoading(true);
 
-      // Fetch all users for calculations (no limit for accurate analytics)
-      const usersResponse = await adminApi.getAllUsers();
-      const users = usersResponse.data.users || [];
+      // Fetch real user analytics from the backend API
+      const [analyticsResponse, statsResponse] = await Promise.all([
+        adminApi.getUserAnalytics(timeRange),
+        adminApi.getUserStatistics(),
+      ]);
 
-      // Calculate role distribution
-      const photographers = users.filter((u: any) => u.role === 'photographer').length;
-      const clients = users.filter((u: any) => u.role === 'client').length;
-      const admins = users.filter((u: any) => u.role === 'admin').length;
+      const apiData = analyticsResponse.data;
+      const statsData = statsResponse.data;
 
-      // Calculate activity metrics
-      const totalUsers = users.length;
-      const activeUsers = users.filter((u: any) => u.status === 'active').length;
-      const suspendedUsers = users.filter((u: any) => u.status === 'suspended').length;
+      // Extract real role distribution from API
+      const usersByRole = apiData.usersByRole || {};
+      const photographers = usersByRole.PHOTOGRAPHER || 0;
+      const clients = usersByRole.CLIENT || 0;
+      const admins = usersByRole.ADMIN || 0;
 
-      // Estimate new users this month (simplified)
-      const newUsersThisMonth = Math.floor(totalUsers * 0.15);
-      const lastMonth = Math.floor(totalUsers * 0.12);
-      const percentageChange = lastMonth > 0 ? Math.round(((newUsersThisMonth - lastMonth) / lastMonth) * 100) : 0;
+      // Get real new users count and calculate growth
+      const newUsersThisMonth = apiData.newUsers || 0;
+      const recentUsers = statsData.overview?.recentUsers || 0;
+      const percentageChange = recentUsers > 0
+        ? Math.round(((newUsersThisMonth - recentUsers) / recentUsers) * 100)
+        : newUsersThisMonth > 0 ? 100 : 0;
 
-      // Generate top users (mock data based on real users)
-      const topUsers = users.slice(0, 5).map((user: any, index: number) => ({
+      // Use real activity data from API
+      const userActivity = apiData.userActivity || {};
+
+      // Format top users from API data
+      const topUsers = (apiData.topUsers || []).slice(0, 5).map((user: any) => ({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        lastActive: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        galleries: user.role === 'photographer' ? Math.floor(Math.random() * 10) + 1 : 0,
-        totalDownloads: Math.floor(Math.random() * 200) + 20,
+        lastActive: new Date().toISOString(), // API doesn't provide this
+        galleries: user._count?.galleries || 0,
+        totalDownloads: user.activityScore || 0, // Use activity score as engagement metric
       }));
 
-      // Generate registration trends (last 6 months)
-      const registrationTrends = [];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      for (let i = 0; i < 6; i++) {
-        registrationTrends.push({
-          month: months[i],
-          registrations: Math.floor(Math.random() * 20) + 5,
-        });
-      }
-
       setAnalytics({
-        totalUsers,
-        activeUsers,
-        suspendedUsers,
+        totalUsers: apiData.totalUsers || 0,
+        activeUsers: apiData.activeUsers || 0,
+        suspendedUsers: (apiData.totalUsers || 0) - (apiData.activeUsers || 0),
         newUsersThisMonth,
         userGrowth: {
           thisMonth: newUsersThisMonth,
-          lastMonth,
+          lastMonth: recentUsers,
           percentageChange,
         },
         usersByRole: {
@@ -136,12 +132,12 @@ export default function UserAnalyticsPage() {
           admins,
         },
         userActivity: {
-          dailyActiveUsers: Math.floor(activeUsers * 0.3),
-          weeklyActiveUsers: Math.floor(activeUsers * 0.7),
-          monthlyActiveUsers: activeUsers,
+          dailyActiveUsers: userActivity.logins || 0,
+          weeklyActiveUsers: userActivity.uploads || 0,
+          monthlyActiveUsers: userActivity.downloads || 0,
         },
         topUsers,
-        registrationTrends,
+        registrationTrends: [], // Not provided by current API
       });
 
     } catch (error: any) {
@@ -343,9 +339,9 @@ export default function UserAnalyticsPage() {
               ) : (
                 <div className="space-y-4">
                   {[
-                    { label: "Daily Active Users", count: analytics.userActivity.dailyActiveUsers, sub: "Last 24 hours", color: "bg-green-500/10 text-green-500 border-green-500/20" },
-                    { label: "Weekly Active Users", count: analytics.userActivity.weeklyActiveUsers, sub: "Last 7 days", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
-                    { label: "Monthly Active Users", count: analytics.userActivity.monthlyActiveUsers, sub: "Last 30 days", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+                    { label: "Logins", count: analytics.userActivity.dailyActiveUsers, sub: `In ${timeRange} period`, color: "bg-green-500/10 text-green-500 border-green-500/20" },
+                    { label: "Uploads", count: analytics.userActivity.weeklyActiveUsers, sub: `In ${timeRange} period`, color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+                    { label: "Downloads", count: analytics.userActivity.monthlyActiveUsers, sub: `In ${timeRange} period`, color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
                   ].map((stat, i) => (
                     <div key={i} className={`p-4 rounded-xl border ${stat.color} flex items-center justify-between transition-transform hover:scale-[1.01]`}>
                       <div>

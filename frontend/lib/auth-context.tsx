@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
 
         const response = await fetch(url, {
+          credentials: 'include',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -248,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/login`,
       {
         method: "POST",
+        credentials: 'include',
         headers: {
           "Content-Type": "application/json",
         },
@@ -287,6 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Call admin logout endpoint for proper session cleanup
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/logout`, {
           method: "POST",
+          credentials: 'include',
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -318,6 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/extend-session`, {
         method: "POST",
+        credentials: 'include',
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -357,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/validate`, {
         method: "GET",
+        credentials: 'include',
         headers: {
           "Authorization": `Bearer ${token}`,
         },

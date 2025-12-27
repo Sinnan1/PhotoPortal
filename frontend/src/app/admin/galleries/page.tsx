@@ -21,6 +21,7 @@ import {
 import { motion } from "framer-motion";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
+import { useStorageData, formatStorageSize } from "@/hooks/use-storage-data";
 import { TotalPhotoCount, PhotoCount } from "@/components/admin/PhotoCount";
 import { ClientActivityMetrics } from "@/components/admin/ClientActivityMetrics";
 import type { AdminGallery } from "@/types";
@@ -53,6 +54,7 @@ export default function AdminGalleriesPage() {
 
   useEffect(() => {
     fetchGalleries();
+    fetchStorageData(); // Fetch storage from centralized analytics API
   }, [searchQuery]);
 
   const fetchGalleries = async () => {
@@ -77,11 +79,8 @@ export default function AdminGalleriesPage() {
     }
   };
 
-  const storageStats = {
-    used: parseFloat((totalGalleries * 0.1).toFixed(1)),
-    total: 10,
-    percentage: Math.min(Math.round((totalGalleries * 0.1 / 10) * 100), 100)
-  };
+  // Use centralized storage hook for accurate B2 data
+  const { totalStorageBytes, fetchStorageData, loading: storageLoading } = useStorageData();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -110,79 +109,7 @@ export default function AdminGalleriesPage() {
         </div>
       </div>
 
-      {/* Storage Overview - Compact 2x2 on Mobile */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
-        <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Galleries</CardTitle>
-            <FolderOpen className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {loading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-6 bg-primary/10 rounded w-16"></div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <div className="text-xl md:text-2xl font-bold font-audrey">{totalGalleries}</div>
-                <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-1">
-                  Created by photographers
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Photos</CardTitle>
-            <Image className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {loading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-6 bg-primary/10 rounded w-16"></div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <div className="text-xl md:text-2xl font-bold font-audrey">
-                  <TotalPhotoCount galleries={galleries} loading={loading} showLabel={false} />
-                </div>
-                <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-1">
-                  Across all galleries
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Span 2 cols on mobile if we have 3 items, or keep as grid-cols-2 so it wraps. 
-            The 3rd one naturally drops to next row on 2-col grid. Ideally we want it full width on bottom row or just 2x2.
-            Let's make it col-span-2 on mobile for better balance if we have 3 items. */}
-        <Card className="col-span-2 md:col-span-1 border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Storage Usage</CardTitle>
-            <HardDrive className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {loading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-6 bg-primary/10 rounded w-16"></div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-xl md:text-2xl font-bold font-audrey">{storageStats.used} GB</div>
-                <div className="w-full">
-                  <Progress value={storageStats.percentage} className="h-1.5 md:h-2" />
-                  <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
-                    {storageStats.percentage}% of {storageStats.total} GB
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Search and Filters - Glassmorphic Stack */}
       <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">

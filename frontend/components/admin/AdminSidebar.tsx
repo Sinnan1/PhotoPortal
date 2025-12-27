@@ -83,26 +83,7 @@ const navigationItems: NavigationItem[] = [
         label: "Gallery Oversight",
         icon: FolderOpen,
         path: "/admin/galleries",
-        children: [
-            {
-                id: "all-galleries",
-                label: "All Galleries",
-                icon: FolderOpen,
-                path: "/admin/galleries",
-            },
-            {
-                id: "gallery-analytics",
-                label: "Gallery Analytics",
-                icon: TrendingUp,
-                path: "/admin/galleries/analytics",
-            },
-            {
-                id: "storage-management",
-                label: "Storage Management",
-                icon: Database,
-                path: "/admin/galleries/storage",
-            },
-        ],
+
     },
     {
         id: "analytics",
@@ -229,12 +210,12 @@ export function AdminSidebar({ open, setOpen, isMobile }: AdminSidebarProps) {
             variants={sidebarVariants}
             className={cn(
                 "fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-                "border-border/40 safe-area-left transition-all duration-300",
+                "border-border/40 safe-area-left transition-all duration-300 overflow-hidden",
                 !open && !isMobile && "w-20",
                 open && !isMobile && "w-72",
                 // Mobile styles
-                isMobile && "w-72 shadow-2xl", // Fixed width on mobile when open
-                isMobile && !open && "w-0 border-none pointer-events-none" // Hide completely when closed
+                isMobile && open && "w-72 shadow-2xl", // Fixed width on mobile when open
+                isMobile && !open && "w-0 border-none pointer-events-none opacity-0" // Hide completely when closed
             )}
         >
 

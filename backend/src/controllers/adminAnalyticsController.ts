@@ -103,40 +103,40 @@ export const getSystemStats = async (req: AdminAuthRequest, res: Response) => {
     ] = await Promise.all([
       // Total users
       prisma.user.count(),
-      
+
       // Active users (not suspended)
       prisma.user.count({
         where: { suspendedAt: null }
       }),
-      
+
       // Total galleries
       prisma.gallery.count(),
-      
+
       // Total photos
       prisma.photo.count(),
-      
+
       // Monthly uploads (photos created this month)
       prisma.photo.count({
         where: {
           createdAt: { gte: monthStart }
         }
       }),
-      
+
       // Storage statistics
       prisma.$queryRaw`
         SELECT 
-          SUM(file_size) as total_storage,
+          SUM("fileSize") as total_storage,
           COUNT(*) as photo_count,
-          AVG(file_size) as avg_file_size
+          AVG("fileSize") as avg_file_size
         FROM photos
       ` as Promise<any[]>,
-      
+
       // Download statistics for this month
       prisma.$queryRaw`
         SELECT 
-          SUM(download_count) as total_downloads
+          SUM("downloadCount") as total_downloads
         FROM photos p
-        WHERE p.created_at >= ${monthStart}
+        WHERE p."createdAt" >= ${monthStart}
       ` as Promise<any[]>
     ])
 
@@ -147,8 +147,8 @@ export const getSystemStats = async (req: AdminAuthRequest, res: Response) => {
     const storageConfig = await prisma.systemConfig.findUnique({
       where: { configKey: 'storage_limit' }
     })
-    const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+    const storageLimit = storageConfig ?
+      (storageConfig.configValue as any).bytes :
       100 * 1024 * 1024 * 1024 // 100GB default
 
     // Calculate error rate (from recent audit logs)
@@ -184,7 +184,7 @@ export const getSystemStats = async (req: AdminAuthRequest, res: Response) => {
       'VIEW_SYSTEM_STATISTICS',
       'system',
       undefined,
-      { 
+      {
         totalUsers,
         totalGalleries,
         storageUsed: systemStats.storageUsed,
@@ -243,25 +243,25 @@ export const getUserAnalytics = async (req: AdminAuthRequest, res: Response) => 
     ] = await Promise.all([
       // Total users
       prisma.user.count(),
-      
+
       // Active users (not suspended)
       prisma.user.count({
         where: { suspendedAt: null }
       }),
-      
+
       // New users in time range
       prisma.user.count({
         where: {
           createdAt: { gte: startDate }
         }
       }),
-      
+
       // Users by role
       prisma.user.groupBy({
         by: ['role'],
         _count: { role: true }
       }),
-      
+
       // User activity from audit logs
       prisma.adminAuditLog.groupBy({
         by: ['action'],
@@ -271,7 +271,7 @@ export const getUserAnalytics = async (req: AdminAuthRequest, res: Response) => 
         },
         _count: { action: true }
       }),
-      
+
       // Top active users (by gallery and photo activity)
       prisma.user.findMany({
         where: {
@@ -330,7 +330,7 @@ export const getUserAnalytics = async (req: AdminAuthRequest, res: Response) => 
         })
 
         const activityScore = user.galleries.length * 10 + photoCount
-        
+
         return {
           id: user.id,
           name: user.name,
@@ -407,9 +407,9 @@ export const getStorageAnalytics = async (req: AdminAuthRequest, res: Response) 
     // Get total storage statistics
     const totalStorageStats = await prisma.$queryRaw`
       SELECT 
-        SUM(file_size) as total_storage,
+        SUM("fileSize") as total_storage,
         COUNT(*) as total_photos,
-        AVG(file_size) as avg_file_size
+        AVG("fileSize") as avg_file_size
       FROM photos
     ` as any[]
 
@@ -427,7 +427,7 @@ export const getStorageAnalytics = async (req: AdminAuthRequest, res: Response) 
           WHEN filename ILIKE '%.dng' THEN 'DNG RAW'
           ELSE 'Other'
         END as file_type,
-        SUM(file_size) as total_size,
+        SUM("fileSize") as total_size,
         COUNT(*) as file_count
       FROM photos
       GROUP BY file_type
@@ -440,12 +440,12 @@ export const getStorageAnalytics = async (req: AdminAuthRequest, res: Response) 
         u.id as user_id,
         u.name as user_name,
         u.email as user_email,
-        SUM(p.file_size) as storage_used,
+        SUM(p."fileSize") as storage_used,
         COUNT(p.id) as photo_count
       FROM users u
-      JOIN galleries g ON u.id = g.photographer_id
-      JOIN folders f ON g.id = f.gallery_id
-      JOIN photos p ON f.id = p.folder_id
+      JOIN galleries g ON u.id = g."photographerId"
+      JOIN folders f ON g.id = f."galleryId"
+      JOIN photos p ON f.id = p."folderId"
       WHERE u.role = 'PHOTOGRAPHER'
       GROUP BY u.id, u.name, u.email
       ORDER BY storage_used DESC
@@ -455,12 +455,12 @@ export const getStorageAnalytics = async (req: AdminAuthRequest, res: Response) 
     // Get storage growth over time
     const storageGrowth = await prisma.$queryRaw`
       SELECT 
-        DATE(created_at) as date,
-        SUM(file_size) as new_storage,
+        DATE("createdAt") as date,
+        SUM("fileSize") as new_storage,
         COUNT(*) as new_photos
       FROM photos
-      WHERE created_at >= ${startDate}
-      GROUP BY DATE(created_at)
+      WHERE "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt")
       ORDER BY date ASC
     ` as any[]
 
@@ -499,8 +499,8 @@ export const getStorageAnalytics = async (req: AdminAuthRequest, res: Response) 
       'VIEW_STORAGE_ANALYTICS',
       'system',
       undefined,
-      { 
-        timeRange, 
+      {
+        timeRange,
         totalStorage: analytics.totalStorage,
         topUserStorage: analytics.storageByUser[0]?.storageUsed || 0
       }
@@ -556,7 +556,7 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
     // Get storage health
     const storageStats = await prisma.$queryRaw`
       SELECT 
-        SUM(file_size) as total_storage,
+        SUM("fileSize") as total_storage,
         COUNT(*) as total_files
       FROM photos
     ` as any[]
@@ -565,8 +565,8 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
     const storageConfig = await prisma.systemConfig.findUnique({
       where: { configKey: 'storage_limit' }
     })
-    const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+    const storageLimit = storageConfig ?
+      (storageConfig.configValue as any).bytes :
       100 * 1024 * 1024 * 1024 // 100GB default
 
     const storageUtilization = (totalStorage / storageLimit) * 100
@@ -603,22 +603,22 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
       },
       database: {
         responseTime: dbResponseTime,
-        status: dbResponseTime < 100 ? 'excellent' : 
-                dbResponseTime < 500 ? 'good' : 
-                dbResponseTime < 1000 ? 'fair' : 'poor'
+        status: dbResponseTime < 100 ? 'excellent' :
+          dbResponseTime < 500 ? 'good' :
+            dbResponseTime < 1000 ? 'fair' : 'poor'
       },
       storage: {
         totalUsed: totalStorage,
         totalLimit: storageLimit,
         utilizationPercent: storageUtilization,
-        status: storageUtilization < 70 ? 'healthy' : 
-                storageUtilization < 85 ? 'warning' : 'critical'
+        status: storageUtilization < 70 ? 'healthy' :
+          storageUtilization < 85 ? 'warning' : 'critical'
       },
       performance: {
         errorRate,
-        errorRateStatus: errorRate < 1 ? 'excellent' : 
-                        errorRate < 5 ? 'good' : 
-                        errorRate < 10 ? 'warning' : 'critical',
+        errorRateStatus: errorRate < 1 ? 'excellent' :
+          errorRate < 5 ? 'good' :
+            errorRate < 10 ? 'warning' : 'critical',
         activeSessions,
         recentUploads,
         uploadsPerHour: recentUploads
@@ -628,7 +628,7 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
 
     // Generate alerts based on thresholds
     const alerts: any[] = []
-    
+
     if (storageUtilization > 85) {
       alerts.push({
         type: 'storage',
@@ -687,7 +687,7 @@ export const getSystemHealth = async (req: AdminAuthRequest, res: Response) => {
       'VIEW_SYSTEM_HEALTH',
       'system',
       undefined,
-      { 
+      {
         storageUtilization,
         errorRate,
         dbResponseTime,
@@ -714,7 +714,7 @@ et security event logging and suspicious activity detection
 export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
   try {
     const adminId = req.admin!.id
-    const { 
+    const {
       timeRange = '7d',
       severity,
       eventType,
@@ -835,7 +835,7 @@ export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
           action: { contains: 'LOGIN_FAILED' }
         }
       }),
-      
+
       // Unauthorized access attempts
       prisma.adminAuditLog.count({
         where: {
@@ -843,7 +843,7 @@ export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
           action: { contains: 'UNAUTHORIZED' }
         }
       }),
-      
+
       // User suspensions
       prisma.adminAuditLog.count({
         where: {
@@ -851,7 +851,7 @@ export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
           action: { contains: 'SUSPEND' }
         }
       }),
-      
+
       // Data deletions
       prisma.adminAuditLog.count({
         where: {
@@ -888,7 +888,7 @@ export const getSecurityLogs = async (req: AdminAuthRequest, res: Response) => {
       'VIEW_SECURITY_LOGS',
       'system',
       undefined,
-      { 
+      {
         timeRange,
         totalEvents: totalCount,
         suspiciousPatterns: suspiciousPatterns.length
@@ -1032,7 +1032,7 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
 
     // Check storage alerts
     const storageStats = await prisma.$queryRaw`
-      SELECT SUM(file_size) as total_storage
+      SELECT SUM("fileSize") as total_storage
       FROM photos
     ` as any[]
 
@@ -1040,8 +1040,8 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
     const storageConfig = await prisma.systemConfig.findUnique({
       where: { configKey: 'storage_limit' }
     })
-    const storageLimit = storageConfig ? 
-      (storageConfig.configValue as any).bytes : 
+    const storageLimit = storageConfig ?
+      (storageConfig.configValue as any).bytes :
       100 * 1024 * 1024 * 1024 // 100GB default
 
     const storageUtilization = (totalStorage / storageLimit) * 100
@@ -1075,8 +1075,8 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
     const userLimitConfig = await prisma.systemConfig.findUnique({
       where: { configKey: 'user_limit' }
     })
-    const userLimit = userLimitConfig ? 
-      (userLimitConfig.configValue as any).limit : 
+    const userLimit = userLimitConfig ?
+      (userLimitConfig.configValue as any).limit :
       1000 // Default limit
 
     if (userCount > userLimit * 0.9) {
@@ -1086,7 +1086,7 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
         severity: userCount > userLimit ? 'CRITICAL' : 'HIGH',
         title: userCount > userLimit ? 'User Limit Exceeded' : 'User Limit Warning',
         message: `Current users: ${userCount}, Limit: ${userLimit}`,
-        action: userCount > userLimit ? 
+        action: userCount > userLimit ?
           'Immediate action: Increase user limit or remove inactive users' :
           'Consider increasing user limit soon',
         timestamp: new Date(),
@@ -1178,7 +1178,7 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
       'VIEW_SYSTEM_ALERTS',
       'system',
       undefined,
-      { 
+      {
         totalAlerts: filteredAlerts.length,
         criticalAlerts: filteredAlerts.filter(a => a.severity === 'CRITICAL').length,
         filters: { type, severity }
@@ -1220,7 +1220,7 @@ export const getSystemAlerts = async (req: AdminAuthRequest, res: Response) => {
 export const exportAnalyticsData = async (req: AdminAuthRequest, res: Response) => {
   try {
     const adminId = req.admin!.id
-    const { 
+    const {
       type = 'system_overview',
       format = 'json',
       timeRange = '30d'
@@ -1290,7 +1290,7 @@ export const exportAnalyticsData = async (req: AdminAuthRequest, res: Response) 
       // Convert to CSV format (simplified)
       res.setHeader('Content-Type', 'text/csv')
       res.setHeader('Content-Disposition', `attachment; filename="${type}_${timeRange}.csv"`)
-      
+
       // This is a simplified CSV conversion - in production you'd want a proper CSV library
       const csvData = JSON.stringify(exportData, null, 2)
       res.send(csvData)
@@ -1317,7 +1317,7 @@ async function generateSystemOverviewExport(startDate: Date) {
     prisma.user.count(),
     prisma.gallery.count(),
     prisma.photo.count(),
-    prisma.$queryRaw`SELECT SUM(file_size) as total FROM photos` as Promise<any[]>
+    prisma.$queryRaw`SELECT SUM("fileSize") as total FROM photos` as Promise<any[]>
   ])
 
   return {
@@ -1356,12 +1356,12 @@ async function generateStorageAnalyticsExport(startDate: Date) {
     SELECT 
       u.name as photographer_name,
       u.email as photographer_email,
-      SUM(p.file_size) as storage_used,
+      SUM(p."fileSize") as storage_used,
       COUNT(p.id) as photo_count
     FROM users u
-    JOIN galleries g ON u.id = g.photographer_id
-    JOIN folders f ON g.id = f.gallery_id
-    JOIN photos p ON f.id = p.folder_id
+    JOIN galleries g ON u.id = g."photographerId"
+    JOIN folders f ON g.id = f."galleryId"
+    JOIN photos p ON f.id = p."folderId"
     WHERE u.role = 'PHOTOGRAPHER'
     GROUP BY u.id, u.name, u.email
     ORDER BY storage_used DESC

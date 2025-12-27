@@ -598,11 +598,11 @@ export const getGalleryAnalytics = async (req: AdminAuthRequest, res: Response) 
     const storageStats = await prisma.$queryRaw`
       SELECT 
         COUNT(p.id) as total_photos,
-        SUM(p.file_size) as total_storage,
-        AVG(p.file_size) as avg_photo_size
+        SUM(p."fileSize") as total_storage,
+        AVG(p."fileSize") as avg_photo_size
       FROM photos p
-      JOIN folders f ON p.folder_id = f.id
-      JOIN galleries g ON f.gallery_id = g.id
+      JOIN folders f ON p."folderId" = f.id
+      JOIN galleries g ON f."galleryId" = g.id
     ` as any[]
 
     // Get top photographers by gallery count
@@ -621,23 +621,23 @@ export const getGalleryAnalytics = async (req: AdminAuthRequest, res: Response) 
     // Get activity trends (galleries created per day in time range)
     const activityTrends = await prisma.$queryRaw`
       SELECT 
-        DATE(created_at) as date,
+        DATE("createdAt") as date,
         COUNT(*) as galleries_created
       FROM galleries
-      WHERE created_at >= ${dateFrom}
-      GROUP BY DATE(created_at)
+      WHERE "createdAt" >= ${dateFrom}
+      GROUP BY DATE("createdAt")
       ORDER BY date ASC
     ` as any[]
 
     // Get download statistics
     const downloadStats = await prisma.$queryRaw`
       SELECT 
-        SUM(g.download_count) as total_gallery_downloads,
-        SUM(p.download_count) as total_photo_downloads,
-        AVG(g.download_count) as avg_gallery_downloads
+        SUM(g."downloadCount") as total_gallery_downloads,
+        SUM(p."downloadCount") as total_photo_downloads,
+        AVG(g."downloadCount") as avg_gallery_downloads
       FROM galleries g
-      LEFT JOIN folders f ON g.id = f.gallery_id
-      LEFT JOIN photos p ON f.id = p.folder_id
+      LEFT JOIN folders f ON g.id = f."galleryId"
+      LEFT JOIN photos p ON f.id = p."folderId"
     ` as any[]
 
     const analytics = {
