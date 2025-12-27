@@ -455,6 +455,15 @@ export const api = {
       throw new Error(errorData.error || "Failed to download liked photos");
     }
 
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return {
+        multipart: true,
+        parts: data.parts
+      };
+    }
+
     return {
       blob: await response.blob(),
       downloadId: response.headers.get('X-Download-ID'),
@@ -479,6 +488,15 @@ export const api = {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to download favorited photos");
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return {
+        multipart: true,
+        parts: data.parts
+      };
     }
 
     return {
@@ -612,6 +630,15 @@ export const api = {
       throw new Error(errorData.error || "Failed to download all photos");
     }
 
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return {
+        multipart: true,
+        parts: data.parts
+      };
+    }
+
     return {
       blob: await response.blob(),
       downloadId: response.headers.get('X-Download-ID'),
@@ -636,6 +663,15 @@ export const api = {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to download folder photos");
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return {
+        multipart: true,
+        parts: data.parts
+      };
     }
 
     return {
