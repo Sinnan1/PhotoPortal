@@ -8,8 +8,10 @@ const BACKOFF_DELAYS = [2000, 4000, 8000] // Retry delays
 /**
  * Hook to send presence heartbeat while viewing a gallery
  * Uses Page Visibility API to pause when tab is hidden
+ * @param galleryId - The gallery being viewed (null for dashboard)
+ * @param enabled - Whether to enable tracking (use to disable for non-photographers)
  */
-export function usePresenceHeartbeat(galleryId: string | null) {
+export function usePresenceHeartbeat(galleryId: string | null, enabled: boolean = true) {
     const intervalRef = useRef<NodeJS.Timeout | null>(null)
     const attemptRef = useRef(0)
     const isVisibleRef = useRef(true)
@@ -93,6 +95,8 @@ export function usePresenceHeartbeat(galleryId: string | null) {
     }, [galleryId, startHeartbeat, stopHeartbeat])
 
     useEffect(() => {
+        // Early return if tracking is disabled (e.g., for non-photographers)
+        if (!enabled) return
         if (!galleryId) return
 
         // Start heartbeat
@@ -128,7 +132,7 @@ export function usePresenceHeartbeat(galleryId: string | null) {
 
             clearPresence()
         }
-    }, [galleryId, startHeartbeat, stopHeartbeat, handleVisibilityChange])
+    }, [enabled, galleryId, startHeartbeat, stopHeartbeat, handleVisibilityChange])
 
     return {
         pause: () => {
@@ -137,7 +141,7 @@ export function usePresenceHeartbeat(galleryId: string | null) {
         },
         resume: () => {
             isPausedRef.current = false
-            if (isVisibleRef.current && galleryId) {
+            if (enabled && isVisibleRef.current && galleryId) {
                 startHeartbeat()
             }
         }

@@ -69,32 +69,33 @@ export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) 
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center px-4 gap-4">
-        {/* Sidebar Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggleSidebar}
-          className="mr-2 text-muted-foreground hover:text-foreground"
-        >
-          {sidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
-        </Button>
+      <div className="flex h-16 items-center px-4 gap-2 md:gap-4 justify-between">
+        {/* Left Side: Toggle & Logo */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleSidebar}
+            aria-label="Toggle sidebar"
+            aria-expanded={sidebarOpen}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            {sidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+          </Button>
 
-        {/* Breadcrumb Placeholder or Page Title could go here */}
-        <div className="flex-1 flex items-center gap-4">
           <Link href="/admin" className="flex items-center gap-2 md:hidden">
-            <Shield className="h-5 w-5 text-primary" />
-            <span className="font-audrey font-bold text-lg">Yarrow</span>
+            <Shield className="h-5 w-5 text-primary shrink-0" />
+            <span className="font-audrey font-bold text-lg hidden sm:inline-block">Yarrow</span>
           </Link>
 
           {/* Search (hidden on mobile) */}
-          <div className="hidden md:flex max-w-sm w-full lg:max-w-md">
+          <div className="hidden md:flex max-w-sm w-full lg:max-w-md ml-2">
             <AdminSearch />
           </div>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Active Users */}
           <Link href="/admin/presence">
             <Button
@@ -126,9 +127,9 @@ export function AdminHeader({ onToggleSidebar, sidebarOpen }: AdminHeaderProps) 
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 pl-2 pr-4 rounded-full border border-border/0 hover:bg-muted/50 hover:border-border/50 transition-all"
+                className="flex items-center gap-2 pl-2 pr-2 sm:pr-4 rounded-full border border-border/0 hover:bg-muted/50 hover:border-border/50 transition-all ml-1"
               >
-                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/20">
+                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/20 shrink-0">
                   <User className="h-4 w-4" />
                 </div>
                 <div className="hidden sm:block text-left">

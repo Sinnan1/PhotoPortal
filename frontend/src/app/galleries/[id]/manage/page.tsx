@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
 import type { Photo, Folder, Gallery } from "@/types"
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat"
 
 export default function ManageGalleryPage() {
   const params = useParams()
@@ -47,6 +48,9 @@ export default function ManageGalleryPage() {
 
   const galleryId = params.id as string
   const { data: gallery, isLoading: loading } = useGallery(galleryId)
+
+  // Track presence while managing/uploading to this gallery
+  usePresenceHeartbeat(galleryId);
   const updateGalleryMutation = useUpdateGallery()
   const createFolderMutation = useCreateFolder()
   const renameFolderMutation = useRenameFolder()

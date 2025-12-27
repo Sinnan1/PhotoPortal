@@ -1,6 +1,22 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Download, Upload, FileJson, AlertTriangle, Check, RefreshCw, X, ShieldAlert } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface ConfigurationBackupProps {
   onExportConfiguration: () => Promise<any>
@@ -34,8 +50,6 @@ export default function ConfigurationBackup({
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-
-      alert('Configuration backup exported successfully!')
     } catch (error: any) {
       console.error('Export failed:', error)
       alert(error.message || 'Failed to export configuration')
@@ -61,6 +75,10 @@ export default function ConfigurationBackup({
       }
     }
     reader.readAsText(file)
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const handleImport = async () => {
@@ -75,6 +93,7 @@ export default function ConfigurationBackup({
       setOverwriteExisting(false)
       setImportPreview(null)
 
+      // Optional: Add a toast notification here
       alert('Configuration imported successfully!')
     } catch (error: any) {
       console.error('Import failed:', error)
@@ -89,70 +108,82 @@ export default function ConfigurationBackup({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Export Section */}
-      <div className="bg-card rounded-lg shadow-sm border border-border">
-        <div className="px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-medium text-foreground">Export Configuration</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create a backup of your current system configuration
-          </p>
-        </div>
-
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-foreground mb-2">
-                System Configuration Backup
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Export all current configuration settings to a JSON file that can be used for backup or migration purposes.
-              </p>
-              <div className="mt-3 text-xs text-muted-foreground/70">
-                <div>• Includes all configuration values and metadata</div>
-                <div>• Contains schema definitions for validation</div>
-                <div>• Safe to share (no sensitive data included)</div>
+    <div className="space-y-6 container mx-auto p-4 md:p-0 max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Export Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm hover:border-primary/20 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl font-audrey">
+                <Download className="h-5 w-5 text-primary" />
+                Export Configuration
+              </CardTitle>
+              <CardDescription>
+                Create a full backup of your system settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-background/40 p-4 border border-border/30 text-sm space-y-3">
+                <div className="flex items-start gap-3">
+                  <FileJson className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground">JSON Format Backup</p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Downloads a complete snapshot of all active configurations, schemas, and metadata.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 pt-2 border-t border-border/20">
+                  <Badge variant="outline" className="w-fit text-[10px] opacity-70"> Safe to share (No secrets)</Badge>
+                  <Badge variant="outline" className="w-fit text-[10px] opacity-70"> Includes Audit Metadata</Badge>
+                </div>
               </div>
-            </div>
 
-            <button
-              onClick={handleExport}
-              disabled={loading}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center space-x-2"
-            >
-              <span>📤</span>
-              <span>{loading ? 'Exporting...' : 'Export Configuration'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+              <Button
+                onClick={handleExport}
+                disabled={loading}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+              >
+                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                {loading ? 'Exporting...' : 'Export Configuration'}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* Import Section */}
-      <div className="bg-card rounded-lg shadow-sm border border-border">
-        <div className="px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-medium text-foreground">Import Configuration</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Restore configuration from a backup file
-          </p>
-        </div>
-
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-foreground mb-2">
-                Restore from Backup
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Import configuration settings from a previously exported backup file.
-              </p>
-              <div className="mt-3 text-xs text-amber-500">
-                <div>⚠️ This will modify your current configuration settings</div>
-                <div>⚠️ Make sure to export current settings before importing</div>
-                <div>⚠️ All changes will be logged in the audit trail</div>
+        {/* Import Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm hover:border-indigo-500/20 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl font-audrey">
+                <Upload className="h-5 w-5 text-indigo-500" />
+                Import Configuration
+              </CardTitle>
+              <CardDescription>
+                Restore settings from a previous backup
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-sm space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-500">Warning: Destructive Action</p>
+                    <p className="text-amber-500/80 text-xs mt-1 leading-relaxed">
+                      Importing will overwrite current settings. Ensure you have a recent backup before proceeding. All changes are logged.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col space-y-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -160,152 +191,126 @@ export default function ConfigurationBackup({
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <button
+              <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+                variant="outline"
+                className="w-full border-indigo-500/50 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400"
               >
-                <span>📥</span>
-                <span>Select Backup File</span>
-              </button>
-            </div>
-          </div>
-        </div>
+                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                Select Backup File
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
-      {/* Import Modal */}
-      {showImportModal && importPreview && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border border-border w-4/5 max-w-4xl shadow-lg rounded-md bg-card">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-foreground mb-4">
-                Import Configuration Backup
-              </h3>
+      {/* Import Dialog */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="sm:max-w-2xl bg-background/95 backdrop-blur-xl border-border/50 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-audrey">
+              <RefreshCw className="h-5 w-5 text-indigo-500" />
+              Review Import
+            </DialogTitle>
+            <DialogDescription>
+              Verify the backup content before applying changes.
+            </DialogDescription>
+          </DialogHeader>
 
-              {/* Backup Info */}
-              <div className="mb-6 p-4 bg-muted/50 rounded-md">
-                <h4 className="text-sm font-medium text-foreground mb-2">Backup Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-muted-foreground">Exported At:</span>
-                    <div className="text-foreground">{formatDate(importPreview.exportedAt)}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Exported By:</span>
-                    <div className="text-foreground">{importPreview.exportedBy?.email || 'Unknown'}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Version:</span>
-                    <div className="text-foreground">{importPreview.version || 'Unknown'}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Configurations:</span>
-                    <div className="text-foreground">{importPreview.configurations?.length || 0} settings</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Configuration Preview */}
-              <div className="mb-6">
-                <h4 className="text-sm font-medium text-foreground mb-2">Configuration Preview</h4>
-                <div className="max-h-64 overflow-y-auto border border-border rounded-md">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Configuration Key
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Value
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Last Updated
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-card divide-y divide-border">
-                      {importPreview.configurations?.map((config: any, index: number) => (
-                        <tr key={index} className="hover:bg-muted/50">
-                          <td className="px-4 py-2 text-sm font-mono text-foreground">
-                            {config.key}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-muted-foreground">
-                            <code className="bg-muted px-1 rounded text-foreground">
-                              {JSON.stringify(config.value)}
-                            </code>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-muted-foreground">
-                            {config.updatedAt ? formatDate(config.updatedAt) : 'Default'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Import Options */}
-              <div className="mb-6 space-y-4">
+          {importPreview && (
+            <div className="space-y-6 py-4">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg border border-border/30">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Reason for import (optional):
-                  </label>
-                  <textarea
+                  <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">Export Date</span>
+                  <span className="font-medium font-mono">{formatDate(importPreview.exportedAt)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">Version</span>
+                  <span className="font-medium font-mono">{importPreview.version || 'Unknown'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">Exported By</span>
+                  <span className="font-medium">{importPreview.exportedBy?.email || 'System'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">Count</span>
+                  <span className="font-medium">{importPreview.configurations?.length || 0} Settings</span>
+                </div>
+              </div>
+
+              {/* Preview Table */}
+              <div className="border border-border/40 rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-background/40">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur-md">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Key</th>
+                      <th className="px-4 py-2 font-medium">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/20">
+                    {importPreview.configurations?.slice(0, 10).map((config: any, i: number) => (
+                      <tr key={i} className="hover:bg-white/5">
+                        <td className="px-4 py-2 font-mono text-xs text-primary/80">{config.key}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-muted-foreground truncate max-w-[150px]">
+                          {JSON.stringify(config.value)}
+                        </td>
+                      </tr>
+                    ))}
+                    {(importPreview.configurations?.length || 0) > 10 && (
+                      <tr>
+                        <td colSpan={2} className="px-4 py-2 text-center text-xs text-muted-foreground italic">
+                          ...and {(importPreview.configurations?.length || 0) - 10} more
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Form Controls */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="import-reason">Reason for Import (Optional)</Label>
+                  <Textarea
+                    id="import-reason"
                     value={importReason}
                     onChange={(e) => setImportReason(e.target.value)}
-                    rows={3}
-                    className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm placeholder:text-muted-foreground"
-                    placeholder="Describe why you're importing this configuration..."
+                    placeholder="Audit log note..."
+                    className="bg-background/50"
                   />
                 </div>
 
-                <div className="flex items-center">
-                  <input
-                    id="overwrite-existing"
-                    type="checkbox"
+                <div className="flex items-center space-x-2 bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
+                  <Switch
+                    id="overwrite"
                     checked={overwriteExisting}
-                    onChange={(e) => setOverwriteExisting(e.target.checked)}
-                    className="h-4 w-4 text-primary focus:ring-primary border-border bg-background rounded"
+                    onCheckedChange={setOverwriteExisting}
+                    className="data-[state=checked]:bg-amber-500"
                   />
-                  <label htmlFor="overwrite-existing" className="ml-2 block text-sm text-foreground">
-                    Overwrite existing configurations
-                  </label>
+                  <Label htmlFor="overwrite" className="flex-1 cursor-pointer">
+                    <span className="font-medium text-foreground">Overwrite Existing</span>
+                    <p className="text-xs text-muted-foreground">Force update values that are already defined.</p>
+                  </Label>
                 </div>
-
-                {!overwriteExisting && (
-                  <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-3 rounded-md">
-                    ⚠️ Import will fail if any configurations already exist. Enable "Overwrite existing" to replace current values.
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowImportModal(false)
-                    setImportData('')
-                    setImportReason('')
-                    setOverwriteExisting(false)
-                    setImportPreview(null)
-                  }}
-                  disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-foreground bg-muted border border-border rounded-md hover:bg-muted/80 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImport}
-                  disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-destructive-foreground bg-destructive border border-transparent rounded-md hover:bg-destructive/90 disabled:opacity-50"
-                >
-                  {loading ? 'Importing...' : 'Import Configuration'}
-                </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button
+              onClick={handleImport}
+              disabled={loading}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+              Confirm Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

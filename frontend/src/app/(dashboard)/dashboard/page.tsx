@@ -44,6 +44,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ShortcutsHelpModal } from "@/components/ShortcutsHelpModal";
 import { useQuery } from "@tanstack/react-query";
 import { DateRange } from "react-day-picker";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +73,9 @@ const formatFileSize = (bytes: number): string => {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  // Track presence while on dashboard (no gallery) - only photographers reach this page
+  usePresenceHeartbeat(null, user?.role === "PHOTOGRAPHER");
 
   const { data: galleries = [], isLoading: loading } = useGalleries();
   const deleteGalleryMutation = useDeleteGallery();

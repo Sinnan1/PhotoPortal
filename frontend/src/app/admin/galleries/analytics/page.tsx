@@ -16,6 +16,7 @@ import {
   Calendar,
   Activity
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -130,266 +131,231 @@ export default function GalleryAnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Gallery Analytics</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Detailed insights into gallery performance and usage patterns
-        </p>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center"
+      >
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold font-audrey text-gray-900 dark:text-gray-100">Gallery Analytics</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 md:mt-2">
+            Detailed insights into gallery performance and usage patterns
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Key Metrics - Compact 2x2 on Mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        {[
+          {
+            title: "Total Galleries",
+            value: analytics.totalGalleries,
+            icon: FolderOpen,
+            trend: analytics.galleryGrowth.percentageChange,
+            trendLabel: "from last month"
+          },
+          {
+            title: "Total Downloads",
+            value: analytics.totalDownloads.toLocaleString(),
+            icon: Download,
+            subtext: "Estimated total"
+          },
+          {
+            title: "Avg Photos/Gallery",
+            value: analytics.averagePhotosPerGallery,
+            icon: Image
+          },
+          {
+            title: "Public Galleries",
+            value: analytics.publicGalleries,
+            icon: Users,
+            subtext: `${analytics.totalGalleries > 0 ? Math.round((analytics.publicGalleries / analytics.totalGalleries) * 100) : 0}% of total`
+          }
+        ].map((metric, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">{metric.title}</CardTitle>
+                <metric.icon className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                {loading ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-6 bg-primary/10 rounded w-16"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-xl md:text-2xl font-bold font-audrey">{metric.value}</div>
+                    {metric.trend !== undefined && (
+                      <div className="flex items-center space-x-1 text-[10px] md:text-xs">
+                        {getTrendIcon(metric.trend)}
+                        <span className={getTrendColor(metric.trend)}>
+                          {metric.trend > 0 ? '+' : ''}{metric.trend}%
+                        </span>
+                        <span className="text-muted-foreground hidden sm:inline">{metric.trendLabel}</span>
+                      </div>
+                    )}
+                    {metric.subtext && (
+                      <p className="text-[10px] md:text-xs text-muted-foreground">{metric.subtext}</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Galleries</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{analytics.totalGalleries}</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  {getTrendIcon(analytics.galleryGrowth.percentageChange)}
-                  <span className={getTrendColor(analytics.galleryGrowth.percentageChange)}>
-                    +{analytics.galleryGrowth.percentageChange}%
-                  </span>
-                  <span className="text-muted-foreground">from last month</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Downloads</CardTitle>
-            <Download className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{analytics.totalDownloads.toLocaleString()}</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                  <span className="text-green-600">+12%</span>
-                  <span className="text-muted-foreground">from last month</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Photos/Gallery</CardTitle>
-            <Image className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{analytics.averagePhotosPerGallery}</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  <Activity className="h-4 w-4 text-blue-600" />
-                  <span className="text-muted-foreground">photos per gallery</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gallery Distribution */}
+      {/* Gallery Distribution & Growth */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Gallery Visibility</CardTitle>
-            <CardDescription>
-              Distribution of public vs private galleries
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="animate-pulse flex items-center justify-between">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-16 text-sm font-medium">Public</div>
-                    <div className="flex-1">
-                      <Progress
-                        value={analytics.totalGalleries > 0 ? (analytics.publicGalleries / analytics.totalGalleries) * 100 : 0}
-                        className="h-2"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium w-16 text-right">
-                    {analytics.publicGalleries}
-                  </div>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-audrey">Gallery Visibility</CardTitle>
+              <CardDescription>Distribution of public vs private galleries</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4 animate-pulse">
+                  {[1, 2].map(i => <div key={i} className="h-10 bg-gray-100 dark:bg-gray-800 rounded"></div>)}
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span> Public
+                      </span>
+                      <span className="font-medium">{analytics.publicGalleries}</span>
+                    </div>
+                    <Progress
+                      value={analytics.totalGalleries > 0 ? (analytics.publicGalleries / analytics.totalGalleries) * 100 : 0}
+                      className="h-2"
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-16 text-sm font-medium">Private</div>
-                    <div className="flex-1">
-                      <Progress
-                        value={analytics.totalGalleries > 0 ? (analytics.privateGalleries / analytics.totalGalleries) * 100 : 0}
-                        className="h-2"
-                      />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-500"></span> Private
+                      </span>
+                      <span className="font-medium">{analytics.privateGalleries}</span>
                     </div>
-                  </div>
-                  <div className="text-sm font-medium w-16 text-right">
-                    {analytics.privateGalleries}
+                    <Progress
+                      value={analytics.totalGalleries > 0 ? (analytics.privateGalleries / analytics.totalGalleries) * 100 : 0}
+                      className="h-2"
+                    />
                   </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Gallery Growth</CardTitle>
-            <CardDescription>
-              Monthly gallery creation trends
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="animate-pulse p-3 rounded-lg bg-gray-100">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-audrey">Gallery Growth</CardTitle>
+              <CardDescription>Monthly gallery creation trends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="h-24 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">This Month</div>
+                    <div className="text-3xl font-bold font-audrey text-green-700 dark:text-green-300">{analytics.galleryGrowth.thisMonth}</div>
+                    <div className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">New galleries</div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm text-green-800 dark:text-green-200">This Month</p>
-                      <p className="text-xs text-green-600 dark:text-green-400">
-                        {analytics.galleryGrowth.thisMonth} new galleries
-                      </p>
-                    </div>
-                    <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                      {analytics.galleryGrowth.thisMonth}
-                    </div>
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Last Month</div>
+                    <div className="text-3xl font-bold font-audrey text-blue-700 dark:text-blue-300">{analytics.galleryGrowth.lastMonth}</div>
+                    <div className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">Historical average</div>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm text-blue-800 dark:text-blue-200">Last Month</p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400">
-                        {analytics.galleryGrowth.lastMonth} galleries created
-                      </p>
-                    </div>
-                    <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                      {analytics.galleryGrowth.lastMonth}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Top Performing Galleries */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Performing Galleries</CardTitle>
-          <CardDescription>
-            Galleries with the highest engagement metrics
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex items-center space-x-4 p-4 border rounded-lg">
-                  <div className="h-12 w-12 bg-gray-200 rounded-lg"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                  <div className="flex space-x-4">
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : analytics.topPerformingGalleries.length === 0 ? (
-            <div className="text-center py-8">
-              <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No performance data available</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Gallery performance metrics will appear here as data becomes available
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {analytics.topPerformingGalleries.map((gallery, index) => (
-                <div key={gallery.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 rounded-lg bg-[#425146] flex items-center justify-center">
-                      <span className="text-white font-bold">#{index + 1}</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100">{gallery.title}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        by {gallery.photographer}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-6 text-sm">
-                    <div className="text-center">
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{gallery.views}</span>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+          <CardHeader>
+            <CardTitle className="font-audrey">Top Performing Galleries</CardTitle>
+            <CardDescription>
+              Galleries with the highest engagement metrics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"></div>)}
+              </div>
+            ) : analytics.topPerformingGalleries.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-border rounded-xl">
+                <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No performance data available</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {analytics.topPerformingGalleries.map((gallery, index) => (
+                  <div key={gallery.id} className="group flex items-center justify-between p-3 md:p-4 rounded-xl border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all duration-300">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-10 w-10 md:h-12 md:w-12 rounded-lg bg-background border border-border flex items-center justify-center font-audrey font-bold text-lg md:text-xl shadow-sm text-muted-foreground group-hover:text-primary transition-colors">
+                        #{index + 1}
                       </div>
-                      <p className="text-xs text-gray-400">views</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center space-x-1">
-                        <Download className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{gallery.downloads}</span>
+                      <div>
+                        <h3 className="font-bold font-audrey text-base md:text-lg text-foreground group-hover:text-primary transition-colors">{gallery.title}</h3>
+                        <p className="text-xs md:text-sm text-muted-foreground">
+                          by {gallery.photographer}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-400">downloads</p>
+                    </div>
+                    <div className="flex items-center gap-4 md:gap-8 text-sm">
+                      <div className="text-center min-w-[50px]">
+                        <div className="flex items-center justify-center space-x-1 font-bold">
+                          <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>{gallery.views}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Views</p>
+                      </div>
+                      <div className="text-center min-w-[50px]">
+                        <div className="flex items-center justify-center space-x-1 font-bold">
+                          <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>{gallery.downloads}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Downloads</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
