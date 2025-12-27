@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         errorText = findViewById(R.id.errorText)
 
         // Reduce sensitivity - require more pull distance to trigger refresh
-        swipeRefresh.setDistanceToTriggerSync(500) // Default is ~64dp, now requires much more pull
+        swipeRefresh.setDistanceToTriggerSync(500)
 
         swipeRefresh.setColorSchemeColors(
             getColor(R.color.primary),
@@ -57,6 +57,11 @@ class MainActivity : AppCompatActivity() {
 
         swipeRefresh.setOnRefreshListener {
             webView.reload()
+        }
+
+        // Only allow pull-to-refresh when WebView is scrolled to the very top
+        swipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            webView.scrollY > 0
         }
 
         findViewById<View>(R.id.retryButton).setOnClickListener {
