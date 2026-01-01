@@ -244,6 +244,13 @@ export const api = {
     })
   },
 
+  // Check for duplicate files before uploading
+  checkDuplicates: (folderId: string, files: Array<{ filename: string; size: number }>) =>
+    apiRequest("/uploads/check-duplicates", {
+      method: "POST",
+      body: JSON.stringify({ folderId, files }),
+    }),
+
   getGalleryPhotos: (galleryId: string) => apiRequest(`/photos/gallery/${galleryId}`),
 
   deletePhoto: (id: string) => apiRequest(`/photos/${id}`, { method: "DELETE" }),

@@ -167,10 +167,62 @@ class UploadManager {
     this.batches.set(batchId, batch)
     this.notify()
 
-    // Start processing
+    // Check for duplicates before starting uploads
+    await this.checkDuplicatesBeforeUpload(batchId, folderId)
+
+    // Start processing (only non-duplicate files will be uploaded)
     this.processBatch(batchId)
 
     return batchId
+  }
+
+  private async checkDuplicatesBeforeUpload(batchId: string, folderId: string) {
+    const batch = this.batches.get(batchId)
+    if (!batch) return
+
+    try {
+      // Import api dynamically to avoid circular dependencies
+      const { api } = await import('./api')
+
+      // Prepare file list for duplicate check
+      const fileList = batch.files.map(f => ({
+        filename: f.file?.name || '',
+        size: f.file?.size || 0
+      }))
+
+      console.log(`🔍 Checking ${fileList.length} files for duplicates...`)
+
+      // Call backend to check for duplicates
+      const response = await api.checkDuplicates(folderId, fileList)
+
+      if (response.success && response.results) {
+        // Mark duplicate files as failed immediately
+        response.results.forEach((result: any) => {
+          const uploadFile = batch.files.find(f => 
+            f.file?.name === result.filename && f.file?.size === result.size
+          )
+          
+          if (uploadFile && result.isDuplicate) {
+            uploadFile.status = 'failed'
+            uploadFile.error = `File "${result.filename}" already exists in this folder`
+            uploadFile.progress = 0
+            batch.failedFiles++
+            console.log(`⚠️ Skipping duplicate: ${result.filename}`)
+          }
+        })
+
+        const duplicateCount = response.summary?.duplicates || 0
+        if (duplicateCount > 0) {
+          console.log(`⏭️ Skipped ${duplicateCount} duplicate file(s) instantly`)
+        }
+
+        this.notify()
+      }
+    } catch (error) {
+      console.error('Failed to check for duplicates:', error)
+      // If duplicate check fails, continue with uploads anyway
+      // This ensures the feature doesn't break existing functionality
+    }
   }
 
   private async processBatch(batchId: string) {
