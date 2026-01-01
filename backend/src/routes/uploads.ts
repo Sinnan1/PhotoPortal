@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import express from 'express'
 import { authenticateToken, requireRole } from '../middleware/auth'
-import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts } from '../controllers/uploadsController'
+import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts, checkDuplicates } from '../controllers/uploadsController'
 import { generateThumbnail } from '../controllers/thumbnailController'
 import { UPLOAD_CONFIG } from '../config/uploadConfig'
 
@@ -101,6 +101,9 @@ router.post('/register', uploadRateLimit, authenticateToken, requireRole('PHOTOG
 
 // Direct upload endpoint (simpler, non-multipart)
 router.post('/direct', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), uploadDirect)
+
+// Check for duplicates before upload
+router.post('/check-duplicates', authenticateToken, requireRole('PHOTOGRAPHER'), checkDuplicates)
 
 // Get upload status (for monitoring)
 router.get('/status', authenticateToken, (req, res) => {

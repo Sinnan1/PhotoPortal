@@ -435,6 +435,13 @@ export const api = {
     })
   },
 
+  // Check for duplicate photos before upload
+  checkDuplicates: (folderId: string, files: { name: string; size: number }[]) =>
+    apiRequest(`/uploads/check-duplicates`, {
+      method: "POST",
+      body: JSON.stringify({ folderId, files }),
+    }),
+
   // Filtered Download APIs
   downloadLikedPhotos: async (galleryId: string, galleryPassword?: string) => {
     const token = getAuthToken();

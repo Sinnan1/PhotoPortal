@@ -28,6 +28,8 @@ export interface UploadBatch {
   compressionQuality: number // 10-100, default 90
 }
 
+import { api } from './api'
+
 type UploadListener = (batches: UploadBatch[]) => void
 
 class UploadManager {
@@ -139,15 +141,35 @@ class UploadManager {
   ): Promise<string> {
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
-    const uploadFiles: UploadFile[] = files.map(file => ({
-      file,
-      id: `${batchId}-${file.name}`,
-      status: 'queued' as const,
-      progress: 0,
-      attempts: 0
-    }))
+    // Check for duplicates before creating batch
+    let duplicates: string[] = []
+    try {
+      const checkResult = await api.checkDuplicates(
+        folderId,
+        files.map(f => ({ name: f.name, size: f.size }))
+      )
+      if (checkResult.success) {
+        duplicates = checkResult.duplicates || []
+      }
+    } catch (error) {
+      console.warn('Failed to check for duplicates:', error)
+      // Continue without check if it fails
+    }
+
+    const uploadFiles: UploadFile[] = files.map(file => {
+      const isDuplicate = duplicates.includes(file.name)
+      return {
+        file,
+        id: `${batchId}-${file.name}`,
+        status: isDuplicate ? 'failed' : 'queued',
+        progress: isDuplicate ? 100 : 0,
+        attempts: 0,
+        error: isDuplicate ? 'File already exists' : undefined
+      }
+    })
 
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
+    const failedFiles = uploadFiles.filter(f => f.status === 'failed').length
 
     const batch: UploadBatch = {
       id: batchId,
@@ -158,7 +180,7 @@ class UploadManager {
       totalBytes,
       uploadedBytes: 0,
       completedFiles: 0,
-      failedFiles: 0,
+      failedFiles,
       averageSpeed: 0,
       compress,
       compressionQuality
@@ -242,6 +264,25 @@ class UploadManager {
           console.log(`▶️ Resuming upload (online): ${uploadFile.file?.name}`)
           // Don't count this as a retry attempt
           return attemptUpload(attempt, true)
+        }
+
+        // Double check for duplicate before starting (in case of race condition or retry)
+        if (attempt === 1 && !isNetworkRetry) {
+          try {
+            const checkResult = await api.checkDuplicates(
+              batch.folderId,
+              [{ name: uploadFile.file.name, size: uploadFile.file.size }]
+            )
+            if (checkResult.success && checkResult.duplicates.includes(uploadFile.file.name)) {
+              uploadFile.status = 'failed'
+              uploadFile.error = 'File already exists'
+              batch.failedFiles++
+              this.notify()
+              return false
+            }
+          } catch (e) {
+            // Ignore check error on retry
+          }
         }
 
         uploadFile.status = 'uploading'

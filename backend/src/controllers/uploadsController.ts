@@ -135,6 +135,80 @@ export const createMultipartUpload = async (req: Request, res: Response) => {
   }
 };
 
+export const checkDuplicates = async (req: Request, res: Response) => {
+  try {
+    const { folderId, files } = req.body;
+    const photographerId = (req as any).user?.id;
+
+    if (!folderId || !files || !Array.isArray(files)) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: folderId, files array",
+      });
+    }
+
+    // Verify folder exists and belongs to photographer
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId },
+      include: { gallery: true },
+    });
+
+    if (!folder) {
+      return res.status(404).json({
+        success: false,
+        error: "Folder not found",
+      });
+    }
+
+    if (folder.gallery.photographerId !== photographerId) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied",
+      });
+    }
+
+    // Check for duplicates
+    // We check if any photo exists in this folder with the same filename AND size
+    const duplicateFilenames: string[] = [];
+
+    // Optimization: Fetch all photos in folder with filenames matching the list
+    // This is faster than N queries
+    const filenames = files.map((f: any) => f.name);
+
+    const existingPhotos = await prisma.photo.findMany({
+      where: {
+        folderId,
+        filename: { in: filenames },
+      },
+      select: {
+        filename: true,
+        fileSize: true,
+      },
+    });
+
+    // Filter by size to be precise
+    for (const file of files) {
+      const match = existingPhotos.find(
+        (p) => p.filename === file.name && p.fileSize === file.size
+      );
+      if (match) {
+        duplicateFilenames.push(file.name);
+      }
+    }
+
+    res.json({
+      success: true,
+      duplicates: duplicateFilenames,
+    });
+  } catch (error) {
+    console.error("Check duplicates error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+};
+
 export const listUploadedParts = async (req: Request, res: Response) => {
   try {
     const { key, uploadId } = req.query;
