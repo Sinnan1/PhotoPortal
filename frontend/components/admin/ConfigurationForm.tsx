@@ -1,6 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Info, AlertCircle, RefreshCw, Save, Check, RotateCcw, Clock } from 'lucide-react'
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface ConfigurationFormProps {
   category: string
@@ -29,13 +46,46 @@ export default function ConfigurationForm({
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const categoryTitles: Record<string, string> = {
-    storage: 'Storage Settings',
-    security: 'Security Settings',
-    registration: 'User Registration',
-    gallery: 'Gallery Settings',
-    branding: 'Branding & UI',
-    email: 'Email Settings'
+  // Stable key counter for array items (prevents AnimatePresence issues with index keys)
+  const keyCounterRef = useRef(0)
+  const arrayKeyMapRef = useRef<Map<string, Map<number, string>>>(new Map())
+
+  const getStableKeyForArrayItem = (configKey: string, index: number, arrayLength: number) => {
+    if (!arrayKeyMapRef.current.has(configKey)) {
+      arrayKeyMapRef.current.set(configKey, new Map())
+    }
+    const itemKeyMap = arrayKeyMapRef.current.get(configKey)!
+
+    // Clean up stale keys if array shrunk
+    if (itemKeyMap.size > arrayLength) {
+      const keysToDelete: number[] = []
+      itemKeyMap.forEach((_, idx) => {
+        if (idx >= arrayLength) keysToDelete.push(idx)
+      })
+      keysToDelete.forEach(idx => itemKeyMap.delete(idx))
+    }
+
+    if (!itemKeyMap.has(index)) {
+      itemKeyMap.set(index, `item-${++keyCounterRef.current}`)
+    }
+    return itemKeyMap.get(index)!
+  }
+
+  const updateArrayKeyMap = (configKey: string, oldIndex: number, newArray: any[]) => {
+    const itemKeyMap = arrayKeyMapRef.current.get(configKey)
+    if (!itemKeyMap) return
+
+    // When an item is removed, shift keys for items after it
+    const newKeyMap = new Map<number, string>()
+    let skipped = false
+    itemKeyMap.forEach((key, idx) => {
+      if (idx === oldIndex) {
+        skipped = true
+        return
+      }
+      newKeyMap.set(skipped ? idx - 1 : idx, key)
+    })
+    arrayKeyMapRef.current.set(configKey, newKeyMap)
   }
 
   const handleSaveWithReason = () => {
@@ -83,14 +133,13 @@ export default function ConfigurationForm({
       switch (configSchema.type) {
         case 'boolean':
           return (
-            <div className="flex items-center">
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-3">
+              <Switch
                 checked={currentValue || false}
-                onChange={(e) => handleChange(e.target.checked)}
-                className="h-4 w-4 text-primary focus:ring-primary border-border rounded bg-background"
+                onCheckedChange={handleChange}
+                className="data-[state=checked]:bg-primary"
               />
-              <span className="ml-2 text-sm text-muted-foreground">
+              <span className="text-sm text-foreground font-medium">
                 {currentValue ? 'Enabled' : 'Disabled'}
               </span>
             </div>
@@ -98,18 +147,18 @@ export default function ConfigurationForm({
 
         case 'number':
           return (
-            <div className="flex items-center space-x-2">
-              <input
+            <div className="flex items-center gap-3">
+              <Input
                 type="number"
                 value={currentValue || ''}
                 onChange={(e) => handleChange(Number(e.target.value))}
                 min={configSchema.min}
                 max={configSchema.max}
-                className="block w-32 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+                className="w-32 bg-background/50 border-border/50 focus:ring-primary/50"
               />
               {configSchema.min !== undefined && configSchema.max !== undefined && (
-                <span className="text-xs text-muted-foreground">
-                  ({configSchema.min} - {configSchema.max})
+                <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                  Max: {configSchema.max}
                 </span>
               )}
             </div>
@@ -121,9 +170,9 @@ export default function ConfigurationForm({
               <select
                 value={currentValue || ''}
                 onChange={(e) => handleChange(e.target.value)}
-                className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+                className="flex h-10 w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">Select...</option>
+                <option value="">Select an option...</option>
                 {configSchema.enum.map((option: string) => (
                   <option key={option} value={option}>
                     {option}
@@ -135,31 +184,33 @@ export default function ConfigurationForm({
 
           if (configSchema.pattern === '^#[0-9A-Fa-f]{6}$') {
             return (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="color"
-                  value={currentValue || '#000000'}
-                  onChange={(e) => handleChange(e.target.value)}
-                  className="h-10 w-16 border border-border rounded cursor-pointer bg-background"
-                />
-                <input
+              <div className="flex items-center gap-3">
+                <div className="relative group">
+                  <input
+                    type="color"
+                    value={currentValue || '#000000'}
+                    onChange={(e) => handleChange(e.target.value)}
+                    className="h-10 w-12 border border-border/50 rounded cursor-pointer bg-background p-1"
+                  />
+                </div>
+                <Input
                   type="text"
                   value={currentValue || ''}
                   onChange={(e) => handleChange(e.target.value)}
                   placeholder="#000000"
                   pattern="^#[0-9A-Fa-f]{6}$"
-                  className="block w-24 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm font-mono"
+                  className="w-28 font-mono bg-background/50 border-border/50 focus:ring-primary/50"
                 />
               </div>
             )
           }
 
           return (
-            <input
+            <Input
               type="text"
               value={currentValue || ''}
               onChange={(e) => handleChange(e.target.value)}
-              className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+              className="w-full bg-background/50 border-border/50 focus:ring-primary/50"
             />
           )
 
@@ -167,184 +218,194 @@ export default function ConfigurationForm({
           const arrayValue = Array.isArray(currentValue) ? currentValue : []
           return (
             <div className="space-y-2">
-              {arrayValue.map((item: string, index: number) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => {
-                      const newArray = [...arrayValue]
-                      newArray[index] = e.target.value
-                      handleChange(newArray)
-                    }}
-                    className="block flex-1 px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
-                  />
-                  <button
-                    onClick={() => {
-                      const newArray = arrayValue.filter((_: any, i: number) => i !== index)
-                      handleChange(newArray)
-                    }}
-                    className="px-2 py-1 text-destructive hover:bg-destructive/10 rounded"
+              <AnimatePresence>
+                {arrayValue.map((item: string, index: number) => (
+                  <motion.div
+                    key={getStableKeyForArrayItem(configKey, index, arrayValue.length)}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-2"
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button
+                    <Input
+                      type="text"
+                      value={item}
+                      onChange={(e) => {
+                        const newArray = [...arrayValue]
+                        newArray[index] = e.target.value
+                        handleChange(newArray)
+                      }}
+                      className="flex-1 bg-background/50 border-border/50 focus:ring-primary/50"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        updateArrayKeyMap(configKey, index, arrayValue)
+                        const newArray = arrayValue.filter((_: any, i: number) => i !== index)
+                        handleChange(newArray)
+                      }}
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive h-10 w-10 p-0"
+                    >
+                      ✕
+                    </Button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handleChange([...arrayValue, ''])}
-                className="px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded border border-primary/30"
+                className="mt-2 text-primary border-primary/20 hover:bg-primary/5"
               >
                 + Add Item
-              </button>
+              </Button>
             </div>
           )
 
         default:
           return (
-            <input
+            <Input
               type="text"
               value={currentValue || ''}
               onChange={(e) => handleChange(e.target.value)}
-              className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+              className="w-full bg-background/50 border-border/50 focus:ring-primary/50"
             />
           )
       }
     }
 
     return (
-      <div key={configKey} className={`p-4 border rounded-lg ${hasChanges ? 'border-amber-500/50 bg-amber-500/5 dark:border-amber-400/30 dark:bg-amber-500/10' : 'border-border bg-card'}`}>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-medium text-foreground">
-                {configKey.split('.').pop()}
-              </h3>
-              {hasChanges && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                  Modified
-                </span>
-              )}
-              {isDefault && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                  Default
-                </span>
-              )}
+      <motion.div
+        key={configKey}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`p-3 md:p-5 rounded-xl border transition-all duration-300 ${hasChanges ? 'border-amber-500/50 bg-amber-500/5 dark:bg-amber-500/10' : 'border-border/40 bg-background/30 hover:border-border/80'}`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-medium text-foreground tracking-tight">
+                  {configKey.split('.').pop()?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                </h3>
+                {hasChanges && (
+                  <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10 text-[10px] h-5 px-1.5">
+                    Modified
+                  </Badge>
+                )}
+                {isDefault && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 opacity-60">
+                    Default
+                  </Badge>
+                )}
+              </div>
+
+              {/* Mobile Reset Button Position */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleResetWithReason(configKey)}
+                disabled={isDefault}
+                className="sm:hidden text-xs h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-2"
+                title="Reset to default"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
             </div>
 
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               {configSchema.description}
             </p>
 
-            <div className="mt-3">
+            <div className="pt-2">
               {renderInput()}
             </div>
 
             {config.metadata && !config.metadata.isDefault && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Last updated: {new Date(config.metadata.updatedAt).toLocaleString()}
+              <div className="flex items-center gap-2 pt-2 text-[10px] text-muted-foreground opacity-60">
+                <Clock className="h-3 w-3" />
+                <span>Last updated: {new Date(config.metadata.updatedAt).toLocaleDateString()}</span>
                 {config.metadata.updatedBy && (
-                  <span> by {config.metadata.updatedBy.name}</span>
+                  <span>by {config.metadata.updatedBy.name}</span>
                 )}
               </div>
             )}
           </div>
 
-          <div className="ml-4 flex-shrink-0">
-            <button
+          <div className="hidden sm:block flex-shrink-0 pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => handleResetWithReason(configKey)}
-              className="text-xs text-muted-foreground hover:text-destructive"
+              disabled={isDefault}
+              className="text-xs h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               title="Reset to default"
             >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
               Reset
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
   const configEntries = Object.entries(configurations)
 
   return (
-    <div className="space-y-6">
-      <div className="bg-card rounded-lg shadow-sm border border-border">
-        <div className="px-6 py-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-foreground">
-              {categoryTitles[category] || category}
-            </h2>
-            {Object.keys(pendingChanges).length > 0 && (
-              <button
-                onClick={handleSaveWithReason}
-                className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90"
-              >
-                Save Changes ({Object.keys(pendingChanges).length})
-              </button>
-            )}
-          </div>
+    <div className="space-y-6 pb-20">
+      {configEntries.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Info className="h-10 w-10 mx-auto mb-3 opacity-50" />
+          <p>No configurations found for this category.</p>
         </div>
-
-        <div className="p-6">
-          {configEntries.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No configurations found for this category.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {configEntries.map(([configKey, config]) =>
-                renderConfigInput(configKey, config)
-              )}
-            </div>
+      ) : (
+        <div className="grid gap-4">
+          {configEntries.map(([configKey, config]) =>
+            renderConfigInput(configKey, config)
           )}
         </div>
-      </div>
+      )}
 
-      {/* Reason Modal */}
-      {showReasonModal && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border border-border w-96 shadow-lg rounded-md bg-card">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-foreground mb-4">
-                {reasonModalType === 'save' ? 'Save Configuration Changes' : 'Reset Configuration'}
-              </h3>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Reason for change (optional):
-                </label>
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={3}
-                  className="block w-full px-3 py-2 border border-border bg-background text-foreground rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm placeholder:text-muted-foreground"
-                  placeholder="Describe why you're making this change..."
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowReasonModal(false)
-                    setReason('')
-                    setResetConfigKey('')
-                  }}
-                  disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-foreground bg-muted border border-border rounded-md hover:bg-muted/80 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleModalSubmit}
-                  disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-md hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {loading ? 'Processing...' : (reasonModalType === 'save' ? 'Save Changes' : 'Reset Configuration')}
-                </button>
-              </div>
+      {/* Reason Dialog */}
+      <Dialog open={showReasonModal} onOpenChange={setShowReasonModal}>
+        <DialogContent className="sm:max-w-[425px] bg-background/95 backdrop-blur-xl border-border/50">
+          <DialogHeader>
+            <DialogTitle className="font-audrey text-xl">
+              {reasonModalType === 'save' ? 'Save Changes' : 'Confirm Reset'}
+            </DialogTitle>
+            <DialogDescription>
+              {reasonModalType === 'save'
+                ? 'Please provide a reason for these configuration changes for the audit log.'
+                : 'Are you sure you want to reset this configuration to its default value?'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="reason">Reason (Optional)</Label>
+              <Textarea
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g., Updated per security policy review..."
+                className="bg-background/50"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReasonModal(false)}>Cancel</Button>
+            <Button
+              onClick={handleModalSubmit}
+              className={reasonModalType === 'reset' ? "bg-destructive hover:bg-destructive/90" : ""}
+              disabled={loading}
+            >
+              {loading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              {reasonModalType === 'save' ? 'Confirm Save' : 'Confirm Reset'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

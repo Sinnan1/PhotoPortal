@@ -25,6 +25,7 @@ export interface UploadBatch {
   failedFiles: number
   averageSpeed: number
   compress: boolean
+  compressionQuality: number // 10-100, default 90
 }
 
 type UploadListener = (batches: UploadBatch[]) => void
@@ -67,7 +68,7 @@ class UploadManager {
     this.batches.forEach((batch, batchId) => {
       const hasQueuedFiles = batch.files.some(f => f.status === 'queued')
       const activeWorkerCount = this.activeWorkers.get(batchId) || 0
-      
+
       if (hasQueuedFiles && activeWorkerCount === 0) {
         console.log(`🔄 Restarting workers for batch ${batchId}`)
         this.processBatch(batchId)
@@ -133,7 +134,8 @@ class UploadManager {
     galleryId: string,
     folderId: string,
     files: File[],
-    compress: boolean = false
+    compress: boolean = false,
+    compressionQuality: number = 90
   ): Promise<string> {
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
@@ -158,16 +160,76 @@ class UploadManager {
       completedFiles: 0,
       failedFiles: 0,
       averageSpeed: 0,
-      compress
+      compress,
+      compressionQuality
     }
 
     this.batches.set(batchId, batch)
     this.notify()
 
-    // Start processing
+    // Check for duplicates before starting uploads
+    await this.checkDuplicatesBeforeUpload(batchId, folderId)
+
+    // Start processing (only non-duplicate files will be uploaded)
     this.processBatch(batchId)
 
     return batchId
+  }
+
+  private async checkDuplicatesBeforeUpload(batchId: string, folderId: string) {
+    const batch = this.batches.get(batchId)
+    if (!batch) return
+
+    try {
+      // Import api dynamically to avoid circular dependencies
+      const { api } = await import('./api')
+
+      // Prepare file list for duplicate check - skip files without valid data
+      const fileList = batch.files
+        .filter(f => f.file?.name && f.file?.size)
+        .map(f => ({
+          filename: f.file!.name,
+          size: f.file!.size
+        }))
+
+      if (fileList.length === 0) {
+        console.log('⚠️ No valid files to check for duplicates')
+        return
+      }
+
+      console.log(`🔍 Checking ${fileList.length} files for duplicates...`)
+
+      // Call backend to check for duplicates
+      const response = await api.checkDuplicates(folderId, fileList)
+
+      if (response.success && response.results) {
+        // Mark duplicate files as failed immediately
+        response.results.forEach((result: { filename: string; size: number; isDuplicate: boolean; existingPhoto?: { id: string; uploadedAt: Date } }) => {
+          const uploadFile = batch.files.find(f => 
+            f.file?.name === result.filename && f.file?.size === result.size
+          )
+          
+          if (uploadFile && result.isDuplicate) {
+            uploadFile.status = 'failed'
+            uploadFile.error = `File "${result.filename}" already exists in this folder`
+            uploadFile.progress = 0
+            batch.failedFiles++
+            console.log(`⚠️ Skipping duplicate: ${result.filename}`)
+          }
+        })
+
+        const duplicateCount = response.summary?.duplicates || 0
+        if (duplicateCount > 0) {
+          console.log(`⏭️ Skipped ${duplicateCount} duplicate file(s) instantly`)
+        }
+
+        this.notify()
+      }
+    } catch (error) {
+      console.error('Failed to check for duplicates:', error)
+      // If duplicate check fails, continue with uploads anyway
+      // This ensures the feature doesn't break existing functionality
+    }
   }
 
   private async processBatch(batchId: string) {
@@ -232,10 +294,10 @@ class UploadManager {
           uploadFile.status = 'queued'
           uploadFile.error = 'Waiting for network...'
           this.notify()
-          
+
           // Wait for network to come back
           await this.waitForOnline()
-          
+
           console.log(`▶️ Resuming upload (online): ${uploadFile.file?.name}`)
           // Don't count this as a retry attempt
           return attemptUpload(attempt, true)
@@ -250,7 +312,7 @@ class UploadManager {
 
         // Compress if requested (only on first attempt)
         if (batch.compress && attempt === 1 && !isNetworkRetry) {
-          fileToUpload = await this.compressImage(uploadFile.file)
+          fileToUpload = await this.compressImage(uploadFile.file, batch.compressionQuality)
         }
 
         const result = await this.performUpload(
@@ -291,7 +353,7 @@ class UploadManager {
         console.error(`Upload attempt ${attempt} failed:`, error)
 
         const errorMessage = error instanceof Error ? error.message : 'Upload failed'
-        
+
         // Don't retry duplicate errors
         const isDuplicate = errorMessage.includes('already exists')
         if (isDuplicate) {
@@ -303,23 +365,23 @@ class UploadManager {
         }
 
         // Check if it's a network error
-        const isNetworkError = errorMessage.includes('Network error') || 
-                               errorMessage.includes('Failed to fetch') ||
-                               errorMessage.includes('timeout') ||
-                               !this.isOnline
+        const isNetworkError = errorMessage.includes('Network error') ||
+          errorMessage.includes('Failed to fetch') ||
+          errorMessage.includes('timeout') ||
+          !this.isOnline
 
         if (isNetworkError) {
           console.log(`🌐 Network error detected for ${uploadFile.file?.name}, will retry when online`)
-          
+
           // Don't count network errors against retry limit
           // Just wait for network and retry
           uploadFile.status = 'queued'
           uploadFile.error = 'Network error - will retry'
           this.notify()
-          
+
           // Wait a bit before checking network again
           await new Promise(resolve => setTimeout(resolve, 2000))
-          
+
           // Retry without incrementing attempt counter for network errors
           return attemptUpload(attempt, true)
         }
@@ -361,7 +423,7 @@ class UploadManager {
     })
   }
 
-  private async compressImage(file: File): Promise<File> {
+  private async compressImage(file: File, quality: number = 90): Promise<File> {
     return new Promise((resolve, reject) => {
       const img = new Image()
       const canvas = document.createElement('canvas')
@@ -387,6 +449,9 @@ class UploadManager {
         canvas.height = height
         ctx?.drawImage(img, 0, 0, width, height)
 
+        // Convert quality from 0-100 to 0-1 scale
+        const qualityDecimal = Math.max(0.1, Math.min(1, quality / 100))
+
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -394,13 +459,14 @@ class UploadManager {
                 type: 'image/jpeg',
                 lastModified: Date.now()
               })
+              console.log(`📷 Compressed ${file.name}: ${(file.size / 1024).toFixed(0)}KB → ${(blob.size / 1024).toFixed(0)}KB (${quality}% quality)`)
               resolve(compressedFile)
             } else {
               reject(new Error('Compression failed'))
             }
           },
           'image/jpeg',
-          0.9
+          qualityDecimal
         )
       }
 
@@ -444,7 +510,7 @@ class UploadManager {
 
       xhr.addEventListener('load', () => {
         this.activeUploads.delete(file.name)
-        
+
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText)

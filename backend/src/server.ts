@@ -23,9 +23,14 @@ import uploadsRoutes from './routes/uploads'
 import folderRoutes from './routes/folders'
 import selectionAnalyticsRoutes from './routes/selectionAnalytics'
 import feedbackRoutes from './routes/feedback'
+import presenceRoutes from './routes/presence'
+import adminPresenceRoutes from './routes/adminPresence'
 
 // Import admin session manager
 import { adminSessionManager } from './utils/adminSessionManager'
+
+// Import presence cleanup function
+import { cleanupStalePresence } from './controllers/presenceController'
 
 // Load environment variables
 dotenv.config()
@@ -42,7 +47,7 @@ app.use(cors({
     : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'x-csrf-token', 'X-CSRF-Token']
 }))
 app.use(morgan('combined'))
 
@@ -109,6 +114,8 @@ app.use('/api/uploads', uploadsRoutes)
 app.use('/api/folders', folderRoutes)
 app.use('/api/analytics', selectionAnalyticsRoutes)
 app.use('/api', feedbackRoutes)
+app.use('/api/presence', presenceRoutes)
+app.use('/api/admin/presence', adminPresenceRoutes)
 
 // Upload configuration endpoint for frontend - using unified config
 app.get('/api/upload-config', (req, res) => {
@@ -260,5 +267,13 @@ app.listen(PORT, async () => {
     uploadSessionService.cleanupOldSessions(UPLOAD_CONFIG.SESSION_RETENTION_DAYS)
   }, UPLOAD_CONFIG.CLEANUP_OLD_SESSIONS_INTERVAL)
   console.log(`🧹 Upload session cleanup started (runs every ${UPLOAD_CONFIG.CLEANUP_OLD_SESSIONS_INTERVAL / (24 * 60 * 60 * 1000)} days)`)
+
+  // Start presence cleanup (every 5 minutes)
+  setInterval(() => {
+    cleanupStalePresence()
+  }, 5 * 60 * 1000)
+  cleanupStalePresence() // Run once on startup
+  console.log(`👥 Presence tracking cleanup started (runs every 5 minutes)`)
 })
+
 

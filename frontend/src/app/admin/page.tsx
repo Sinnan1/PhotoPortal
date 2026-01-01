@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
+import { useStorageData, formatStorageSize } from "@/hooks/use-storage-data";
 import { DashboardStatCard } from "@/components/admin/DashboardStatCard";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -29,8 +30,6 @@ interface DashboardStats {
   activeUsers: number;
   totalGalleries: number;
   pendingApprovals: number;
-  storageUsed: string;
-  storageLimit: string;
 }
 
 interface RecentActivity {
@@ -47,15 +46,17 @@ export default function AdminDashboard() {
     activeUsers: 0,
     totalGalleries: 0,
     pendingApprovals: 0,
-    storageUsed: "0 MB",
-    storageLimit: "10 GB",
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Use centralized storage hook
+  const { totalStorageBytes, fetchStorageData } = useStorageData();
+
   useEffect(() => {
     fetchDashboardData();
+    fetchStorageData(); // Fetch storage separately using the centralized hook
   }, []);
 
   const fetchDashboardData = async () => {
@@ -67,23 +68,18 @@ export default function AdminDashboard() {
       const userStats = userStatsResponse.data;
 
       // Fetch gallery statistics
-      const galleryStatsResponse = await adminApi.getAllGalleries({ limit: 1 });
+      const galleryStatsResponse = await adminApi.getAllGalleries({ limit: 10 });
       const totalGalleries = galleryStatsResponse.data.pagination?.total || 0;
 
       // Fetch pending approvals
       const pendingResponse = await adminApi.getPendingApprovals();
       const pendingApprovals = pendingResponse.data.count || 0;
 
-      // Calculate storage (simplified)
-      const storageUsed = totalGalleries > 0 ? `${(totalGalleries * 0.1).toFixed(1)} GB` : "0 MB";
-
       setStats({
         totalUsers: userStats.overview.totalUsers,
         activeUsers: userStats.overview.activeUsers,
         totalGalleries,
         pendingApprovals,
-        storageUsed,
-        storageLimit: "10 GB",
       });
 
       // Generate recent activity from real data
@@ -166,7 +162,7 @@ export default function AdminDashboard() {
             Overview of your platform's performance and activity
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto">
           <Button variant="outline" className="gap-2">
             <Clock className="h-4 w-4" />
             Last 30 Days
@@ -182,7 +178,7 @@ export default function AdminDashboard() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6" // Compact 2x2 grid on mobile
       >
         <DashboardStatCard
           title="Total Users"
@@ -208,29 +204,28 @@ export default function AdminDashboard() {
           delay={0.3}
         />
         <DashboardStatCard
-          title="Storage Used"
-          value={stats.storageUsed}
+          title="B2 Storage"
+          value={formatStorageSize(totalStorageBytes)}
           icon={HardDrive}
-          description={`of ${stats.storageLimit} limit`}
+          description="Total data in Backblaze B2"
           delay={0.4}
         />
       </motion.div>
 
-      {/* Bento Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Bento Grid Layout - Reversed on mobile to show Actions first */}
+      <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-6">
 
         {/* Main Activity Feed - Spans 2 columns */}
         <motion.div
           variants={item}
           initial="hidden"
-          animate="visible" // Note: This should be "show" based on parent, but let's just animate it directly or use viewport
-          whileInView={{ opacity: 1, y: 0 }}
+          animate="show" whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="lg:col-span-2"
         >
           <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Activity className="h-5 w-5 text-primary" />
                 System Activity
               </CardTitle>
@@ -238,7 +233,7 @@ export default function AdminDashboard() {
                 Recent actions and system notifications
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
               {loading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
@@ -252,7 +247,7 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {recentActivity.length > 0 ? (
                     recentActivity.map((activity, index) => (
                       <motion.div
@@ -260,34 +255,34 @@ export default function AdminDashboard() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="group flex items-center space-x-4 p-4 rounded-xl border border-border/50 bg-background/50 hover:bg-background hover:border-primary/20 transition-all duration-300 hover:shadow-md"
+                        className="group flex items-center space-x-3 md:space-x-4 p-3 md:p-4 rounded-xl border border-border/50 bg-background/50 hover:bg-background hover:border-primary/20 transition-all duration-300 hover:shadow-md"
                       >
                         <div className={cn(
-                          "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center transition-colors",
+                          "flex-shrink-0 h-8 w-8 md:h-10 md:w-10 rounded-full flex items-center justify-center transition-colors",
                           activity.type === "user" ? "bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white" :
                             activity.type === "gallery" ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white" :
                               "bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white"
                         )}>
-                          {activity.type === "user" && <Users className="h-5 w-5" />}
-                          {activity.type === "gallery" && <FolderOpen className="h-5 w-5" />}
-                          {activity.type === "security" && <Shield className="h-5 w-5" />}
+                          {activity.type === "user" && <Users className="h-4 w-4 md:h-5 md:w-5" />}
+                          {activity.type === "gallery" && <FolderOpen className="h-4 w-4 md:h-5 md:w-5" />}
+                          {activity.type === "security" && <Shield className="h-4 w-4 md:h-5 md:w-5" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                             {activity.action}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {activity.user} • {activity.time}
                           </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex">
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       </motion.div>
                     ))
                   ) : (
-                    <div className="text-center py-12">
-                      <Activity className="h-12 w-12 text-muted mx-auto mb-4" />
+                    <div className="text-center py-8 md:py-12">
+                      <Activity className="h-10 w-10 md:h-12 md:w-12 text-muted mx-auto mb-4" />
                       <p className="text-muted-foreground">No recent activity</p>
                     </div>
                   )}
@@ -298,7 +293,7 @@ export default function AdminDashboard() {
         </motion.div>
 
         {/* Right Column: Quick Actions & Status */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Pending Approvals Card */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -306,10 +301,10 @@ export default function AdminDashboard() {
             transition={{ delay: 0.2 }}
           >
             <Card className={cn(
-              "border-l-4 transition-all duration-300",
+              "border-l-4 transition-all duration-300 shadow-sm",
               stats.pendingApprovals > 0 ? "border-l-amber-500" : "border-l-emerald-500"
             )}>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-2 p-4 md:p-6 md:pb-3">
                 <CardTitle className="text-base font-medium flex items-center justify-between">
                   <span>Pending Actions</span>
                   {stats.pendingApprovals > 0 ? (
@@ -319,7 +314,7 @@ export default function AdminDashboard() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                 {stats.pendingApprovals > 0 ? (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
@@ -346,31 +341,31 @@ export default function AdminDashboard() {
             transition={{ delay: 0.3 }}
           >
             <Card>
-              <CardHeader>
+              <CardHeader className="p-4 md:p-6 pb-2">
                 <CardTitle className="text-base font-medium">Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-3">
+              <CardContent className="grid grid-cols-2 gap-3 p-4 pt-0 md:p-6 md:pt-0">
                 <Link href="/admin/users/create" className="contents">
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
-                    <Users className="h-5 w-5 text-primary" />
+                  <Button variant="outline" className="h-16 md:h-20 flex flex-col gap-1 md:gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                    <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                     <span className="text-xs font-medium">Add User</span>
                   </Button>
                 </Link>
                 <Link href="/admin/galleries" className="contents">
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
-                    <FolderOpen className="h-5 w-5 text-primary" />
+                  <Button variant="outline" className="h-16 md:h-20 flex flex-col gap-1 md:gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                    <FolderOpen className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                     <span className="text-xs font-medium">Galleries</span>
                   </Button>
                 </Link>
                 <Link href="/admin/analytics" className="contents">
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
-                    <BarChart3 className="h-5 w-5 text-primary" />
+                  <Button variant="outline" className="h-16 md:h-20 flex flex-col gap-1 md:gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                    <BarChart3 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                     <span className="text-xs font-medium">Analytics</span>
                   </Button>
                 </Link>
                 <Link href="/admin/system-config#backup" className="contents">
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
-                    <Database className="h-5 w-5 text-primary" />
+                  <Button variant="outline" className="h-16 md:h-20 flex flex-col gap-1 md:gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                    <Database className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                     <span className="text-xs font-medium">Backup</span>
                   </Button>
                 </Link>

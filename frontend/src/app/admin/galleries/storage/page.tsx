@@ -18,32 +18,29 @@ import {
   Download,
   MoreHorizontal
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 
 interface StorageData {
   totalStorage: {
-    used: number;
-    total: number;
-    percentage: number;
+    used: number; // Total bytes used in B2
+    totalPhotos: number;
+    totalGalleries: number;
+    avgFileSize: number; // Average photo size in bytes
   };
   galleryStorage: Array<{
     id: string;
     title: string;
     photographer: string;
-    size: number;
+    size: number; // Size in bytes
     photoCount: number;
     lastModified: string;
     status: 'active' | 'archived' | 'large';
   }>;
-  storageBreakdown: {
-    photos: number;
-    thumbnails: number;
-    metadata: number;
-    other: number;
-  };
+  storageByType: Record<string, number>; // File type -> bytes (e.g., "JPEG": 12345678)
   warnings: Array<{
-    type: 'large_gallery' | 'storage_full' | 'old_files';
+    type: 'large_gallery' | 'old_files';
     message: string;
     count: number;
   }>;
@@ -51,9 +48,9 @@ interface StorageData {
 
 export default function GalleryStoragePage() {
   const [storageData, setStorageData] = useState<StorageData>({
-    totalStorage: { used: 0, total: 10, percentage: 0 },
+    totalStorage: { used: 0, totalPhotos: 0, totalGalleries: 0, avgFileSize: 0 },
     galleryStorage: [],
-    storageBreakdown: { photos: 0, thumbnails: 0, metadata: 0, other: 0 },
+    storageByType: {},
     warnings: [],
   });
   const [loading, setLoading] = useState(true);
@@ -69,32 +66,30 @@ export default function GalleryStoragePage() {
     try {
       setLoading(true);
 
-      // Fetch storage analytics
-      const storageResponse = await adminApi.getStorageAnalytics();
-      const storageStats = storageResponse.data;
+      // Fetch real storage analytics from API
+      const [galleriesResponse, storageAnalyticsResponse] = await Promise.all([
+        adminApi.getAllGalleries({ limit: 100 }),
+        adminApi.getStorageAnalytics()
+      ]);
 
-      // Fetch all galleries for storage calculation
-      const galleriesResponse = await adminApi.getAllGalleries({ limit: 100 });
       const galleries = galleriesResponse.data.galleries || [];
+      const storageAnalytics = storageAnalyticsResponse.data;
 
-      // Calculate storage metrics
-      const totalUsed = galleries.length * 0.1; // Estimate 100MB per gallery
-      const totalStorage = 10; // 10GB total
-      const percentage = Math.min((totalUsed / totalStorage) * 100, 100);
+      const LARGE_GALLERY_THRESHOLD = 500 * 1024 * 1024; // 500 MB in bytes
 
-      // Generate gallery storage data
+      // Generate gallery storage data using real totalSize
       const galleryStorage = galleries.map((gallery: any) => {
-        const size = Math.random() * 0.5 + 0.05; // 50MB to 550MB
-        const photoCount = gallery.stats?.totalPhotos || Math.floor(Math.random() * 50) + 10;
+        const sizeInBytes = Number(gallery.totalSize) || 0;
+        const photoCount = gallery.stats?.totalPhotos || 0;
 
         return {
           id: gallery.id,
           title: gallery.title,
           photographer: gallery.photographer.name,
-          size: parseFloat(size.toFixed(2)),
+          size: sizeInBytes,
           photoCount,
           lastModified: gallery.createdAt,
-          status: size > 0.4 ? 'large' : 'active' as 'active' | 'archived' | 'large',
+          status: sizeInBytes > LARGE_GALLERY_THRESHOLD ? 'large' : 'active' as 'active' | 'archived' | 'large',
         };
       }).sort((a: any, b: any) => sortBy === 'size' ? b.size - a.size :
         sortBy === 'name' ? a.title.localeCompare(b.title) :
@@ -108,42 +103,29 @@ export default function GalleryStoragePage() {
         )
         : galleryStorage;
 
-      // Calculate storage breakdown
-      const totalGallerySize = galleryStorage.reduce((sum: number, g: any) => sum + g.size, 0);
-      const storageBreakdown = {
-        photos: parseFloat((totalGallerySize * 0.85).toFixed(2)),
-        thumbnails: parseFloat((totalGallerySize * 0.10).toFixed(2)),
-        metadata: parseFloat((totalGallerySize * 0.03).toFixed(2)),
-        other: parseFloat((totalGallerySize * 0.02).toFixed(2)),
-      };
+      // Calculate total photos from gallery data
+      const totalPhotos = galleryStorage.reduce((sum: number, g: any) => sum + g.photoCount, 0);
 
       // Generate warnings
       const warnings = [];
-      const largeGalleries = galleryStorage.filter((g: any) => g.size > 0.4).length;
+      const largeGalleries = galleryStorage.filter((g: any) => g.size > LARGE_GALLERY_THRESHOLD).length;
       if (largeGalleries > 0) {
         warnings.push({
           type: 'large_gallery' as const,
-          message: `${largeGalleries} galleries are using significant storage`,
+          message: `${largeGalleries} galleries are using significant storage (>500 MB)`,
           count: largeGalleries,
-        });
-      }
-
-      if (percentage > 80) {
-        warnings.push({
-          type: 'storage_full' as const,
-          message: 'Storage usage is approaching capacity',
-          count: 1,
         });
       }
 
       setStorageData({
         totalStorage: {
-          used: parseFloat(totalUsed.toFixed(2)),
-          total: totalStorage,
-          percentage: Math.round(percentage),
+          used: storageAnalytics.totalStorage || 0,
+          totalPhotos,
+          totalGalleries: galleries.length,
+          avgFileSize: storageAnalytics.totalStorage && totalPhotos ? Math.round(storageAnalytics.totalStorage / totalPhotos) : 0,
         },
         galleryStorage: filteredGalleries,
-        storageBreakdown,
+        storageByType: storageAnalytics.storageByType || {},
         warnings,
       });
 
@@ -163,10 +145,11 @@ export default function GalleryStoragePage() {
     fetchStorageData();
   }, [searchQuery, sortBy]);
 
-  const formatSize = (sizeInGB: number) => {
-    if (sizeInGB < 0.001) return `${Math.round(sizeInGB * 1000000)} KB`;
-    if (sizeInGB < 1) return `${Math.round(sizeInGB * 1000)} MB`;
-    return `${sizeInGB.toFixed(2)} GB`;
+  const formatSize = (sizeInBytes: number) => {
+    if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+    if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    if (sizeInBytes < 1024 * 1024 * 1024) return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(sizeInBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
   const getStatusBadge = (status: string, size: number) => {
@@ -193,249 +176,211 @@ export default function GalleryStoragePage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Storage Management</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Monitor and manage storage usage across all galleries
-        </p>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center"
+      >
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold font-audrey text-gray-900 dark:text-gray-100">Storage Management</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 md:mt-2">
+            Monitor and manage storage usage across all galleries
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Storage Overview - Compact 2x2 on Mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        {[
+          {
+            title: "B2 Storage Used",
+            icon: HardDrive,
+            value: formatSize(storageData.totalStorage.used),
+            subtext: "Total data stored in Backblaze B2"
+          },
+          {
+            title: "Total Photos",
+            icon: Database,
+            value: storageData.totalStorage.totalPhotos.toLocaleString(),
+            subtext: "Across all galleries"
+          },
+          {
+            title: "Avg Photo Size",
+            icon: HardDrive,
+            value: formatSize(storageData.totalStorage.avgFileSize),
+            subtext: "Average file size"
+          },
+          {
+            title: "Total Galleries",
+            icon: FolderOpen,
+            value: storageData.totalStorage.totalGalleries.toLocaleString(),
+            subtext: "Active galleries"
+          }
+        ].map((stat, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6 md:pb-2">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+                <stat.icon className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground group-hover:scale-110 transition-transform" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                {loading ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-6 bg-primary/10 rounded w-16"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xl md:text-2xl font-bold font-audrey">{stat.value}</div>
+                    <p className="text-[10px] md:text-xs text-muted-foreground">{stat.subtext}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Storage Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Storage</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{storageData.totalStorage.used} GB</div>
-                <div className="mt-2">
-                  <Progress value={storageData.totalStorage.percentage} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {storageData.totalStorage.percentage}% of {storageData.totalStorage.total} GB used
-                  </p>
+      {/* Storage Breakdown & Warnings */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-audrey">Storage Breakdown</CardTitle>
+              <CardDescription>Distribution across different file types</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loading ? (
+                <div className="space-y-4 animate-pulse">
+                  {[1, 2, 3, 4].map(i => <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded"></div>)}
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              ) : Object.keys(storageData.storageByType).length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-border/50 rounded-xl">
+                  <Database className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No storage data yet</p>
+                </div>
+              ) : (
+                <>
+                  {Object.entries(storageData.storageByType)
+                    .sort(([, a], [, b]) => b - a) // Sort by size descending
+                    .map(([fileType, bytes], i) => {
+                      // Assign colors based on file type
+                      const colorMap: Record<string, string> = {
+                        'JPEG': 'bg-blue-500',
+                        'PNG': 'bg-emerald-500',
+                        'WEBP': 'bg-purple-500',
+                        'TIFF': 'bg-amber-500',
+                        'Canon RAW': 'bg-red-500',
+                        'Nikon RAW': 'bg-yellow-500',
+                        'Sony RAW': 'bg-orange-500',
+                        'DNG RAW': 'bg-pink-500',
+                        'Other': 'bg-gray-500',
+                      };
+                      const color = colorMap[fileType] || 'bg-gray-400';
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Space</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {(storageData.totalStorage.total - storageData.totalStorage.used).toFixed(2)} GB
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {100 - storageData.totalStorage.percentage}% remaining
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                      return (
+                        <div key={fileType} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${color}`} />
+                              <span>{fileType}</span>
+                            </div>
+                            <span className="font-medium font-mono">{formatSize(bytes)}</span>
+                          </div>
+                          <Progress value={storageData.totalStorage.used > 0 ? (bytes / storageData.totalStorage.used) * 100 : 0} className="h-1.5" />
+                        </div>
+                      );
+                    })}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Storage Health</CardTitle>
-            {storageData.totalStorage.percentage > 80 ? (
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            ) : (
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {storageData.totalStorage.percentage > 80 ? "Warning" : "Good"}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-audrey">Storage Warnings</CardTitle>
+              <CardDescription>Issues that require attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {storageData.warnings.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-border/50 rounded-xl">
+                  <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+                  <p className="text-sm text-muted-foreground">System is healthy. No storage warnings.</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {storageData.totalStorage.percentage > 80
-                    ? "Storage approaching capacity"
-                    : "Storage levels are healthy"}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="space-y-3">
+                  {storageData.warnings.map((warning, index) => (
+                    <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                      {getWarningIcon(warning.type)}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                          {warning.message}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="border-orange-500/30 text-orange-600 dark:text-orange-400">
+                        {warning.count}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
-
-      {/* Storage Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Storage Breakdown</CardTitle>
-          <CardDescription>
-            How storage is distributed across different file types
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="animate-pulse flex items-center justify-between">
-                  <div className="h-4 bg-gray-200 rounded w-24"></div>
-                  <div className="h-4 bg-gray-200 rounded w-16"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-20 text-sm font-medium">Photos</div>
-                  <div className="flex-1">
-                    <Progress
-                      value={(storageData.storageBreakdown.photos / storageData.totalStorage.used) * 100}
-                      className="h-2"
-                    />
-                  </div>
-                </div>
-                <div className="text-sm font-medium w-16 text-right">
-                  {formatSize(storageData.storageBreakdown.photos)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-20 text-sm font-medium">Thumbnails</div>
-                  <div className="flex-1">
-                    <Progress
-                      value={(storageData.storageBreakdown.thumbnails / storageData.totalStorage.used) * 100}
-                      className="h-2"
-                    />
-                  </div>
-                </div>
-                <div className="text-sm font-medium w-16 text-right">
-                  {formatSize(storageData.storageBreakdown.thumbnails)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-20 text-sm font-medium">Metadata</div>
-                  <div className="flex-1">
-                    <Progress
-                      value={(storageData.storageBreakdown.metadata / storageData.totalStorage.used) * 100}
-                      className="h-2"
-                    />
-                  </div>
-                </div>
-                <div className="text-sm font-medium w-16 text-right">
-                  {formatSize(storageData.storageBreakdown.metadata)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-20 text-sm font-medium">Other</div>
-                  <div className="flex-1">
-                    <Progress
-                      value={(storageData.storageBreakdown.other / storageData.totalStorage.used) * 100}
-                      className="h-2"
-                    />
-                  </div>
-                </div>
-                <div className="text-sm font-medium w-16 text-right">
-                  {formatSize(storageData.storageBreakdown.other)}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Storage Warnings */}
-      {storageData.warnings.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Storage Warnings</CardTitle>
-            <CardDescription>
-              Issues that require attention
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {storageData.warnings.map((warning, index) => (
-                <div key={index} className="flex items-center space-x-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20">
-                  {getWarningIcon(warning.type)}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                      {warning.message}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-orange-600 border-orange-600">
-                    {warning.count}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Search and Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+      <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+        <CardContent className="pt-4 md:pt-6 p-4 md:p-6">
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search galleries by name or photographer..."
-                className="pl-10"
+                placeholder="Search galleries..."
+                className="pl-10 bg-background/50 border-border/50"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={sortBy === 'size' ? 'default' : 'outline'}
-                onClick={() => setSortBy('size')}
-              >
-                By Size
-              </Button>
-              <Button
-                variant={sortBy === 'name' ? 'default' : 'outline'}
-                onClick={() => setSortBy('name')}
-              >
-                By Name
-              </Button>
-              <Button
-                variant={sortBy === 'date' ? 'default' : 'outline'}
-                onClick={() => setSortBy('date')}
-              >
-                By Date
-              </Button>
+            <div className="grid grid-cols-3 sm:flex gap-2">
+              {[
+                { label: "Size", key: "size" },
+                { label: "Name", key: "name" },
+                { label: "Date", key: "date" }
+              ].map((btn) => (
+                <Button
+                  key={btn.key}
+                  variant={sortBy === btn.key ? 'default' : 'outline'}
+                  onClick={() => setSortBy(btn.key as any)}
+                  size="sm"
+                  className={`text-xs md:text-sm ${sortBy !== btn.key ? "bg-background/50 border-border/50" : ""}`}
+                >
+                  By {btn.label}
+                </Button>
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Gallery Storage Table */}
-      <Card>
+      {/* Gallery Storage List */}
+      <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
         <CardHeader>
-          <CardTitle>Gallery Storage Usage</CardTitle>
+          <CardTitle className="font-audrey">Gallery Storage Usage</CardTitle>
           <CardDescription>
             Storage usage by individual galleries
           </CardDescription>
@@ -443,59 +388,58 @@ export default function GalleryStoragePage() {
         <CardContent>
           {loading ? (
             <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex items-center space-x-4 p-4 border rounded-lg">
-                  <div className="h-12 w-12 bg-gray-200 rounded-lg"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-              ))}
+              {[1, 2, 3].map(i => <div key={i} className="h-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"></div>)}
             </div>
           ) : storageData.galleryStorage.length === 0 ? (
-            <div className="text-center py-8">
-              <HardDrive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No galleries found</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {searchQuery ? 'Try adjusting your search terms' : 'Gallery storage data will appear here'}
-              </p>
+            <div className="text-center py-12 border border-dashed border-border rounded-xl">
+              <HardDrive className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No galleries to display</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {storageData.galleryStorage.map((gallery) => (
-                <div key={gallery.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 rounded-lg bg-[#425146] flex items-center justify-center">
-                      <FolderOpen className="h-6 w-6 text-white" />
+            <div className="space-y-3">
+              {storageData.galleryStorage.map((gallery, index) => (
+                <motion.div
+                  key={gallery.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-border/40 rounded-xl bg-background/40 hover:bg-background/60 hover:border-primary/20 transition-all duration-300 gap-4"
+                >
+                  <div className="flex items-start md:items-center space-x-4">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                      <FolderOpen className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-medium text-gray-900 dark:text-gray-100">{gallery.title}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="font-bold font-audrey text-foreground truncate">{gallery.title}</h3>
                         {getStatusBadge(gallery.status, gallery.size)}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-500 dark:text-gray-400">
-                        <div>Photographer: {gallery.photographer}</div>
-                        <div>{gallery.photoCount} photos</div>
-                        <div>Size: {formatSize(gallery.size)}</div>
-                        <div>Modified: {new Date(gallery.lastModified).toLocaleDateString()}</div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>{gallery.photographer}</span>
+                        <span className="hidden md:inline">•</span>
+                        <span>{gallery.photoCount} photos</span>
+                        <span className="hidden md:inline">•</span>
+                        <span>{new Date(gallery.lastModified).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Archive className="h-4 w-4 mr-1" />
-                      Archive
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+
+                  <div className="flex items-center justify-between md:justify-end gap-4 pl-14 md:pl-0">
+                    <div className="text-right">
+                      <div className="font-bold font-mono text-sm">{formatSize(gallery.size)}</div>
+                      <div className="text-[10px] text-muted-foreground">storage used</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 md:w-auto md:px-3 md:py-2">
+                        <Archive className="h-4 w-4 md:mr-1.5" />
+                        <span className="hidden md:inline">Archive</span>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}

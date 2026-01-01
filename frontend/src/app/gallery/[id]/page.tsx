@@ -38,11 +38,14 @@ import { FolderTiles } from "@/components/gallery/folder-tiles";
 import { BreadcrumbNavigation } from "@/components/layout/breadcrumb-navigation";
 import { CompactFolderTree } from "@/components/gallery/compact-folder-tree";
 import { useAuth } from "@/lib/auth-context";
-import { DownloadFilteredPhotos } from "@/components/ui/download-filtered-photos";
 import { DownloadProgress } from "@/components/ui/download-progress";
 import { useDownloadProgress } from "@/hooks/use-download-progress";
 import { SelectionCounter } from "@/components/ui/selection-counter";
 import { GallerySelectionSummary } from "@/components/ui/gallery-selection-summary";
+import { DownloadWarningModal } from "@/components/ui/download-warning-modal";
+import { MultipartDownloadModal } from "@/components/ui/multipart-download-modal";
+import { formatBytes } from "@/lib/utils";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 
 // Import the API base URL and getAuthToken function
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -84,6 +87,9 @@ function GalleryPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
 
+  // Track presence while viewing this gallery
+  usePresenceHeartbeat(galleryId);
+
 
 
   const [password, setPassword] = useState("");
@@ -97,6 +103,21 @@ function GalleryPage() {
   const [showFolderTree, setShowFolderTree] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tile">("grid");
+
+  // Download confirmation modal state
+  const [downloadModal, setDownloadModal] = useState<{
+    open: boolean;
+    type: 'all' | 'folder' | 'liked' | 'favorited' | null;
+    count: number;
+    size: number;
+    folderId?: string;
+    folderName?: string;
+  }>({ open: false, type: null, count: 0, size: 0 });
+
+  const [multipartModal, setMultipartModal] = useState<{
+    open: boolean;
+    parts: any[];
+  }>({ open: false, parts: [] });
 
   // React Query hooks
   const { data: gallery, isLoading: galleryLoading, error: galleryError } = useGallery(galleryId, { password });
@@ -260,24 +281,92 @@ function GalleryPage() {
     }
   };
 
-  const handleDownloadCurrentFolder = async () => {
+  // Show download confirmation modal for current folder
+  const handleDownloadCurrentFolder = () => {
     if (!currentFolder) return;
-    try {
-      const response = await api.createDownloadTicket(galleryId, { folderId: currentFolder.id, filter: 'folder' });
-      window.location.href = response.downloadUrl;
-    } catch (error) {
-      console.error("Failed to start download:", error);
-      showToast("Failed to start download", "error");
-    }
+    setDownloadModal({
+      open: true,
+      type: 'folder',
+      count: galleryPhotoCounts.folder,
+      size: galleryPhotoCounts.folderSize,
+      folderId: currentFolder.id,
+      folderName: currentFolder.name
+    });
   };
 
-  const handleDownloadAll = async () => {
+  // Show download confirmation modal for all photos
+  const handleDownloadAll = () => {
+    setDownloadModal({
+      open: true,
+      type: 'all',
+      count: galleryPhotoCounts.all,
+      size: galleryPhotoCounts.allSize
+    });
+  };
+
+  // Show download confirmation modal for liked photos
+  const handleDownloadLiked = () => {
+    setDownloadModal({
+      open: true,
+      type: 'liked',
+      count: galleryPhotoCounts.liked,
+      size: galleryPhotoCounts.likedSize
+    });
+  };
+
+  // Show download confirmation modal for favorited photos
+  const handleDownloadFavorited = () => {
+    setDownloadModal({
+      open: true,
+      type: 'favorited',
+      count: galleryPhotoCounts.favorited,
+      size: galleryPhotoCounts.favoritedSize
+    });
+  };
+
+  // Handle confirmed download from modal
+  const handleConfirmDownload = async () => {
+    if (!downloadModal.type) return;
+
+    const filterType = downloadModal.type;
+    const folderId = downloadModal.folderId;
+    setDownloadModal(prev => ({ ...prev, open: false }));
+
     try {
-      const response = await api.createDownloadTicket(galleryId, { filter: 'all' });
-      window.location.href = response.downloadUrl;
+      console.log(`Starting ${filterType} photos download for gallery:`, galleryId);
+
+      // Build request options based on download type
+      const options: { filter: string; folderId?: string } = { filter: filterType };
+      if (filterType === 'folder' && folderId) {
+        options.folderId = folderId;
+      }
+
+      const response = await api.createDownloadTicket(galleryId, options);
+      console.log("Download ticket response:", response);
+      if (response && response.downloadUrl) {
+        if (response.strategy === 'MULTIPART_MANIFEST') {
+          // It's a multipart download, fetch the manifest
+          try {
+            const manifestResponse = await fetch(response.downloadUrl);
+            const data = await manifestResponse.json();
+            setMultipartModal({
+              open: true,
+              parts: data.parts
+            });
+          } catch (error) {
+            console.error("Failed to fetch multipart manifest:", error);
+            showToast("Failed to prepare download", "error");
+          }
+        } else {
+          // Direct stream, use standard browser download
+          window.location.href = response.downloadUrl;
+        }
+      } else {
+        showToast("Failed to get download URL", "error");
+      }
     } catch (error) {
-      console.error("Failed to start download:", error);
-      showToast("Failed to start download", "error");
+      console.error(`Failed to start ${filterType} photos download:`, error);
+      showToast(error instanceof Error ? error.message : "Failed to start download", "error");
     }
   };
 
@@ -346,16 +435,40 @@ function GalleryPage() {
 
   const totalPages = Math.ceil(filteredPhotos.length / PHOTOS_PER_PAGE);
 
-  // Calculate liked and favorited photo counts for the entire gallery
+  // Calculate photo counts and sizes for all download types
   const galleryPhotoCounts = useMemo(() => {
-    if (!gallery || !user) return { liked: 0, favorited: 0 };
+    if (!gallery) return {
+      all: 0, allSize: 0,
+      folder: 0, folderSize: 0,
+      liked: 0, likedSize: 0,
+      favorited: 0, favoritedSize: 0
+    };
 
     const allPhotos = gallery.folders?.flatMap(f => f?.photos || []) || [];
-    const likedCount = allPhotos.filter(p => p.likedBy?.some(like => like.userId === user.id)).length;
-    const favoritedCount = allPhotos.filter(p => p.favoritedBy?.some(fav => fav.userId === user.id)).length;
+    const allSize = allPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0);
 
-    return { liked: likedCount, favorited: favoritedCount };
-  }, [gallery, user]);
+    // Current folder photos
+    const folderPhotos = currentFolder?.photos || [];
+    const folderSize = folderPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0);
+
+    // Liked and favorited (requires user)
+    const likedPhotos = user ? allPhotos.filter(p => p.likedBy?.some(like => like.userId === user.id)) : [];
+    const favoritedPhotos = user ? allPhotos.filter(p => p.favoritedBy?.some(fav => fav.userId === user.id)) : [];
+
+    const likedSize = likedPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0);
+    const favoritedSize = favoritedPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0);
+
+    return {
+      all: allPhotos.length,
+      allSize,
+      folder: folderPhotos.length,
+      folderSize,
+      liked: likedPhotos.length,
+      favorited: favoritedPhotos.length,
+      likedSize,
+      favoritedSize
+    };
+  }, [gallery, user, currentFolder]);
 
   // Reset to page 1 when filter or folder changes
   useEffect(() => {
@@ -718,7 +831,7 @@ function GalleryPage() {
 
                 {/* Download Liked */}
                 {user && galleryPhotoCounts.liked > 0 && (
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadLiked}>
                     <Heart className="mr-2 h-4 w-4 text-red-500" />
                     Liked Photos ({galleryPhotoCounts.liked})
                   </DropdownMenuItem>
@@ -726,7 +839,7 @@ function GalleryPage() {
 
                 {/* Download Favorited */}
                 {user && galleryPhotoCounts.favorited > 0 && (
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadFavorited}>
                     <Star className="mr-2 h-4 w-4 text-yellow-500" />
                     Favorited Photos ({galleryPhotoCounts.favorited})
                   </DropdownMenuItem>
@@ -1159,6 +1272,27 @@ function GalleryPage() {
           canDownload={gallery.canDownload !== false}
         />
       )}
+
+      {/* Download Confirmation Modal */}
+      <DownloadWarningModal
+        open={downloadModal.open}
+        onOpenChange={(open) => setDownloadModal(prev => ({ ...prev, open }))}
+        onConfirm={handleConfirmDownload}
+        downloadType={
+          downloadModal.type === 'all' ? 'All Photos' :
+            downloadModal.type === 'folder' ? `"${downloadModal.folderName || 'Folder'}"` :
+              downloadModal.type === 'liked' ? 'Liked Photos' :
+                downloadModal.type === 'favorited' ? 'Favorited Photos' : 'Photos'
+        }
+        photoCount={downloadModal.count}
+        estimatedSize={downloadModal.size}
+      />
+
+      <MultipartDownloadModal
+        open={multipartModal.open}
+        onOpenChange={(open) => setMultipartModal(prev => ({ ...prev, open }))}
+        parts={multipartModal.parts}
+      />
     </div>
   );
 }

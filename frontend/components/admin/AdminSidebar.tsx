@@ -83,26 +83,7 @@ const navigationItems: NavigationItem[] = [
         label: "Gallery Oversight",
         icon: FolderOpen,
         path: "/admin/galleries",
-        children: [
-            {
-                id: "all-galleries",
-                label: "All Galleries",
-                icon: FolderOpen,
-                path: "/admin/galleries",
-            },
-            {
-                id: "gallery-analytics",
-                label: "Gallery Analytics",
-                icon: TrendingUp,
-                path: "/admin/galleries/analytics",
-            },
-            {
-                id: "storage-management",
-                label: "Storage Management",
-                icon: Database,
-                path: "/admin/galleries/storage",
-            },
-        ],
+
     },
     {
         id: "analytics",
@@ -121,6 +102,12 @@ const navigationItems: NavigationItem[] = [
                 label: "User Analytics",
                 icon: Users,
                 path: "/admin/analytics/users",
+            },
+            {
+                id: "active-users",
+                label: "Active Users",
+                icon: Activity,
+                path: "/admin/presence",
             },
             {
                 id: "performance",
@@ -212,18 +199,23 @@ export function AdminSidebar({ open, setOpen, isMobile }: AdminSidebarProps) {
     };
 
     const sidebarVariants = {
-        open: { x: 0, width: "18rem", transition: { type: "spring", stiffness: 300, damping: 30 } },
-        closed: { x: isMobile ? "-100%" : 0, width: isMobile ? "0rem" : "5rem", transition: { type: "spring", stiffness: 300, damping: 30 } },
+        open: { x: 0, transition: { type: "spring" as const, stiffness: 300, damping: 30 } },
+        closed: { x: isMobile ? "-100%" : 0, transition: { type: "spring" as const, stiffness: 300, damping: 30 } },
     };
 
     return (
-        <aside
+        <motion.aside
+            initial="closed"
+            animate={open ? "open" : "closed"}
+            variants={sidebarVariants}
             className={cn(
-                "fixed left-0 top-16 z-30 h-[calc(100vh-4rem)] border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-                "border-border/40 safe-area-left transition-all duration-300",
+                "fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+                "border-border/40 safe-area-left transition-all duration-300 overflow-hidden",
                 !open && !isMobile && "w-20",
-                open && "w-72",
-                isMobile && "top-16 z-50 h-[calc(100vh-4rem)]" // Ensure mobile behavior is consistent
+                open && !isMobile && "w-72",
+                // Mobile styles
+                isMobile && open && "w-72 shadow-2xl", // Fixed width on mobile when open
+                isMobile && !open && "w-0 border-none pointer-events-none opacity-0" // Hide completely when closed
             )}
         >
 
@@ -324,6 +316,6 @@ export function AdminSidebar({ open, setOpen, isMobile }: AdminSidebarProps) {
                     {open && <span>Sign Out</span>}
                 </Button>
             </div>
-        </aside >
+        </motion.aside >
     );
 }

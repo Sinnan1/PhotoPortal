@@ -38,6 +38,7 @@ model User {
   clients               User[]             @relation("PhotographerClients")
   feedbackGiven         ClientFeedback[]   @relation("ClientFeedbackGiven")
   galleryGroups         GalleryGroup[]     @relation("PhotographerGalleryGroups")
+  presence              UserPresence?      @relation("UserPresence")
 
   @@map("users")
 }
@@ -51,6 +52,7 @@ model Gallery {
   downloadLimit  Int?      @default(0)
   downloadCount  Int       @default(0)
   isLocked       Boolean   @default(false)
+  totalSize      BigInt    @default(0)
   photographerId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -63,13 +65,14 @@ model Gallery {
   // Event grouping (optional)
   groupId    String? // Optional link to GalleryGroup
 
-  favoritedBy    FavoritedGallery[]
-  folders        Folder[]
-  photographer   User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
-  accessibleBy   GalleryAccess[]
-  likedBy        LikedGallery[]
-  uploadSessions UploadSession[]    @relation("GalleryUploadSessions")
-  group          GalleryGroup?      @relation("GroupGalleries", fields: [groupId], references: [id], onDelete: SetNull)
+  favoritedBy       FavoritedGallery[]
+  folders           Folder[]
+  photographer      User               @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  accessibleBy      GalleryAccess[]
+  likedBy           LikedGallery[]
+  uploadSessions    UploadSession[]    @relation("GalleryUploadSessions")
+  group             GalleryGroup?      @relation("GroupGalleries", fields: [groupId], references: [id], onDelete: SetNull)
+  activeViewers     UserPresence[]     @relation("GalleryPresence")
 
   @@index([photographerId, shootYear, shootMonth])
   @@index([photographerId, shootDate])
@@ -343,4 +346,27 @@ model ClientFeedback {
   @@index([photographerId])
   @@index([createdAt])
   @@map("client_feedback")
+}
+
+model UserPresence {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  galleryId      String?
+  lastSeenAt     DateTime  @default(now())
+  userAgent      String?
+  ipAddress      String?
+  
+  // Parsed device info (server-side)
+  browser        String?
+  browserVersion String?
+  os             String?
+  deviceType     String?   // desktop | mobile | tablet
+  
+  createdAt      DateTime  @default(now())
+  
+  user    User     @relation("UserPresence", fields: [userId], references: [id], onDelete: Cascade)
+  gallery Gallery? @relation("GalleryPresence", fields: [galleryId], references: [id], onDelete: SetNull)
+  
+  @@index([lastSeenAt])
+  @@map("user_presence")
 }

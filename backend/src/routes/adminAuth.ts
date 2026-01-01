@@ -16,16 +16,16 @@ import {
 } from '../controllers/adminAuthController'
 import { authenticateAdmin, requireAdmin } from '../middleware/adminAuth'
 import { getAdminSetupStatus } from '../utils/createFirstAdmin'
-import { 
-	generateCSRFToken, 
-	validateCSRFToken, 
+import {
+	generateCSRFToken,
+	validateCSRFToken,
 	revokeCSRFToken,
 	addCSRFTokenToResponse,
 	getCSRFTokenStatus
 } from '../middleware/csrf'
-import { 
-	adminLoginLimiter, 
-	adminGeneralLimiter, 
+import {
+	adminLoginLimiter,
+	adminGeneralLimiter,
 	passwordChangeLimiter,
 	getRateLimitStatus
 } from '../middleware/rateLimiter'
@@ -77,7 +77,7 @@ router.get('/setup-status', async (req, res) => {
 router.post('/setup-first-admin', setupFirstAdmin)
 
 // Admin invitation system (public routes for verification)
-router.post('/verify-invitation/:token', verifyAdminInvitation)
+router.get('/verify-invitation/:token', verifyAdminInvitation)
 router.post('/activate-account', activateAdminAccount)
 
 // CSRF token management with rate limiting

@@ -16,11 +16,12 @@ import {
   CheckCircle,
   TrendingUp,
   TrendingDown,
-  Monitor,
   HardDrive,
   Cpu,
-  MemoryStick
+  MemoryStick,
+  RefreshCw
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,48 +29,39 @@ interface PerformanceMetrics {
   systemHealth: {
     status: 'healthy' | 'warning' | 'critical';
     uptime: number;
-    lastRestart: string;
+    uptimeFormatted: string;
   };
   responseTime: {
     average: number;
-    p95: number;
-    p99: number;
-    trend: number;
-  };
-  throughput: {
-    requestsPerSecond: number;
-    requestsPerMinute: number;
-    trend: number;
+    status: string;
   };
   errorRate: {
     percentage: number;
-    total: number;
-    trend: number;
+    status: string;
   };
   resourceUsage: {
-    cpu: number;
-    memory: number;
-    disk: number;
-    network: number;
+    memoryUsed: number;
+    memoryTotal: number;
+    memoryPercent: number;
   };
   databasePerformance: {
     queryTime: number;
-    connections: number;
-    slowQueries: number;
+    status: string;
   };
-  apiEndpoints: Array<{
-    endpoint: string;
-    method: string;
-    avgResponseTime: number;
-    requestCount: number;
+  storage: {
+    totalUsed: number;
+    utilizationPercent: number;
+    status: string;
+  };
+  performance: {
+    activeSessions: number;
+    uploadsPerHour: number;
     errorRate: number;
-    status: 'healthy' | 'slow' | 'error';
-  }>;
+  };
   alerts: Array<{
     type: 'warning' | 'error' | 'info';
     message: string;
-    timestamp: string;
-    resolved: boolean;
+    severity: string;
   }>;
 }
 
@@ -78,143 +70,118 @@ export default function PerformanceAnalyticsPage() {
     systemHealth: {
       status: 'healthy',
       uptime: 0,
-      lastRestart: new Date().toISOString(),
+      uptimeFormatted: '0h',
     },
     responseTime: {
       average: 0,
-      p95: 0,
-      p99: 0,
-      trend: 0,
-    },
-    throughput: {
-      requestsPerSecond: 0,
-      requestsPerMinute: 0,
-      trend: 0,
+      status: 'excellent',
     },
     errorRate: {
       percentage: 0,
-      total: 0,
-      trend: 0,
+      status: 'excellent',
     },
     resourceUsage: {
-      cpu: 0,
-      memory: 0,
-      disk: 0,
-      network: 0,
+      memoryUsed: 0,
+      memoryTotal: 0,
+      memoryPercent: 0,
     },
     databasePerformance: {
       queryTime: 0,
-      connections: 0,
-      slowQueries: 0,
+      status: 'excellent',
     },
-    apiEndpoints: [],
+    storage: {
+      totalUsed: 0,
+      utilizationPercent: 0,
+      status: 'healthy',
+    },
+    performance: {
+      activeSessions: 0,
+      uploadsPerHour: 0,
+      errorRate: 0,
+    },
     alerts: [],
   });
   const [loading, setLoading] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPerformanceMetrics();
 
     // Set up auto-refresh every 30 seconds
-    const interval = setInterval(fetchPerformanceMetrics, 30000);
-    setRefreshInterval(interval);
+    const interval = setInterval(() => {
+      fetchPerformanceMetrics();
+    }, 30000);
 
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, []);
 
   const fetchPerformanceMetrics = async () => {
     try {
-      setLoading(true);
+      // Don't set loading on auto-refresh to maintain "live" feel
+      if (metrics.systemHealth.uptime === 0) setLoading(true);
 
-      // Generate mock performance data (in a real app, this would come from monitoring APIs)
-      const mockMetrics: PerformanceMetrics = {
+      // Fetch real system health data from the API
+      const healthResponse = await adminApi.getSystemHealth();
+      const healthData = healthResponse.data;
+
+      // Determine overall system status based on health metrics
+      let systemStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
+      if (healthData.database.status === 'poor' || healthData.performance.errorRateStatus === 'critical') {
+        systemStatus = 'critical';
+      } else if (healthData.database.status === 'fair' || healthData.storage.status === 'warning' || healthData.performance.errorRateStatus === 'warning') {
+        systemStatus = 'warning';
+      }
+
+      // Build alerts from health data
+      const alerts: PerformanceMetrics['alerts'] = (healthData.alerts || []).map((alert: any) => ({
+        type: alert.severity === 'high' ? 'error' : alert.severity === 'medium' ? 'warning' : 'info',
+        message: alert.message,
+        severity: alert.severity,
+      }));
+
+      const realMetrics: PerformanceMetrics = {
         systemHealth: {
-          status: Math.random() > 0.1 ? 'healthy' : 'warning',
-          uptime: Math.floor(Math.random() * 30) + 1, // 1-30 days
-          lastRestart: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+          status: systemStatus,
+          uptime: healthData.system.uptime || 0,
+          uptimeFormatted: healthData.system.uptimeFormatted || '0h',
         },
         responseTime: {
-          average: Math.floor(Math.random() * 200) + 50, // 50-250ms
-          p95: Math.floor(Math.random() * 500) + 200, // 200-700ms
-          p99: Math.floor(Math.random() * 1000) + 500, // 500-1500ms
-          trend: Math.random() > 0.5 ? Math.floor(Math.random() * 20) : -Math.floor(Math.random() * 20),
-        },
-        throughput: {
-          requestsPerSecond: Math.floor(Math.random() * 100) + 20,
-          requestsPerMinute: Math.floor(Math.random() * 6000) + 1200,
-          trend: Math.random() > 0.3 ? Math.floor(Math.random() * 15) : -Math.floor(Math.random() * 15),
+          average: healthData.database.responseTime || 0,
+          status: healthData.database.status || 'unknown',
         },
         errorRate: {
-          percentage: parseFloat((Math.random() * 2).toFixed(2)), // 0-2%
-          total: Math.floor(Math.random() * 50),
-          trend: Math.random() > 0.7 ? Math.floor(Math.random() * 10) : -Math.floor(Math.random() * 10),
+          percentage: healthData.performance.errorRate || 0,
+          status: healthData.performance.errorRateStatus || 'unknown',
         },
         resourceUsage: {
-          cpu: Math.floor(Math.random() * 60) + 20, // 20-80%
-          memory: Math.floor(Math.random() * 50) + 30, // 30-80%
-          disk: Math.floor(Math.random() * 40) + 20, // 20-60%
-          network: Math.floor(Math.random() * 30) + 10, // 10-40%
+          memoryUsed: healthData.system.memory?.used || 0,
+          memoryTotal: healthData.system.memory?.total || 0,
+          memoryPercent: healthData.system.memory?.total > 0
+            ? Math.round((healthData.system.memory.used / healthData.system.memory.total) * 100)
+            : 0,
         },
         databasePerformance: {
-          queryTime: Math.floor(Math.random() * 50) + 10, // 10-60ms
-          connections: Math.floor(Math.random() * 20) + 5, // 5-25 connections
-          slowQueries: Math.floor(Math.random() * 5), // 0-5 slow queries
+          queryTime: healthData.database.responseTime || 0,
+          status: healthData.database.status || 'unknown',
         },
-        apiEndpoints: [
-          {
-            endpoint: '/api/galleries',
-            method: 'GET',
-            avgResponseTime: Math.floor(Math.random() * 100) + 50,
-            requestCount: Math.floor(Math.random() * 1000) + 500,
-            errorRate: parseFloat((Math.random() * 1).toFixed(2)),
-            status: Math.random() > 0.2 ? 'healthy' : 'slow',
-          },
-          {
-            endpoint: '/api/photos/download',
-            method: 'POST',
-            avgResponseTime: Math.floor(Math.random() * 200) + 100,
-            requestCount: Math.floor(Math.random() * 500) + 200,
-            errorRate: parseFloat((Math.random() * 2).toFixed(2)),
-            status: Math.random() > 0.1 ? 'healthy' : 'slow',
-          },
-          {
-            endpoint: '/api/admin/users',
-            method: 'GET',
-            avgResponseTime: Math.floor(Math.random() * 80) + 30,
-            requestCount: Math.floor(Math.random() * 200) + 50,
-            errorRate: parseFloat((Math.random() * 0.5).toFixed(2)),
-            status: 'healthy',
-          },
-          {
-            endpoint: '/api/auth/login',
-            method: 'POST',
-            avgResponseTime: Math.floor(Math.random() * 150) + 75,
-            requestCount: Math.floor(Math.random() * 300) + 100,
-            errorRate: parseFloat((Math.random() * 3).toFixed(2)),
-            status: Math.random() > 0.15 ? 'healthy' : 'error',
-          },
-        ],
-        alerts: [
-          {
-            type: 'warning' as const,
-            message: 'High memory usage detected on server',
-            timestamp: new Date(Date.now() - Math.random() * 60 * 60 * 1000).toISOString(),
-            resolved: Math.random() > 0.3,
-          },
-          {
-            type: 'info' as const,
-            message: 'Database maintenance completed successfully',
-            timestamp: new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000).toISOString(),
-            resolved: true,
-          },
-        ].filter(() => Math.random() > 0.3), // Randomly show some alerts
+        storage: {
+          totalUsed: healthData.storage.totalUsed || 0,
+          utilizationPercent: healthData.storage.utilizationPercent || 0,
+          status: healthData.storage.status || 'healthy',
+        },
+        performance: {
+          activeSessions: healthData.performance.activeSessions || 0,
+          uploadsPerHour: healthData.performance.uploadsPerHour || 0,
+          errorRate: healthData.performance.errorRate || 0,
+        },
+        alerts,
       };
 
-      setMetrics(mockMetrics);
+      setMetrics(realMetrics);
+      setLastRefreshed(new Date());
 
     } catch (error: any) {
       console.error('Failed to fetch performance metrics:', error);
@@ -228,439 +195,270 @@ export default function PerformanceAnalyticsPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'healthy':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case 'critical':
-      case 'error':
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return 'text-green-600';
-      case 'warning':
-        return 'text-yellow-600';
+      case 'healthy': return 'text-green-500';
+      case 'warning': return 'text-amber-500';
       case 'critical':
-      case 'error':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
+      case 'error': return 'text-red-500';
+      default: return 'text-muted-foreground';
     }
-  };
-
-  const getTrendIcon = (trend: number) => {
-    return trend > 0 ? (
-      <TrendingUp className="h-4 w-4 text-green-600" />
-    ) : trend < 0 ? (
-      <TrendingDown className="h-4 w-4 text-red-600" />
-    ) : (
-      <Activity className="h-4 w-4 text-gray-600" />
-    );
   };
 
   const formatUptime = (days: number) => {
-    if (days < 1) return `${Math.floor(days * 24)} hours`;
-    return `${Math.floor(days)} days`;
+    if (days < 1) return `${Math.floor(days * 24)}h`;
+    return `${Math.floor(days)}d`;
   };
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-center">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Performance Analytics</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Real-time system performance monitoring and metrics
+          <h1 className="text-2xl md:text-3xl font-bold font-audrey text-gray-900 dark:text-gray-100 flex items-center gap-3">
+            <Activity className="h-6 w-6 text-primary" />
+            Performance Analytics
+          </h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-2">
+            Real-time system monitoring
+            <span className={`inline-flex h-2 w-2 rounded-full animate-pulse ${metrics.systemHealth.status === 'healthy' ? 'bg-green-500' :
+              metrics.systemHealth.status === 'warning' ? 'bg-yellow-500' :
+                metrics.systemHealth.status === 'critical' ? 'bg-red-500' :
+                  'bg-gray-400'
+              }`}></span>
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            Live Data
-          </Badge>
-          <Button onClick={fetchPerformanceMetrics} variant="outline">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground hidden md:inline-block">
+            Updated: {lastRefreshed.toLocaleTimeString()}
+          </span>
+          <Button
+            onClick={() => { setLoading(true); fetchPerformanceMetrics(); }}
+            variant="outline"
+            size="sm"
+            className="bg-background/20 backdrop-blur-md border-border/50 hover:bg-background/40 transition-all"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
+      </motion.div>
+
+      {/* System Health Overview - Glassmorphic Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        {[
+          {
+            title: "System Status",
+            value: metrics.systemHealth.status,
+            subtext: `Uptime: ${metrics.systemHealth.uptimeFormatted}`,
+            icon: Activity,
+            color: metrics.systemHealth.status === 'healthy' ? 'text-green-500' : metrics.systemHealth.status === 'warning' ? 'text-amber-500' : 'text-red-500'
+          },
+          {
+            title: "DB Response",
+            value: `${metrics.responseTime.average}ms`,
+            subtext: metrics.responseTime.status,
+            icon: Clock,
+            color: metrics.responseTime.average < 100 ? "text-green-500" : metrics.responseTime.average < 500 ? "text-blue-500" : "text-amber-500"
+          },
+          {
+            title: "Active Sessions",
+            value: metrics.performance.activeSessions,
+            subtext: `${metrics.performance.uploadsPerHour} uploads/hr`,
+            icon: Zap,
+            color: "text-purple-500"
+          },
+          {
+            title: "Error Rate",
+            value: `${metrics.errorRate.percentage.toFixed(1)}%`,
+            subtext: metrics.errorRate.status,
+            icon: AlertTriangle,
+            color: metrics.errorRate.percentage > 5 ? "text-red-500" : metrics.errorRate.percentage > 1 ? "text-amber-500" : "text-green-500"
+          },
+        ].map((metric, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.05 }}
+          >
+            <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm group hover:border-primary/20 transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{metric.title}</CardTitle>
+                <metric.icon className={`h-4 w-4 ${metric.color} opacity-70 group-hover:opacity-100 transition-opacity`} />
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                {loading ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-6 bg-primary/10 rounded w-16"></div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-xl md:text-2xl font-bold font-audrey capitalize truncate">{metric.value}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{metric.subtext}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
-      {/* System Health Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Status</CardTitle>
-            {getStatusIcon(metrics.systemHealth.status)}
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className={`text-2xl font-bold capitalize ${getStatusColor(metrics.systemHealth.status)}`}>
-                  {metrics.systemHealth.status}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Uptime: {formatUptime(metrics.systemHealth.uptime)}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Response Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{metrics.responseTime.average}ms</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  {getTrendIcon(metrics.responseTime.trend)}
-                  <span className={metrics.responseTime.trend > 0 ? 'text-red-600' : 'text-green-600'}>
-                    {Math.abs(metrics.responseTime.trend)}ms
-                  </span>
-                  <span className="text-muted-foreground">avg</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Throughput</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{metrics.throughput.requestsPerSecond}</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  {getTrendIcon(metrics.throughput.trend)}
-                  <span className={metrics.throughput.trend > 0 ? 'text-green-600' : 'text-red-600'}>
-                    {Math.abs(metrics.throughput.trend)}%
-                  </span>
-                  <span className="text-muted-foreground">req/sec</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Error Rate</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{metrics.errorRate.percentage}%</div>
-                <div className="flex items-center space-x-1 text-xs">
-                  {getTrendIcon(-metrics.errorRate.trend)}
-                  <span className={metrics.errorRate.trend > 0 ? 'text-red-600' : 'text-green-600'}>
-                    {Math.abs(metrics.errorRate.trend)}%
-                  </span>
-                  <span className="text-muted-foreground">change</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Resource Usage */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resource Usage</CardTitle>
-          <CardDescription>
-            Current system resource utilization
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="space-y-2 animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded"></div>
-                  <div className="h-2 bg-gray-200 rounded"></div>
-                  <div className="h-3 bg-gray-200 rounded w-16"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Cpu className="h-4 w-4 text-blue-600" />
-                    <span>CPU</span>
-                  </div>
-                  <span className="font-medium">{metrics.resourceUsage.cpu}%</span>
-                </div>
-                <Progress value={metrics.resourceUsage.cpu} className="h-2" />
-                <p className="text-xs text-gray-500">
-                  {metrics.resourceUsage.cpu > 80 ? 'High usage' : 'Normal'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <MemoryStick className="h-4 w-4 text-green-600" />
-                    <span>Memory</span>
-                  </div>
-                  <span className="font-medium">{metrics.resourceUsage.memory}%</span>
-                </div>
-                <Progress value={metrics.resourceUsage.memory} className="h-2" />
-                <p className="text-xs text-gray-500">
-                  {metrics.resourceUsage.memory > 80 ? 'High usage' : 'Normal'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <HardDrive className="h-4 w-4 text-purple-600" />
-                    <span>Disk</span>
-                  </div>
-                  <span className="font-medium">{metrics.resourceUsage.disk}%</span>
-                </div>
-                <Progress value={metrics.resourceUsage.disk} className="h-2" />
-                <p className="text-xs text-gray-500">
-                  {metrics.resourceUsage.disk > 80 ? 'High usage' : 'Normal'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Wifi className="h-4 w-4 text-orange-600" />
-                    <span>Network</span>
-                  </div>
-                  <span className="font-medium">{metrics.resourceUsage.network}%</span>
-                </div>
-                <Progress value={metrics.resourceUsage.network} className="h-2" />
-                <p className="text-xs text-gray-500">
-                  {metrics.resourceUsage.network > 80 ? 'High usage' : 'Normal'}
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* API Endpoints Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>API Endpoint Performance</CardTitle>
-          <CardDescription>
-            Performance metrics for key API endpoints
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex items-center space-x-4 p-4 border rounded-lg">
-                  <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                  <div className="flex space-x-4">
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {metrics.apiEndpoints.map((endpoint, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(endpoint.status)}
-                      <Badge variant="outline" className="text-xs">
-                        {endpoint.method}
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                        {endpoint.endpoint}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {endpoint.requestCount.toLocaleString()} requests
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-6 text-sm">
-                    <div className="text-center">
-                      <div className="font-medium">{endpoint.avgResponseTime}ms</div>
-                      <p className="text-xs text-gray-400">avg response</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-medium">{endpoint.errorRate}%</div>
-                      <p className="text-xs text-gray-400">error rate</p>
-                    </div>
-                    <Badge
-                      variant={endpoint.status === 'healthy' ? 'outline' : 'destructive'}
-                      className={endpoint.status === 'healthy' ? 'text-green-600 border-green-600' : ''}
-                    >
-                      {endpoint.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Database Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Database Performance</CardTitle>
-            <CardDescription>
-              Database query performance and connection metrics
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse flex items-center justify-between">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Database className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">Avg Query Time</span>
-                  </div>
-                  <span className="text-sm font-bold">{metrics.databasePerformance.queryTime}ms</span>
+        {/* Resource Usage */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="h-full border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-audrey text-xl flex items-center gap-2">
+                <Server className="h-5 w-5 text-muted-foreground" />
+                Resource Usage
+              </CardTitle>
+              <CardDescription>Real-time server resource utilization</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {loading ? (
+                <div className="space-y-4 animate-pulse">
+                  {[1, 2, 3, 4].map(i => <div key={i} className="h-10 bg-gray-100 dark:bg-gray-800 rounded"></div>)}
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Server className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium">Active Connections</span>
-                  </div>
-                  <span className="text-sm font-bold">{metrics.databasePerformance.connections}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-medium">Slow Queries</span>
-                  </div>
-                  <span className="text-sm font-bold">{metrics.databasePerformance.slowQueries}</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* System Alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle>System Alerts</CardTitle>
-            <CardDescription>
-              Recent system alerts and notifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="animate-pulse p-3 rounded-lg bg-gray-100">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                ))}
-              </div>
-            ) : metrics.alerts.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                <p className="text-gray-500">No active alerts</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  System is running smoothly
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {metrics.alerts.map((alert, index) => (
-                  <div
-                    key={index}
-                    className={`p-3 rounded-lg ${alert.type === 'error' ? 'bg-red-50 dark:bg-red-950/20' :
-                      alert.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-950/20' :
-                        'bg-blue-50 dark:bg-blue-950/20'
-                      }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      {alert.type === 'error' ? (
-                        <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
-                      ) : alert.type === 'warning' ? (
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4 text-blue-500 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${alert.type === 'error' ? 'text-red-800 dark:text-red-200' :
-                          alert.type === 'warning' ? 'text-yellow-800 dark:text-yellow-200' :
-                            'text-blue-800 dark:text-blue-200'
-                          }`}>
-                          {alert.message}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(alert.timestamp).toLocaleString()}
-                        </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Memory Usage */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <MemoryStick className="h-4 w-4 text-purple-500" />
+                        <span className="font-medium">Memory</span>
                       </div>
-                      {alert.resolved && (
-                        <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
-                          Resolved
-                        </Badge>
-                      )}
+                      <span className="font-mono font-bold">{metrics.resourceUsage.memoryUsed} / {metrics.resourceUsage.memoryTotal} MB</span>
+                    </div>
+                    <Progress value={metrics.resourceUsage.memoryPercent} className="h-2" indicatorClassName="bg-purple-500" />
+                    <p className="text-xs text-muted-foreground text-right">{metrics.resourceUsage.memoryPercent}% used</p>
+                  </div>
+
+                  {/* Storage Usage */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium">Storage</span>
+                      </div>
+                      <span className="font-mono font-bold text-sm">
+                        {(metrics.storage.totalUsed / (1024 * 1024 * 1024)).toFixed(2)} GB
+                      </span>
+                    </div>
+                    <Progress value={metrics.storage.utilizationPercent} className="h-2" indicatorClassName="bg-amber-500" />
+                    <p className="text-xs text-muted-foreground text-right">{metrics.storage.status}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Database Performance & Alerts */}
+        <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm">
+              <CardHeader>
+                <CardTitle className="font-audrey text-xl flex items-center gap-2">
+                  <Database className="h-5 w-5 text-muted-foreground" />
+                  Database Health
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="grid grid-cols-3 gap-4 animate-pulse">
+                    {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded"></div>)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="p-3 bg-background/40 rounded-lg border border-border/50 text-center">
+                      <div className="text-xl font-bold font-mono">{metrics.databasePerformance.queryTime}ms</div>
+                      <div className="text-[10px] text-muted-foreground uppercase mt-1">Query Time</div>
+                    </div>
+                    <div className={`p-3 bg-background/40 rounded-lg border text-center ${metrics.databasePerformance.status === 'excellent' ? 'border-green-500/30 bg-green-500/5' :
+                      metrics.databasePerformance.status === 'good' ? 'border-blue-500/30 bg-blue-500/5' :
+                        'border-amber-500/30 bg-amber-500/5'
+                      }`}>
+                      <div className={`text-xl font-bold font-mono capitalize ${metrics.databasePerformance.status === 'excellent' ? 'text-green-500' :
+                        metrics.databasePerformance.status === 'good' ? 'text-blue-500' :
+                          'text-amber-500'
+                        }`}>{metrics.databasePerformance.status}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase mt-1">Status</div>
+                    </div>
+                    <div className={`p-3 bg-background/40 rounded-lg border text-center ${metrics.storage.status === 'healthy' ? 'border-green-500/30 bg-green-500/5' :
+                      metrics.storage.status === 'warning' ? 'border-amber-500/30 bg-amber-500/5' :
+                        'border-red-500/30 bg-red-500/5'
+                      }`}>
+                      <div className={`text-xl font-bold font-mono capitalize ${metrics.storage.status === 'healthy' ? 'text-green-500' :
+                        metrics.storage.status === 'warning' ? 'text-amber-500' :
+                          'text-red-500'
+                        }`}>{metrics.storage.status}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase mt-1">Storage</div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="border-border/50 bg-background/50 backdrop-blur-sm shadow-sm h-full">
+              <CardHeader>
+                <CardTitle className="font-audrey text-xl">Recent Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3 animate-pulse">
+                    <div className="h-12 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                    <div className="h-12 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                  </div>
+                ) : metrics.alerts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-4 text-center text-muted-foreground">
+                    <CheckCircle className="h-8 w-8 text-green-500 mb-2 opacity-80" />
+                    <p className="text-sm">All systems normal</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {metrics.alerts.map((alert, i) => {
+                      const alertStyles = {
+                        error: { bg: 'bg-red-500/10 border-red-500/20', text: 'text-red-500' },
+                        warning: { bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-500' },
+                        info: { bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-500' },
+                      };
+                      const style = alertStyles[alert.type] || { bg: 'bg-gray-500/10 border-gray-500/20', text: 'text-gray-500' };
+                      return (
+                        <div key={i} className={`p-3 rounded-lg flex items-start gap-3 border ${style.bg}`}>
+                          <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${style.text}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium leading-tight">{alert.message}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1 opacity-70 capitalize">{alert.severity} priority</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

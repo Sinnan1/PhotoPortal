@@ -119,9 +119,9 @@ export function AdminBreadcrumb({ currentPath, className }: AdminBreadcrumbProps
   }
 
   return (
-    <nav className={cn("flex items-center space-x-1 text-sm", className)}>
-      {/* Admin Root Indicator */}
-      <div className="flex items-center text-[#425146] mr-2">
+    <nav className={cn("flex items-center space-x-1 text-sm overflow-x-auto whitespace-nowrap no-scrollbar mask-gradient-right", className)}>
+      {/* Admin Root Indicator - Hidden on mobile to save space */}
+      <div className="hidden sm:flex items-center text-[#425146] mr-2 shrink-0">
         <Shield className="h-4 w-4 mr-1" />
         <span className="font-medium">Admin</span>
       </div>
@@ -135,7 +135,7 @@ export function AdminBreadcrumb({ currentPath, className }: AdminBreadcrumbProps
             {index > 0 && (
               <ChevronRight className="h-4 w-4 text-gray-400 mx-2" />
             )}
-            
+
             {isLast ? (
               <span className="text-gray-900 dark:text-gray-100 font-medium flex items-center">
                 {Icon && <Icon className="h-4 w-4 mr-1" />}

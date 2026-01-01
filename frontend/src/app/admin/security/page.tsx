@@ -7,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Shield, 
-  Clock, 
-  Monitor, 
-  Smartphone, 
-  AlertTriangle, 
+import {
+  Shield,
+  Clock,
+  Monitor,
+  Smartphone,
+  AlertTriangle,
   CheckCircle,
   LogOut,
   RefreshCw,
@@ -32,29 +32,38 @@ interface AdminSession {
   expiresAt: string;
 }
 
+interface AuditLog {
+  id: string;
+  action: string;
+  admin: { name: string; email: string };
+  targetType: string;
+  ipAddress: string;
+  createdAt: string;
+  details: any;
+}
+
+interface SecurityStats {
+  totalLogs: number;
+  recentAlerts: number;
+}
+
 export default function AdminSecurityPage() {
   const { user, adminLogout } = useAuth();
   const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [securityStats, setSecurityStats] = useState<SecurityStats>({ totalLogs: 0, recentAlerts: 0 });
   const [loading, setLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(true);
   const [error, setError] = useState("");
   const [revoking, setRevoking] = useState<string | null>(null);
 
-  // Real security data - no hardcoded alerts for now
-  const securityAlerts: any[] = [];
-
-  const auditLogs = [
-    {
-      id: 1,
-      action: "Admin Login",
-      user: user?.email || "Current Admin",
-      ip: "Current Session",
-      timestamp: new Date().toLocaleString(),
-      status: "success"
-    }
-  ];
+  // Real security alerts from getSystemHealth
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     loadSessions();
+    loadAuditLogs();
+    loadSecurityAlerts();
   }, []);
 
   const loadSessions = async () => {
@@ -68,6 +77,35 @@ export default function AdminSecurityPage() {
       setError(err instanceof Error ? err.message : "Failed to load sessions");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    try {
+      setLogsLoading(true);
+      const response = await adminApi.getSecurityLogs({ limit: 10 });
+      if (response.success && response.data) {
+        setAuditLogs(response.data.logs || []);
+        setSecurityStats({
+          totalLogs: response.data.pagination?.total || 0,
+          recentAlerts: 0, // From getSystemHealth alerts
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load audit logs:", err);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const loadSecurityAlerts = async () => {
+    try {
+      const response = await adminApi.getSystemHealth();
+      if (response.data?.alerts) {
+        setSecurityAlerts(response.data.alerts);
+      }
+    } catch (err) {
+      console.error("Failed to load security alerts:", err);
     }
   };
 
@@ -224,9 +262,9 @@ export default function AdminSecurityPage() {
             <FileText className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{auditLogs.length}</div>
+            <div className="text-2xl font-bold">{securityStats.totalLogs}</div>
             <p className="text-xs text-muted-foreground">
-              Last 24 hours
+              Total logged events
             </p>
           </CardContent>
         </Card>
@@ -303,15 +341,14 @@ export default function AdminSecurityPage() {
               {sessions.map((session) => {
                 const isCurrentSession = session.id === currentSessionId;
                 const sessionStatus = getSessionStatus(session.expiresAt);
-                
+
                 return (
                   <div
                     key={session.id}
-                    className={`p-4 border rounded-lg ${
-                      isCurrentSession 
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20' 
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
+                    className={`p-4 border rounded-lg ${isCurrentSession
+                      ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20'
+                      : 'border-gray-200 dark:border-gray-700'
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -326,7 +363,7 @@ export default function AdminSecurityPage() {
                                 Current Session
                               </Badge>
                             )}
-                            <Badge 
+                            <Badge
                               variant={sessionStatus.color as any}
                               className="text-xs"
                             >
@@ -342,7 +379,7 @@ export default function AdminSecurityPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         {!isCurrentSession && (
                           <Button
@@ -439,28 +476,39 @@ export default function AdminSecurityPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {auditLogs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <p className="font-medium text-sm">{log.action}</p>
-                      {getStatusBadge(log.status)}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      <div>{log.user}</div>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span>{log.ip}</span>
-                        <span>{log.timestamp}</span>
+          {logsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#425146]"></div>
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No audit logs found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {auditLogs.map((log) => (
+                <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-2 w-2 rounded-full bg-blue-600"></div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-sm">{log.action}</p>
+                        <Badge variant="outline" className="text-xs">{log.targetType}</Badge>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div>{log.admin?.name || 'System'} ({log.admin?.email || 'N/A'})</div>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <span>{log.ipAddress || 'Unknown IP'}</span>
+                          <span>{new Date(log.createdAt).toLocaleString()}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           <div className="mt-4 text-center">
             <Button variant="outline" size="sm">
               <FileText className="h-4 w-4 mr-2" />

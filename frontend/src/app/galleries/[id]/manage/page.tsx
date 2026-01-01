@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
 import type { Photo, Folder, Gallery } from "@/types"
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat"
 
 export default function ManageGalleryPage() {
   const params = useParams()
@@ -47,6 +48,9 @@ export default function ManageGalleryPage() {
 
   const galleryId = params.id as string
   const { data: gallery, isLoading: loading } = useGallery(galleryId)
+
+  // Track presence while managing/uploading to this gallery
+  usePresenceHeartbeat(galleryId);
   const updateGalleryMutation = useUpdateGallery()
   const createFolderMutation = useCreateFolder()
   const renameFolderMutation = useRenameFolder()
@@ -56,6 +60,9 @@ export default function ManageGalleryPage() {
   // Folder management state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [compressBeforeUpload, setCompressBeforeUpload] = useState(false)
+
+  // Compression settings from admin config
+  const [compressionConfig, setCompressionConfig] = useState<{ enabled: boolean; quality: number }>({ enabled: true, quality: 90 })
 
   // Derived selected folder
   const selectedFolder = gallery?.folders?.find(f => f.id === selectedFolderId) || null
@@ -118,6 +125,37 @@ export default function ManageGalleryPage() {
       console.error("Failed to load photo stats:", error)
     }
   }
+
+  // Fetch compression config from admin settings
+  useEffect(() => {
+    const fetchCompressionConfig = async () => {
+      try {
+        const token = document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
+        if (!token) return
+
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+        const response = await fetch(`${BASE_URL}/uploads/config`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setCompressionConfig({
+              enabled: data.data.compressionEnabled,
+              quality: data.data.compressionQuality
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch compression config:", error)
+      }
+    }
+
+    if (user?.role === "PHOTOGRAPHER") {
+      fetchCompressionConfig()
+    }
+  }, [user])
 
   // Enable folder selection on the hidden input when present
   useEffect(() => {
@@ -214,7 +252,8 @@ export default function ManageGalleryPage() {
         galleryId,
         selectedFolderId,
         fileArray,
-        compressBeforeUpload
+        compressBeforeUpload,
+        compressionConfig.quality
       )
 
       showToast(`Started uploading ${fileArray.length} ${fileArray.length === 1 ? 'photo' : 'photos'}`, 'success')
@@ -500,16 +539,18 @@ export default function ManageGalleryPage() {
                       />
                     </label>
 
-                    <div className="mt-4 flex items-center gap-2 text-sm">
-                      <Checkbox
-                        id="compress"
-                        checked={compressBeforeUpload}
-                        onCheckedChange={(checked) => setCompressBeforeUpload(checked as boolean)}
-                      />
-                      <label htmlFor="compress" className="text-muted-foreground cursor-pointer">
-                        Compress photos before upload (faster upload, 90% quality)
-                      </label>
-                    </div>
+                    {compressionConfig.enabled && (
+                      <div className="mt-4 flex items-center gap-2 text-sm">
+                        <Checkbox
+                          id="compress"
+                          checked={compressBeforeUpload}
+                          onCheckedChange={(checked) => setCompressBeforeUpload(checked as boolean)}
+                        />
+                        <label htmlFor="compress" className="text-muted-foreground cursor-pointer">
+                          Compress photos before upload (faster upload, {compressionConfig.quality}% quality)
+                        </label>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

@@ -28,7 +28,8 @@ import {
 	exportFavoritedPhotosToExcel,
 	exportLikedPhotosToCSV,
 	exportFavoritedPhotosToCSV,
-	getGalleryPhotoStats
+	getGalleryPhotoStats,
+	downloadPart
 } from '../controllers/photoController'
 import { authenticateToken, requireRole, requireAnyRole, requireAdminOrOwner } from '../middleware/auth'
 import { auditMiddleware } from '../middleware/auditMiddleware'
@@ -103,5 +104,8 @@ router.post('/download-ticket', authenticateToken, createDownloadTicket);
 
 // Ticket-based download
 router.get('/download-zip', downloadWithTicket);
+
+// Multipart download part
+router.get('/download/part', downloadPart);
 
 export default router

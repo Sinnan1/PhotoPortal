@@ -638,6 +638,12 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 		// Delete from database
 		await prisma.photo.delete({ where: { id } });
 
+		// Decrement gallery totalSize
+		await prisma.gallery.update({
+			where: { id: photo.folder.galleryId },
+			data: { totalSize: { decrement: photo.fileSize || 0 } }
+		});
+
 		res.json({
 			success: true,
 			message: "Photo deleted successfully",
@@ -1233,12 +1239,21 @@ export const downloadLikedPhotos = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'liked'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createFilteredPhotoZip(
 			galleryId,
 			userId,
 			"liked",
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download liked photos error:", error);
@@ -1286,7 +1301,24 @@ export const createDownloadTicket = async (req: AuthRequest, res: Response) => {
 		const baseUrl = process.env.DIRECT_DOWNLOAD_URL || `${protocol}://${req.get('host')}`;
 		const downloadUrl = `${baseUrl}/api/photos/download-zip?ticket=${ticket}`;
 
-		res.json({ success: true, downloadUrl });
+		// Determine download strategy
+		const { strategy, totalSize, estimatedParts } = await DownloadService.getDownloadStrategy(
+			galleryId,
+			userId,
+			filter as any,
+			folderId
+		);
+
+		res.json({
+			success: true,
+			ticket,
+			strategy,
+			downloadUrl,
+			meta: {
+				totalSize,
+				estimatedParts
+			}
+		});
 
 	} catch (error) {
 		console.error("Create download ticket error:", error);
@@ -1308,14 +1340,14 @@ export const downloadWithTicket = async (req: Request, res: Response) => {
 
 		switch (filter) {
 			case 'all':
-				await DownloadService.createGalleryPhotoZip(galleryId, userId, "all", undefined, res);
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "all", undefined, res, undefined, ticket as string);
 				break;
 			case 'folder':
-				await DownloadService.createGalleryPhotoZip(galleryId, userId, "folder", folderId, res);
+				await DownloadService.createGalleryPhotoZip(galleryId, userId, "folder", folderId, res, undefined, ticket as string);
 				break;
 			case 'liked':
 			case 'favorited':
-				await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res);
+				await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, undefined, ticket as string);
 				break;
 			default:
 				return res.status(400).json({ success: false, error: "Invalid download filter" });
@@ -1356,12 +1388,21 @@ export const downloadFavoritedPhotos = async (
 			});
 		}
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'favorited'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createFilteredPhotoZip(
 			galleryId,
 			userId,
 			"favorited",
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download favorited photos error:", error);
@@ -1442,13 +1483,22 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 		res.setHeader("Connection", "keep-alive");
 		res.setHeader("Transfer-Encoding", "chunked");
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'all'
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
 			galleryId,
 			userId,
 			"all",
 			undefined,
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download all photos error:", error);
@@ -1509,13 +1559,23 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 		res.setHeader("Connection", "keep-alive");
 		res.setHeader("Transfer-Encoding", "chunked");
 
+		// Generate a ticket for potential multipart downloads
+		const ticket = jwt.sign({
+			userId,
+			galleryId,
+			filter: 'folder',
+			folderId
+		}, process.env.JWT_SECRET!, { expiresIn: '1h' });
+
 		// Use download service to create and stream the zip
 		await DownloadService.createGalleryPhotoZip(
 			galleryId,
 			userId,
 			"folder",
 			folderId,
-			res
+			res,
+			undefined,
+			ticket
 		);
 	} catch (error) {
 		console.error("Download folder photos error:", error);
@@ -2183,3 +2243,55 @@ export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 		});
 	}
 };
+
+// Download a specific part of a gallery/folder (for multipart downloads)
+// GET /photos/download/part?galleryId=...&partIndex=...&photoIds=...&filter=...
+export const downloadPart = async (req: Request, res: Response) => {
+	try {
+		const { galleryId, partIndex, filter } = req.query;
+
+		if (!galleryId || !partIndex) {
+			return res.status(400).json({ success: false, error: "Missing parameters" });
+		}
+
+		const index = parseInt(partIndex as string);
+
+		// We need the user ID.
+		// If this is a direct link click, we rely on the cookie (AuthRequest middleware) or a ticket.
+		const authReq = req as AuthRequest;
+		let userId = authReq.user?.id;
+
+		// If no user (e.g. client download link shared?), try to get ticket from query
+		if (!userId) {
+			const { ticket } = req.query;
+			if (ticket) {
+				try {
+					const decoded = jwt.verify(ticket as string, process.env.JWT_SECRET!) as any;
+					userId = decoded.userId;
+				} catch (e) {
+					return res.status(401).json({ success: false, error: "Invalid or expired ticket" });
+				}
+			}
+		}
+
+		if (!userId) {
+			return res.status(401).json({ success: false, error: "Authentication required" });
+		}
+
+		await processDownloadPart(res, userId, galleryId as string, filter as any, index);
+
+	} catch (error) {
+		console.error("Download part error:", error);
+		if (!res.headersSent) {
+			res.status(500).json({ success: false, error: "Failed to download part" });
+		}
+	}
+}
+
+async function processDownloadPart(res: Response, userId: string, galleryId: string, filter: string, partIndex: number) {
+	if (filter === 'liked' || filter === 'favorited') {
+		await DownloadService.createFilteredPhotoZip(galleryId, userId, filter, res, partIndex);
+	} else {
+		await DownloadService.createGalleryPhotoZip(galleryId, userId, 'all', undefined, res, partIndex);
+	}
+}

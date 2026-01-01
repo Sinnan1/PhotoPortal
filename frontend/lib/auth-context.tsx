@@ -5,6 +5,38 @@ import type React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+// Safe storage helper
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.warn('Storage access failed:', e);
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('Storage access failed:', e);
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch (e) {
+      console.warn('Storage access failed:', e);
+    }
+  }
+};
+
 interface User {
   id: string;
   email: string;
@@ -12,6 +44,7 @@ interface User {
   role: "PHOTOGRAPHER" | "CLIENT" | "ADMIN";
 }
 
+// ... existing interfaces ...
 // Admin-specific error types
 export enum AdminErrorType {
   INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
@@ -75,16 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // and validate the token by making a request to a protected endpoint that matches the role
       try {
         // Determine which endpoint to use based on last known user role in localStorage
-        const storedUser = localStorage.getItem("user");
+        const storedUser = safeStorage.getItem("user");
         const role = storedUser ? (JSON.parse(storedUser).role as "PHOTOGRAPHER" | "CLIENT" | "ADMIN") : undefined;
 
         const url = role === "CLIENT"
           ? `${process.env.NEXT_PUBLIC_API_URL}/auth/client-profile`
           : role === "ADMIN"
-          ? `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/profile`
-          : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
+            ? `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/profile`
+            : `${process.env.NEXT_PUBLIC_API_URL}/galleries`;
 
         const response = await fetch(url, {
+          credentials: 'include',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -97,13 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Token is invalid, clear everything
           document.cookie =
             "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          localStorage.removeItem("user");
+          safeStorage.removeItem("user");
         }
       } catch (error) {
         console.error("Token validation failed:", error);
         document.cookie =
           "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        localStorage.removeItem("user");
+        safeStorage.removeItem("user");
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -134,10 +168,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user: userData, token } = data.data;
 
     document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
+    safeStorage.setItem("user", JSON.stringify(userData));
+    safeStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
-    
+
     // Redirect based on role
     if (userData.role === "ADMIN") {
       router.push("/admin");
@@ -168,8 +202,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user: userData, token } = data.data;
 
     document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
+    safeStorage.setItem("user", JSON.stringify(userData));
+    safeStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
     router.push("/dashboard/client");
   };
@@ -202,11 +236,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user: userData, token } = data.data;
 
     document.cookie = `auth-token=${token}; path=/; max-age=604800; secure; samesite=strict`; // 7 days
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("auth-token", token); // Store token in localStorage as backup
+    safeStorage.setItem("user", JSON.stringify(userData));
+    safeStorage.setItem("auth-token", token); // Store token in localStorage as backup
     setUser(userData);
     router.push("/dashboard");
-    
+
     return { requiresApproval: false };
   };
 
@@ -215,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       `${process.env.NEXT_PUBLIC_API_URL}/admin/auth/login`,
       {
         method: "POST",
+        credentials: 'include',
         headers: {
           "Content-Type": "application/json",
         },
@@ -232,13 +267,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Store admin session with shorter expiration (2 hours)
     document.cookie = `auth-token=${token}; path=/; max-age=7200; secure; samesite=strict`;
-    localStorage.setItem("user", JSON.stringify(admin));
-    localStorage.setItem("admin-session", JSON.stringify({
+    safeStorage.setItem("user", JSON.stringify(admin));
+    safeStorage.setItem("admin-session", JSON.stringify({
       sessionId,
       expiresAt,
       loginTime: new Date().toISOString()
     }));
-    
+
     setUser(admin);
     router.push("/admin");
   };
@@ -254,6 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Call admin logout endpoint for proper session cleanup
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/logout`, {
           method: "POST",
+          credentials: 'include',
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -265,8 +301,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       // Clear all session data
       document.cookie = "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      localStorage.removeItem("user");
-      localStorage.removeItem("admin-session");
+      safeStorage.removeItem("user");
+      safeStorage.removeItem("admin-session");
       setUser(null);
       router.push("/admin/login");
     }
@@ -285,6 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/extend-session`, {
         method: "POST",
+        credentials: 'include',
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -295,11 +332,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         if (data.success && data.data.newExpiresAt) {
           // Update session expiration in localStorage
-          const adminSession = localStorage.getItem("admin-session");
+          const adminSession = safeStorage.getItem("admin-session");
           if (adminSession) {
             const sessionData = JSON.parse(adminSession);
             sessionData.expiresAt = data.data.newExpiresAt;
-            localStorage.setItem("admin-session", JSON.stringify(sessionData));
+            safeStorage.setItem("admin-session", JSON.stringify(sessionData));
           }
         }
         return true;
@@ -324,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/validate`, {
         method: "GET",
+        credentials: 'include',
         headers: {
           "Authorization": `Bearer ${token}`,
         },
@@ -371,26 +409,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       document.cookie =
         "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      localStorage.removeItem("user");
-      localStorage.removeItem("admin-session");
+      safeStorage.removeItem("user");
+      safeStorage.removeItem("admin-session");
       setUser(null);
       router.push("/login");
     }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      clientLogin, 
+    <AuthContext.Provider value={{
+      user,
+      login,
+      clientLogin,
       adminLogin,
-      register, 
-      logout, 
+      register,
+      logout,
       adminLogout,
       extendAdminSession,
       validateAdminSession,
       handleAdminError,
-      loading 
+      loading
     }}>
       {children}
     </AuthContext.Provider>

@@ -19,9 +19,10 @@ const validatePasswordStrength = (password: string) => {
     numbers: /\d/.test(password),
     special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   };
-  
+
   const score = Object.values(requirements).filter(Boolean).length;
-  return { requirements, score, isStrong: score >= 4 && requirements.length };
+  const isStrong = requirements.length && requirements.uppercase && requirements.lowercase && requirements.numbers && requirements.special;
+  return { requirements, score, isStrong };
 };
 
 interface SetupStatus {
@@ -37,7 +38,7 @@ export default function AdminSetupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  
+
   // Form data
   const [formData, setFormData] = useState({
     name: "",
@@ -45,10 +46,10 @@ export default function AdminSetupPage() {
     password: "",
     confirmPassword: ""
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const router = useRouter();
 
   // Check setup status on component mount
@@ -61,10 +62,10 @@ export default function AdminSetupPage() {
       setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/auth/setup-status`);
       const data = await response.json();
-      
+
       if (data.success) {
         setSetupStatus(data.data);
-        
+
         // If setup is already complete, redirect to login
         if (!data.data.needsFirstAdminSetup) {
           router.push('/admin/login');
@@ -90,47 +91,47 @@ export default function AdminSetupPage() {
       setError("Name is required");
       return false;
     }
-    
+
     if (!formData.email.trim()) {
       setError("Email is required");
       return false;
     }
-    
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError("Please enter a valid email address");
       return false;
     }
-    
+
     if (!formData.password) {
       setError("Password is required");
       return false;
     }
-    
+
     const passwordValidation = validatePasswordStrength(formData.password);
     if (!passwordValidation.isStrong) {
       setError("Password does not meet security requirements");
       return false;
     }
-    
+
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
-    
+
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       setLoading(true);
       setError("");
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/auth/setup-first-admin`, {
         method: 'POST',
         headers: {
@@ -142,13 +143,13 @@ export default function AdminSetupPage() {
           password: formData.password,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         setSuccess("Admin account created successfully!");
         setCurrentStep(3); // Move to success step
-        
+
         // Redirect to login after a delay
         setTimeout(() => {
           router.push('/admin/login');
@@ -197,17 +198,17 @@ export default function AdminSetupPage() {
               {currentStep === 3 && "Your admin account has been created successfully"}
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <Progress value={(currentStep / 3) * 100} className="mb-6" />
-            
+
             {error && (
               <Alert className="mb-4 border-red-200 bg-red-50">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">{error}</AlertDescription>
               </Alert>
             )}
-            
+
             {success && (
               <Alert className="mb-4 border-green-200 bg-green-50">
                 <CheckCircle className="h-4 w-4 text-green-600" />
@@ -233,7 +234,7 @@ export default function AdminSetupPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
                     <div className="relative">
@@ -249,7 +250,7 @@ export default function AdminSetupPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <Button
                     type="button"
                     onClick={() => setCurrentStep(2)}
@@ -314,7 +315,7 @@ export default function AdminSetupPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
                     <div className="relative">

@@ -10,6 +10,7 @@
  * - Real-time progress tracking with download IDs
  * - Consistent error handling and recovery
  * - Support for concurrent downloads
+ * - Configurable Multipart Downloads for large sets
  * 
  * Supported Download Types:
  * - All photos in a gallery
@@ -45,6 +46,13 @@ export interface DownloadProgress {
     updatedAt: Date
 }
 
+export interface DownloadStrategy {
+    strategy: 'DIRECT_STREAM' | 'MULTIPART_MANIFEST'
+    totalSize: number
+    chunkSize: number
+    estimatedParts?: number
+}
+
 // In-memory storage for download progress (in production, use Redis or database)
 const downloadProgress = new Map<string, DownloadProgress>()
 
@@ -60,6 +68,19 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000);
 
+// Helper to get system configuration with fallback
+async function getSystemConfig(key: string, defaultValue: any): Promise<any> {
+    try {
+        const config = await prisma.systemConfig.findUnique({
+            where: { configKey: key }
+        })
+        return config ? config.configValue : defaultValue
+    } catch (error) {
+        console.warn(`Failed to fetch system config ${key}, using default:`, error)
+        return defaultValue
+    }
+}
+
 export class DownloadService {
     static createDownload(filename: string, totalPhotos: number): string {
         const downloadId = uuidv4()
@@ -73,7 +94,7 @@ export class DownloadService {
             createdAt: new Date(),
             updatedAt: new Date()
         }
-        
+
         downloadProgress.set(downloadId, progress)
         return downloadId
     }
@@ -86,12 +107,12 @@ export class DownloadService {
                 ...updates,
                 updatedAt: new Date()
             }
-            
+
             // Calculate progress percentage
             if (updated.totalPhotos > 0) {
                 updated.progress = Math.round((updated.processedPhotos / updated.totalPhotos) * 100)
             }
-            
+
             downloadProgress.set(downloadId, updated)
         }
     }
@@ -104,13 +125,204 @@ export class DownloadService {
         downloadProgress.delete(downloadId)
     }
 
+    /**
+     * Verify user has access to a gallery for downloads
+     */
+    static async verifyGalleryAccess(
+        galleryId: string,
+        userId: string,
+        userRole: string,
+        password?: string
+    ): Promise<boolean> {
+        try {
+            const gallery = await prisma.gallery.findUnique({
+                where: { id: galleryId },
+                select: {
+                    photographerId: true,
+                    password: true
+                }
+            })
+
+            if (!gallery) {
+                return false
+            }
+
+            // Photographer always has access to their own galleries
+            if (userRole === 'PHOTOGRAPHER' && gallery.photographerId === userId) {
+                return true
+            }
+
+            // Admin has access to all galleries
+            if (userRole === 'ADMIN') {
+                return true
+            }
+
+            // For clients, check if they have explicit access
+            if (userRole === 'CLIENT') {
+                const hasAccess = await prisma.galleryAccess.findUnique({
+                    where: {
+                        userId_galleryId: {
+                            userId,
+                            galleryId
+                        }
+                    }
+                })
+
+                if (!hasAccess) {
+                    return false
+                }
+
+                // If gallery has password, verify it matches
+                if (gallery.password && password !== gallery.password) {
+                    return false
+                }
+
+                return true
+            }
+
+            return false
+
+        } catch (error) {
+            console.error('Error verifying gallery access:', error)
+            return false
+        }
+    }
+
+    /**
+     * Determines the download strategy (Single Zip vs Multipart) based on size
+     */
+    static async getDownloadStrategy(
+        galleryId: string,
+        userId: string,
+        downloadType: 'all' | 'folder' | 'liked' | 'favorited',
+        folderId?: string
+    ): Promise<DownloadStrategy> {
+        // Fetch configuration
+        const downloadMode = await getSystemConfig('download.mode', 'single')
+        const chunkSizeMB = await getSystemConfig('download.chunkSize', 2000)
+        const chunkSizeBytes = chunkSizeMB * 1024 * 1024
+
+        // Helper to query file size sum
+        let totalSize = 0
+
+        if (downloadType === 'all') {
+            const result = await prisma.photo.aggregate({
+                where: { folder: { galleryId } },
+                _sum: { fileSize: true }
+            })
+            totalSize = result._sum.fileSize || 0
+        } else if (downloadType === 'folder' && folderId) {
+            const result = await prisma.photo.aggregate({
+                where: { folderId },
+                _sum: { fileSize: true }
+            })
+            totalSize = result._sum.fileSize || 0
+        } else if (downloadType === 'liked') {
+            const photos = await prisma.likedPhoto.findMany({
+                where: { userId, photo: { folder: { galleryId } } },
+                include: { photo: { select: { fileSize: true } } }
+            })
+            totalSize = photos.reduce((sum, p) => sum + (p.photo.fileSize || 0), 0)
+        } else if (downloadType === 'favorited') {
+            const photos = await prisma.favoritedPhoto.findMany({
+                where: { userId, photo: { folder: { galleryId } } },
+                include: { photo: { select: { fileSize: true } } }
+            })
+            totalSize = photos.reduce((sum, p) => sum + (p.photo.fileSize || 0), 0)
+        }
+
+        const strategy = (downloadMode === 'multipart' && totalSize > chunkSizeBytes)
+            ? 'MULTIPART_MANIFEST'
+            : 'DIRECT_STREAM'
+
+        return {
+            strategy,
+            totalSize,
+            chunkSize: chunkSizeBytes,
+            estimatedParts: strategy === 'MULTIPART_MANIFEST' ? Math.ceil(totalSize / chunkSizeBytes) : 1
+        }
+    }
+
+    // Helper to process photos sequentially to avoid VPS crashes
+    private static async processPhotosSequentially(
+        photos: any[],
+        archive: archiver.Archiver,
+        downloadId: string
+    ): Promise<void> {
+        let processedCount = 0
+        const totalEntries = photos.length
+
+        // Track entry completion via promise
+        // We use this to wait for each file to be fully appended before moving to the next
+        // Archiver manages backpressure, but rapid appending can still overwhelm resources
+        // By waiting for the 'entry' event (or drain), we can control the pace more strictly if needed
+        // However, standard archiver.append logic queues streams. To truly reduce open connections,
+        // we must await the stream completion or at least until it's consumed.
+
+        for (const photo of photos) {
+            try {
+                console.log(`📁 Queuing photo ${processedCount + 1}/${totalEntries}: ${photo.filename}`)
+
+                // Extract S3 key from URL
+                const originalUrl = new URL(photo.originalUrl)
+                const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
+                const bucketName = pathParts[0]
+                const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
+
+                // Get photo stream from S3
+                // Important: getObjectStreamFromS3 opens the connection now
+                const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
+
+                // Create a promise that resolves when this entry is fully processed by archiver
+                // Note: archiver 'entry' event fires when the entry is added to the directory, which happens AFTER data is written
+                const entryProcessedPromise = new Promise<void>((resolve, reject) => {
+                    // We can't easily hook into "this specific entry finished" without complex listeners
+                    // But we can pause the loop.
+                    // Actually, stream.pipe(archive) is handled by archive.append internally.
+                    // To force sequential processing (one connection at a time), we need to wait for the stream to end.
+                    stream.on('end', () => resolve())
+                    stream.on('error', (err: any) => reject(err))
+                })
+
+                // Add to archive
+                archive.append(stream, { name: photo.filename })
+
+                // WAIT for this file to finish downloading/archiving before starting the next one
+                // This is crucial for preventing 1000 simultaneous S3 connections
+                await entryProcessedPromise
+
+                processedCount++
+                this.updateProgress(downloadId, {
+                    processedPhotos: processedCount
+                })
+
+                console.log(`✅ Processed photo ${processedCount}/${totalEntries}`)
+
+            } catch (error) {
+                console.error(`Failed to process photo ${photo.filename}:`, error)
+                // Continue with next photo even if one fails
+                processedCount++
+                this.updateProgress(downloadId, {
+                    processedPhotos: processedCount
+                })
+            }
+        }
+    }
+
     static async createGalleryPhotoZip(
         galleryId: string,
         userId: string,
         downloadType: 'all' | 'folder',
         folderId?: string,
-        res?: any
+        res?: any,
+        partIndex?: number, // Optional: part index instead of IDs for URL safety
+        ticket?: string // Optional: Original ticket to include in part links
     ): Promise<void> {
+        // Fetch configuration
+        const downloadMode = await getSystemConfig('download.mode', 'single')
+        const chunkSizeMB = await getSystemConfig('download.chunkSize', 2000)
+        const chunkSizeBytes = chunkSizeMB * 1024 * 1024
+
         const gallery = await prisma.gallery.findUnique({
             where: { id: galleryId },
             select: {
@@ -122,10 +334,12 @@ export class DownloadService {
                 folders: {
                     include: {
                         photos: {
+                            orderBy: { id: 'asc' }, // Stable sort required for partitioning
                             select: {
                                 id: true,
                                 filename: true,
-                                originalUrl: true
+                                originalUrl: true,
+                                fileSize: true
                             }
                         }
                     }
@@ -137,191 +351,190 @@ export class DownloadService {
             throw new Error('Gallery not found')
         }
 
-        // Check if gallery has expired
         if (gallery.expiresAt && gallery.expiresAt < new Date()) {
             throw new Error('Gallery has expired')
         }
 
         // Get photos based on download type
         let photos: any[] = []
-        let zipFilename = ''
+        let baseFilename = ''
 
         if (downloadType === 'all') {
             photos = gallery.folders.flatMap(folder => folder.photos)
-            zipFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_all_photos.zip`
+            baseFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_all_photos`
         } else if (downloadType === 'folder' && folderId) {
             const folder = gallery.folders.find(f => f.id === folderId)
             if (!folder) {
                 throw new Error('Folder not found')
             }
             photos = folder.photos
-            zipFilename = `${folder.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'folder'}_photos.zip`
+            baseFilename = `${folder.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'folder'}_photos`
         }
 
         if (photos.length === 0) {
             throw new Error(`No photos found for ${downloadType} download`)
         }
 
-        // Create download tracking
-        const downloadId = this.createDownload(zipFilename, photos.length)
+        // Logic for Multipart:
+        // 1. If partIndex is provided, recalculate chunks and pick the specific one.
+        // 2. If no partIndex but downloadMode is multipart and size exceeds limit, generate manifest.
 
-        console.log(`📦 Starting ${downloadType} photos download: ${downloadId} (${photos.length} photos)`)
+        let targetPhotos: any[] = photos
+        let targetFilename = `${baseFilename}.zip`
+
+        if (downloadMode === 'multipart') {
+            const totalSize = photos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
+
+            // Generate parts list (needed for both manifest and part selection)
+            const parts = []
+            let currentChunk: any[] = []
+            let currentChunkSize = 0
+            let pIndex = 1
+
+            for (const photo of photos) {
+                if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
+                    parts.push({
+                        index: pIndex,
+                        filename: `${baseFilename}_part${pIndex}.zip`,
+                        photos: currentChunk,
+                        size: currentChunkSize,
+                        count: currentChunk.length
+                    })
+                    pIndex++
+                    currentChunk = []
+                    currentChunkSize = 0
+                }
+                currentChunk.push(photo)
+                currentChunkSize += (photo.fileSize || 0)
+            }
+
+            if (currentChunk.length > 0) {
+                parts.push({
+                    index: pIndex,
+                    filename: `${baseFilename}_part${pIndex}.zip`,
+                    photos: currentChunk,
+                    size: currentChunkSize,
+                    count: currentChunk.length
+                })
+            }
+
+            // Case A: User requested specific part
+            if (partIndex !== undefined) {
+                const part = parts.find(p => p.index === partIndex)
+                if (!part) {
+                    throw new Error('Part not found')
+                }
+                targetPhotos = part.photos
+                targetFilename = part.filename
+                console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
+            }
+            // Case B: Needs splitting, return manifest
+            else if (totalSize > chunkSizeBytes) {
+                console.log(`📦 Multipart download triggering for ${photos.length} photos (${(totalSize / 1024 / 1024).toFixed(2)} MB)`)
+
+                if (res) {
+                    res.json({
+                        multipart: true,
+                        parts: parts.map(p => ({
+                            part: p.index,
+                            filename: p.filename,
+                            size: p.size,
+                            count: p.count,
+                            // Use partIndex instead of photoIds for robust, short URLs
+                            downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}${ticket ? `&ticket=${ticket}` : ''}`
+                        }))
+                    })
+                }
+                return
+            }
+        }
+
+        // Calculate exact size for Content-Length header
+        let exactZipSize = 22; // Start with EOCD size
+
+        for (const photo of targetPhotos) {
+            const filenameLength = Buffer.byteLength(photo.filename);
+            const fileOverhead = 92 + (2 * filenameLength); // 30 + 16 + 46 = 92
+            exactZipSize += (photo.fileSize || 0) + fileOverhead;
+        }
+
+        // Create download tracking
+        const downloadId = this.createDownload(targetFilename, targetPhotos.length)
+
+        console.log(`📦 Starting download: ${downloadId} (${targetPhotos.length} photos, exact size: ${Math.round(exactZipSize / 1024 / 1024 * 10) / 10} MB)`)
 
         try {
-            // Set response headers for zip download
+            const useCompression = false
+
             if (res) {
                 res.setHeader('Content-Type', 'application/zip')
-                res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
+                res.setHeader('Content-Disposition', `attachment; filename="${targetFilename}"`)
                 res.setHeader('X-Download-ID', downloadId)
                 res.setHeader('Access-Control-Expose-Headers', 'X-Download-ID')
+
+                if (exactZipSize > 0) {
+                    res.setHeader('Content-Length', exactZipSize)
+                    console.log(`📦 Content-Length set to ${exactZipSize} bytes`)
+                }
             }
 
-            // Create zip archive with optimized settings for streaming
-            // Use store mode (no compression) for large galleries to reduce CPU and memory
-            const useCompression = photos.length < 500
             const archive = archiver('zip', {
-                zlib: { level: useCompression ? 1 : 0 }, // No compression for large galleries
-                store: !useCompression, // Store mode for large galleries
-                highWaterMark: 1024 * 1024 // 1MB buffer to prevent memory buildup
+                zlib: { level: useCompression ? 1 : 0 },
+                store: !useCompression,
+                highWaterMark: 1024 * 1024
             })
-            
-            console.log(`📦 Archive mode: ${useCompression ? 'compressed' : 'stored'} for ${photos.length} photos`)
 
-            // Handle archive events
+            // Error & Progress Handlers
             const archiveErrorHandler = (err: any) => {
                 console.error('Archive error:', err)
-                this.updateProgress(downloadId, {
-                    status: 'error',
-                    error: err.message
-                })
-                
-                // Destroy archive to free resources
+                this.updateProgress(downloadId, { status: 'error', error: err.message })
                 if (archive && typeof archive.destroy === 'function') {
-                    try {
-                        archive.destroy()
-                        console.log('🧹 Archive destroyed after error')
-                    } catch (destroyError) {
-                        console.warn('Failed to destroy archive:', destroyError)
-                    }
+                    try { archive.destroy() } catch (e) { }
                 }
-                
                 if (res && !res.headersSent) {
                     res.status(500).json({ success: false, error: 'Failed to create archive' })
-                } else if (res) {
-                    res.end()
                 }
-            }
-
-            const archiveProgressHandler = (progress: any) => {
-                // Update progress based on archive progress
-                this.updateProgress(downloadId, {
-                    status: 'processing',
-                    processedPhotos: progress.entries.processed
-                })
             }
 
             const clientDisconnectHandler = () => {
                 console.log('⚠️ Client disconnected, aborting archive creation')
-                this.updateProgress(downloadId, {
-                    status: 'error',
-                    error: 'Client disconnected'
-                })
-                
-                // Destroy archive to stop processing
+                this.updateProgress(downloadId, { status: 'error', error: 'Client disconnected' })
                 if (archive && typeof archive.destroy === 'function') {
-                    try {
-                        archive.destroy()
-                        console.log('🧹 Archive destroyed after client disconnect')
-                    } catch (destroyError) {
-                        console.warn('Failed to destroy archive:', destroyError)
-                    }
+                    try { archive.destroy() } catch (e) { }
                 }
             }
 
             archive.on('error', archiveErrorHandler)
-            archive.on('progress', archiveProgressHandler)
-            
-            // Handle client disconnect
             if (res) {
                 res.on('close', clientDisconnectHandler)
             }
 
-            // Update status to processing
             this.updateProgress(downloadId, { status: 'processing' })
 
-            // Pipe archive to response
             if (res) {
                 archive.pipe(res)
             }
 
-            // Add photos to archive - process all at once and let archiver handle backpressure
-            let processedCount = 0
-            
-            console.log(`📦 Processing ${photos.length} photos with archiver managing backpressure`)
-            
-            // Track entry completion
-            let entriesProcessed = 0
-            const totalEntries = photos.length
-            
-            // Listen to archive entry events to track progress
-            archive.on('entry', (entry: any) => {
-                entriesProcessed++
-                console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
-                
-                this.updateProgress(downloadId, {
-                    processedPhotos: entriesProcessed
-                })
-            })
-            
-            // Add all photos to archive - archiver will handle backpressure internally
-            for (const photo of photos) {
-                try {
-                    console.log(`📁 Queuing photo ${processedCount + 1}/${photos.length}: ${photo.filename}`)
+            // USE SEQUENTIAL PROCESSING
+            await this.processPhotosSequentially(targetPhotos, archive, downloadId)
 
-                    // Extract S3 key from URL
-                    const originalUrl = new URL(photo.originalUrl)
-                    const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
-                    const bucketName = pathParts[0]
-                    const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
+            // Finalize
+            await archive.finalize()
 
-                    // Get photo stream from S3
-                    const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
-                    
-                    // Add to archive - archiver will manage the stream
-                    archive.append(stream, { name: photo.filename })
-                    
-                    processedCount++
-                    
-                } catch (error) {
-                    console.error(`Failed to queue photo ${photo.filename}:`, error)
-                    processedCount++ // Still count as processed to continue
-                }
-            }
-
-            console.log(`✅ Added ${processedCount} photos to archive`)
-
-            // Update status to ready
             this.updateProgress(downloadId, {
                 status: 'ready',
-                processedPhotos: processedCount
+                processedPhotos: targetPhotos.length
             })
-
-            // Finalize the archive
-            await archive.finalize()
 
         } catch (error) {
             console.error(`Download service error for ${downloadId}:`, error)
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during zip creation.';
-            this.updateProgress(downloadId, {
-                status: 'error',
-                error: errorMessage
-            })
+            this.updateProgress(downloadId, { status: 'error', error: errorMessage })
             throw new Error(errorMessage);
         } finally {
-            // Clean up after a delay
             setTimeout(() => {
                 this.cleanupDownload(downloadId)
-            }, 300000) // 5 minutes
+            }, 300000)
         }
     }
 
@@ -329,8 +542,15 @@ export class DownloadService {
         galleryId: string,
         userId: string,
         filterType: 'liked' | 'favorited',
-        res: any
+        res: any,
+        partIndex?: number,
+        ticket?: string // Optional: Original ticket to include in part links
     ): Promise<void> {
+        // Fetch configuration
+        const downloadMode = await getSystemConfig('download.mode', 'single')
+        const chunkSizeMB = await getSystemConfig('download.chunkSize', 2000)
+        const chunkSizeBytes = chunkSizeMB * 1024 * 1024
+
         const gallery = await prisma.gallery.findUnique({
             where: { id: galleryId },
             select: {
@@ -346,28 +566,25 @@ export class DownloadService {
             throw new Error('Gallery not found')
         }
 
-        // Check if gallery has expired
         if (gallery.expiresAt && gallery.expiresAt < new Date()) {
             throw new Error('Gallery has expired')
         }
 
         // Get filtered photos
-        const photoQuery = filterType === 'liked' 
+        const photoQuery = filterType === 'liked'
             ? prisma.likedPhoto.findMany({
                 where: {
                     userId,
-                    photo: {
-                        folder: {
-                            galleryId
-                        }
-                    }
+                    photo: { folder: { galleryId } }
                 },
+                orderBy: { photoId: 'asc' }, // Stable sort
                 include: {
                     photo: {
                         select: {
                             id: true,
                             filename: true,
-                            originalUrl: true
+                            originalUrl: true,
+                            fileSize: true
                         }
                     }
                 }
@@ -375,214 +592,153 @@ export class DownloadService {
             : prisma.favoritedPhoto.findMany({
                 where: {
                     userId,
-                    photo: {
-                        folder: {
-                            galleryId
-                        }
-                    }
+                    photo: { folder: { galleryId } }
                 },
+                orderBy: { photoId: 'asc' }, // Stable sort
                 include: {
                     photo: {
                         select: {
                             id: true,
                             filename: true,
-                            originalUrl: true
+                            originalUrl: true,
+                            fileSize: true
                         }
                     }
                 }
             })
 
-        const filteredPhotos = await photoQuery
+        let filteredPhotos = await photoQuery
 
         if (filteredPhotos.length === 0) {
             throw new Error(`No ${filterType} photos found in this gallery`)
         }
 
-        // Create download tracking
-        const zipFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_${filterType}_photos.zip`
-        const downloadId = this.createDownload(zipFilename, filteredPhotos.length)
+        const baseFilename = `${gallery.title.replace(/[^a-zA-Z0-9]/g, '_')}_${filterType}_photos`
 
-        console.log(`📦 Starting ${filterType} photos download: ${downloadId}`)
+        let targetPhotos: any[] = filteredPhotos.map(item => item.photo)
+        let targetFilename = `${baseFilename}.zip`
 
-        // Set response headers for zip download
-        res.setHeader('Content-Type', 'application/zip')
-        res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`)
-        res.setHeader('X-Download-ID', downloadId)
+        if (downloadMode === 'multipart') {
+            const totalSize = targetPhotos.reduce((sum, p) => sum + (p.fileSize || 0), 0)
 
-        // Create zip archive with optimized settings
-        const useCompression = filteredPhotos.length < 500
-        const archive = archiver('zip', {
-            zlib: { level: useCompression ? 6 : 0 },
-            store: !useCompression,
-            highWaterMark: 1024 * 1024 // 1MB buffer
-        })
-        
-        console.log(`📦 Archive mode: ${useCompression ? 'compressed' : 'stored'} for ${filteredPhotos.length} photos`)
+            // Generate parts list
+            const parts = []
+            let currentChunk: any[] = []
+            let currentChunkSize = 0
+            let pIndex = 1
 
-        // Handle archive events
-        const archiveErrorHandler = (err: any) => {
-            console.error('Archive error:', err)
-            this.updateProgress(downloadId, {
-                status: 'error',
-                error: err.message
-            })
-            
-            // Destroy archive to free resources
-            if (archive && typeof archive.destroy === 'function') {
-                try {
-                    archive.destroy()
-                    console.log('🧹 Archive destroyed after error')
-                } catch (destroyError) {
-                    console.warn('Failed to destroy archive:', destroyError)
+            for (const photo of targetPhotos) {
+                if (currentChunkSize + (photo.fileSize || 0) > chunkSizeBytes && currentChunk.length > 0) {
+                    parts.push({
+                        index: pIndex,
+                        filename: `${baseFilename}_part${pIndex}.zip`,
+                        photos: currentChunk,
+                        size: currentChunkSize,
+                        count: currentChunk.length
+                    })
+                    pIndex++
+                    currentChunk = []
+                    currentChunkSize = 0
                 }
+                currentChunk.push(photo)
+                currentChunkSize += (photo.fileSize || 0)
             }
-            
-            if (!res.headersSent) {
-                res.status(500).json({ success: false, error: 'Failed to create archive' })
+
+            if (currentChunk.length > 0) {
+                parts.push({
+                    index: pIndex,
+                    filename: `${baseFilename}_part${pIndex}.zip`,
+                    photos: currentChunk,
+                    size: currentChunkSize,
+                    count: currentChunk.length
+                })
+            }
+
+            // Case A: User requested specific part
+            if (partIndex !== undefined) {
+                const part = parts.find(p => p.index === partIndex)
+                if (!part) {
+                    throw new Error('Part not found')
+                }
+                targetPhotos = part.photos
+                targetFilename = part.filename
+                console.log(`📦 Delivering Part ${partIndex} (${targetPhotos.length} photos)`)
+            }
+            // Case B: Needs splitting, return manifest
+            else if (totalSize > chunkSizeBytes) {
+                console.log(`📦 Multipart download triggering for ${filteredPhotos.length} ${filterType} photos`)
+                if (res) {
+                    res.json({
+                        multipart: true,
+                        parts: parts.map(p => ({
+                            part: p.index,
+                            filename: p.filename,
+                            size: p.size,
+                            count: p.count,
+                            // Use partIndex instead of photoIds
+                            downloadUrl: `/api/photos/download/part?galleryId=${galleryId}&partIndex=${p.index}&filter=${filterType}${ticket ? `&ticket=${ticket}` : ''}`
+                        }))
+                    })
+                }
+                return
             }
         }
 
-        const archiveProgressHandler = (progress: any) => {
-            // Update progress based on archive progress
-            const percentage = Math.round((progress.entries.processed / progress.entries.total) * 100)
-            this.updateProgress(downloadId, {
-                status: 'processing',
-                processedPhotos: progress.entries.processed
-            })
+        let exactZipSize = 22;
+
+        for (const photo of targetPhotos) {
+            const filenameLength = Buffer.byteLength(photo.filename);
+            const fileOverhead = 92 + (2 * filenameLength);
+            exactZipSize += (photo.fileSize || 0) + fileOverhead;
+        }
+
+        const downloadId = this.createDownload(targetFilename, targetPhotos.length)
+        console.log(`📦 Starting ${filterType} download: ${downloadId}`)
+
+        res.setHeader('Content-Type', 'application/zip')
+        res.setHeader('Content-Disposition', `attachment; filename="${targetFilename}"`)
+        res.setHeader('X-Download-ID', downloadId)
+
+        if (exactZipSize > 0) {
+            res.setHeader('Content-Length', exactZipSize)
+        }
+
+        const archive = archiver('zip', {
+            zlib: { level: 0 },
+            store: true,
+            highWaterMark: 1024 * 1024
+        })
+
+        const archiveErrorHandler = (err: any) => {
+            console.error('Archive error:', err)
+            this.updateProgress(downloadId, { status: 'error', error: err.message })
+            try { archive.destroy() } catch (e) { }
         }
 
         const clientDisconnectHandler = () => {
-            console.log('⚠️ Client disconnected, aborting archive creation')
-            this.updateProgress(downloadId, {
-                status: 'error',
-                error: 'Client disconnected'
-            })
-            
-            // Destroy archive to stop processing
-            if (archive && typeof archive.destroy === 'function') {
-                try {
-                    archive.destroy()
-                    console.log('🧹 Archive destroyed after client disconnect')
-                } catch (destroyError) {
-                    console.warn('Failed to destroy archive:', destroyError)
-                }
-            }
+            console.log('⚠️ Client disconnected')
+            this.updateProgress(downloadId, { status: 'error', error: 'Client disconnected' })
+            try { archive.destroy() } catch (e) { }
         }
 
         archive.on('error', archiveErrorHandler)
-        archive.on('progress', archiveProgressHandler)
         res.on('close', clientDisconnectHandler)
 
-        // Update status to processing
         this.updateProgress(downloadId, { status: 'processing' })
-
-        // Pipe archive to response
         archive.pipe(res)
 
-        // Add photos to archive - let archiver handle backpressure
-        let processedCount = 0
-        
-        console.log(`📦 Processing ${filteredPhotos.length} photos with archiver managing backpressure`)
-        
-        // Track entry completion
-        let entriesProcessed = 0
-        const totalEntries = filteredPhotos.length
-        
-        // Listen to archive entry events to track progress
-        archive.on('entry', (entry: any) => {
-            entriesProcessed++
-            console.log(`✅ Archived ${entriesProcessed}/${totalEntries}: ${entry.name}`)
-            
-            this.updateProgress(downloadId, {
-                processedPhotos: entriesProcessed
-            })
-        })
-        
-        // Add all photos to archive - archiver will handle backpressure internally
-        for (const filteredPhoto of filteredPhotos) {
-            try {
-                const photo = filteredPhoto.photo
-                console.log(`📁 Queuing photo ${processedCount + 1}/${filteredPhotos.length}: ${photo.filename}`)
+        // Process sequentially
+        await this.processPhotosSequentially(targetPhotos, archive, downloadId)
 
-                // Extract S3 key from URL
-                const originalUrl = new URL(photo.originalUrl)
-                const pathParts = originalUrl.pathname.split('/').filter(part => part.length > 0)
-                const bucketName = pathParts[0]
-                const s3Key = decodeURIComponent(pathParts.slice(1).join('/'))
-
-                // Get photo stream from S3
-                const { stream } = await getObjectStreamFromS3(s3Key, bucketName)
-                
-                // Add to archive - archiver will manage the stream
-                archive.append(stream, { name: photo.filename })
-                
-                processedCount++
-                
-            } catch (error) {
-                console.error(`Failed to queue photo ${filteredPhoto.photo.filename}:`, error)
-                processedCount++ // Continue with next photo
-            }
-        }
-
-        console.log(`✅ Added ${processedCount} photos to archive`)
-
-        // Update status to ready
-        this.updateProgress(downloadId, {
-            status: 'ready',
-            processedPhotos: processedCount
-        })
-
-        // Finalize the archive
         await archive.finalize()
 
-        // Clean up after a delay
-        setTimeout(() => {
-            this.cleanupDownload(downloadId)
-        }, 300000) // 5 minutes
-    }
-
-    static async verifyGalleryAccess(
-        galleryId: string,
-        userId: string,
-        userRole: string,
-        password?: string
-    ): Promise<boolean> {
-        const gallery = await prisma.gallery.findUnique({
-            where: { id: galleryId },
-            select: {
-                password: true,
-                photographerId: true
-            }
+        this.updateProgress(downloadId, {
+            status: 'ready',
+            processedPhotos: targetPhotos.length
         })
 
-        if (!gallery) {
-            return false
-        }
-
-        // Check if gallery has password protection
-        if (gallery.password) {
-            // Check if user is photographer owner or client with access
-            if (userRole === 'PHOTOGRAPHER' && userId === gallery.photographerId) {
-                return true
-            }
-
-            const hasAccess = await prisma.galleryAccess.findUnique({
-                where: { userId_galleryId: { userId, galleryId } }
-            })
-            
-            if (hasAccess) {
-                return true
-            }
-
-            // Validate provided password
-            if (!password) {
-                return false
-            }
-
-            const bcrypt = await import('bcryptjs')
-            return await bcrypt.default.compare(password, gallery.password)
-        }
-
-        return true
+        setTimeout(() => {
+            this.cleanupDownload(downloadId)
+        }, 300000)
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Yarrow Admin</string>
+    <string name="retry">Try Again</string>
+    <string name="error_icon">Error icon</string>
+</resources>

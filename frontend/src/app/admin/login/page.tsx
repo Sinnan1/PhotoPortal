@@ -21,7 +21,7 @@ const validatePasswordStrength = (password: string) => {
     numbers: /\d/.test(password),
     special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   };
-  
+
   const score = Object.values(requirements).filter(Boolean).length;
   return { requirements, score, isStrong: score >= 4 && requirements.length };
 };
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
+
     // Check if account is locked out
     if (lockoutTime && lockoutTime > 0) {
       setError(`Account temporarily locked. Try again in ${Math.ceil(lockoutTime / 60)} minutes.`);
@@ -86,14 +86,14 @@ export default function AdminLoginPage() {
     try {
       // Use auth context admin login which handles everything properly
       await adminLogin(email, password);
-      
+
       // Reset failed attempts on successful login
       setFailedAttempts(0);
       setLockoutTime(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       setError(errorMessage);
-      
+
       // Handle rate limiting
       if (errorMessage.includes("Too many failed attempts")) {
         const retryMatch = errorMessage.match(/(\d+)/);
@@ -104,7 +104,7 @@ export default function AdminLoginPage() {
         // Increment failed attempts for other errors
         const newFailedAttempts = failedAttempts + 1;
         setFailedAttempts(newFailedAttempts);
-        
+
         // Show warning after 3 failed attempts
         if (newFailedAttempts >= 3) {
           setError(`${errorMessage}. Warning: Account will be temporarily locked after 5 failed attempts.`);
@@ -157,7 +157,7 @@ export default function AdminLoginPage() {
                 <Alert variant="destructive">
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
-                    Account temporarily locked due to multiple failed attempts. 
+                    Account temporarily locked due to multiple failed attempts.
                     Try again in {Math.ceil(lockoutTime / 60)} minutes.
                   </AlertDescription>
                 </Alert>
@@ -167,7 +167,7 @@ export default function AdminLoginPage() {
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    {failedAttempts} failed attempt{failedAttempts > 1 ? 's' : ''}. 
+                    {failedAttempts} failed attempt{failedAttempts > 1 ? 's' : ''}.
                     Account will be locked after 5 failed attempts.
                   </AlertDescription>
                 </Alert>
@@ -257,8 +257,8 @@ export default function AdminLoginPage() {
                         <span>Password Strength</span>
                         <span>{passwordValidation.score}/5</span>
                       </div>
-                      <Progress 
-                        value={(passwordValidation.score / 5) * 100} 
+                      <Progress
+                        value={(passwordValidation.score / 5) * 100}
                         className={`h-2 ${passwordValidation.isStrong ? 'bg-green-100' : 'bg-red-100'}`}
                       />
                     </div>

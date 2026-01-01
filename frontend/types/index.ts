@@ -172,6 +172,7 @@ export interface AdminGallery {
     };
     createdAt: string;
     isPublic: boolean;
+    totalSize?: number | bigint; // B2 storage size in bytes
     _count?: {
         folders: number;
     };
