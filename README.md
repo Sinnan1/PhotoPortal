@@ -191,9 +191,10 @@ photo-portal/
    AWS_SECRET_ACCESS_KEY="your-aws-secret"
    AWS_REGION="us-east-1"
    S3_BUCKET_NAME="your-bucket-name"
-   BACKBLAZE_APPLICATION_KEY_ID="your-b2-key"
-   BACKBLAZE_APPLICATION_KEY="your-b2-secret"
-   BACKBLAZE_BUCKET_ID="your-bucket-id"
+   B2_KEY_ID="your-b2-key-id"
+   B2_APPLICATION_KEY="your-b2-application-key"
+   B2_BUCKET_NAME="your-bucket-name"
+   B2_BUCKET_ID="your-bucket-id"
    
    # Admin setup (optional - for first admin user)
    FIRST_ADMIN_EMAIL="admin@yourdomain.com"
@@ -526,8 +527,8 @@ AWS_REGION=us-west-004
 S3_BUCKET_NAME=your-bucket
 
 # Backblaze B2 (optional)
-B2_KEY_ID=your-b2-key
-B2_APPLICATION_KEY=your-b2-key
+B2_KEY_ID=your-b2-key-id
+B2_APPLICATION_KEY=your-b2-application-key
 B2_BUCKET_NAME=your-bucket
 B2_BUCKET_ID=your-bucket-id
 
