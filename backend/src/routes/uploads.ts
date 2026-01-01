@@ -44,6 +44,39 @@ const uploadRateLimit = (req: any, res: any, next: any) => {
   next()
 }
 
+// Rate limiting for duplicate checks - lighter than upload rate limiting
+// Track duplicate check requests per user
+const userDuplicateChecks = new Map<string, { count: number; resetTime: number }>()
+const MAX_DUPLICATE_CHECKS_PER_MINUTE = 10
+
+const duplicateCheckRateLimit = (req: any, res: any, next: any) => {
+  const userId = req.user?.id
+  if (!userId) {
+    return next()
+  }
+
+  const now = Date.now()
+  const userCheck = userDuplicateChecks.get(userId)
+
+  // Reset counter every minute
+  if (!userCheck || now > userCheck.resetTime) {
+    userDuplicateChecks.set(userId, { count: 1, resetTime: now + 60000 })
+    return next()
+  }
+
+  // Check limit
+  if (userCheck.count >= MAX_DUPLICATE_CHECKS_PER_MINUTE) {
+    return res.status(429).json({
+      error: 'Too many duplicate check requests. Please wait a moment.',
+      retryAfter: Math.ceil((userCheck.resetTime - now) / 1000)
+    })
+  }
+
+  // Increment counter
+  userCheck.count++
+  next()
+}
+
 // Track active uploads (global and per-user)
 router.use((req, res, next) => {
   if (req.path.includes('/multipart/') || req.path.includes('/thumbnail/')) {
@@ -83,7 +116,7 @@ router.post('/multipart/abort', uploadRateLimit, authenticateToken, requireRole(
 router.get('/multipart/parts', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), listUploadedParts)
 
 // Check for duplicate files before uploading
-router.post('/check-duplicates', authenticateToken, requireRole('PHOTOGRAPHER'), checkDuplicates)
+router.post('/check-duplicates', duplicateCheckRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), checkDuplicates)
 
 // Proxy upload to avoid CORS/timeout issues - using unified config
 const CHUNK_UPLOAD_LIMIT = `${Math.ceil(UPLOAD_CONFIG.CHUNK_SIZE / (1024 * 1024))}mb`
