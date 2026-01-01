@@ -97,8 +97,8 @@ export const checkDuplicates = async (req: Request, res: Response) => {
 
     console.log(`🔍 Checking ${files.length} files for duplicates in folder ${folderId}`);
 
-    // Check each file for duplicates
-    const results = await Promise.all(
+    // Check each file for duplicates - use allSettled to handle failures gracefully
+    const results = await Promise.allSettled(
       files.map(async (file: { filename: string; size: number }) => {
         if (!file.filename || typeof file.size !== 'number') {
           return {
@@ -145,16 +145,27 @@ export const checkDuplicates = async (req: Request, res: Response) => {
       })
     );
 
-    const duplicateCount = results.filter(r => r.isDuplicate).length;
-    console.log(`✅ Duplicate check complete: ${duplicateCount}/${files.length} duplicates found`);
+    // Extract successful results and handle failures
+    const successfulResults = results
+      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+      .map(result => result.value);
+
+    const failedCount = results.length - successfulResults.length;
+    if (failedCount > 0) {
+      console.warn(`⚠️ ${failedCount} file(s) failed during duplicate check`);
+    }
+
+    const duplicateCount = successfulResults.filter(r => r.isDuplicate).length;
+    console.log(`✅ Duplicate check complete: ${duplicateCount}/${successfulResults.length} duplicates found`);
 
     res.json({
       success: true,
-      results,
+      results: successfulResults,
       summary: {
         total: files.length,
         duplicates: duplicateCount,
-        unique: files.length - duplicateCount,
+        unique: successfulResults.length - duplicateCount,
+        failed: failedCount,
       },
     });
   } catch (error) {

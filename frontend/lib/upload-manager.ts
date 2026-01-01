@@ -184,11 +184,18 @@ class UploadManager {
       // Import api dynamically to avoid circular dependencies
       const { api } = await import('./api')
 
-      // Prepare file list for duplicate check
-      const fileList = batch.files.map(f => ({
-        filename: f.file?.name || '',
-        size: f.file?.size || 0
-      }))
+      // Prepare file list for duplicate check - skip files without valid data
+      const fileList = batch.files
+        .filter(f => f.file?.name && f.file?.size)
+        .map(f => ({
+          filename: f.file!.name,
+          size: f.file!.size
+        }))
+
+      if (fileList.length === 0) {
+        console.log('⚠️ No valid files to check for duplicates')
+        return
+      }
 
       console.log(`🔍 Checking ${fileList.length} files for duplicates...`)
 
@@ -197,7 +204,7 @@ class UploadManager {
 
       if (response.success && response.results) {
         // Mark duplicate files as failed immediately
-        response.results.forEach((result: any) => {
+        response.results.forEach((result: { filename: string; size: number; isDuplicate: boolean; existingPhoto?: { id: string; uploadedAt: Date } }) => {
           const uploadFile = batch.files.find(f => 
             f.file?.name === result.filename && f.file?.size === result.size
           )
