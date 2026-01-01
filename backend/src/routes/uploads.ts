@@ -4,6 +4,7 @@ import { authenticateToken, requireRole } from '../middleware/auth'
 import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts, checkDuplicates } from '../controllers/uploadsController'
 import { generateThumbnail } from '../controllers/thumbnailController'
 import { UPLOAD_CONFIG } from '../config/uploadConfig'
+import { createRateLimiter } from '../middleware/rateLimiter'
 
 const router = Router()
 
@@ -44,38 +45,16 @@ const uploadRateLimit = (req: any, res: any, next: any) => {
   next()
 }
 
-// Rate limiting for duplicate checks - lighter than upload rate limiting
-// Track duplicate check requests per user
-const userDuplicateChecks = new Map<string, { count: number; resetTime: number }>()
-const MAX_DUPLICATE_CHECKS_PER_MINUTE = 10
-
-const duplicateCheckRateLimit = (req: any, res: any, next: any) => {
-  const userId = req.user?.id
-  if (!userId) {
-    return next()
-  }
-
-  const now = Date.now()
-  const userCheck = userDuplicateChecks.get(userId)
-
-  // Reset counter every minute
-  if (!userCheck || now > userCheck.resetTime) {
-    userDuplicateChecks.set(userId, { count: 1, resetTime: now + 60000 })
-    return next()
-  }
-
-  // Check limit
-  if (userCheck.count >= MAX_DUPLICATE_CHECKS_PER_MINUTE) {
-    return res.status(429).json({
-      error: 'Too many duplicate check requests. Please wait a moment.',
-      retryAfter: Math.ceil((userCheck.resetTime - now) / 1000)
-    })
-  }
-
-  // Increment counter
-  userCheck.count++
-  next()
-}
+// Rate limiting for duplicate checks using standard rate limiter
+const duplicateCheckRateLimit = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  maxRequests: 10,
+  keyGenerator: (req) => {
+    const userId = (req as any).user?.id
+    return userId ? `duplicate-check:${userId}` : `duplicate-check:${req.ip}`
+  },
+  message: 'Too many duplicate check requests, please try again later'
+})
 
 // Track active uploads (global and per-user)
 router.use((req, res, next) => {
