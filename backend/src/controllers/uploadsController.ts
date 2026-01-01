@@ -55,6 +55,125 @@ const handleB2Error = (error: any, operation: string) => {
   };
 };
 
+export const checkDuplicates = async (req: Request, res: Response) => {
+  try {
+    const { files, folderId } = req.body;
+    const photographerId = (req as any).user?.id;
+
+    // Validate required fields
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing or invalid files array",
+      });
+    }
+
+    if (!folderId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing folderId",
+      });
+    }
+
+    // Verify folder exists and belongs to photographer
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId },
+      include: { gallery: true },
+    });
+
+    if (!folder) {
+      return res.status(404).json({
+        success: false,
+        error: "Folder not found",
+      });
+    }
+
+    if (folder.gallery.photographerId !== photographerId) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied",
+      });
+    }
+
+    console.log(`🔍 Checking ${files.length} files for duplicates in folder ${folderId}`);
+
+    // Check each file for duplicates - use allSettled to handle failures gracefully
+    const results = await Promise.allSettled(
+      files.map(async (file: { filename: string; size: number }) => {
+        if (!file.filename || typeof file.size !== 'number') {
+          return {
+            filename: file.filename || 'unknown',
+            size: file.size || 0,
+            isDuplicate: false,
+            error: 'Invalid file data',
+          };
+        }
+
+        // Check if photo with same filename and size exists in this folder
+        const existingPhoto = await prisma.photo.findFirst({
+          where: {
+            folderId,
+            filename: file.filename,
+            fileSize: file.size,
+          },
+          select: {
+            id: true,
+            filename: true,
+            fileSize: true,
+            createdAt: true,
+          },
+        });
+
+        if (existingPhoto) {
+          console.log(`⚠️ Duplicate found: ${file.filename} (${file.size} bytes)`);
+          return {
+            filename: file.filename,
+            size: file.size,
+            isDuplicate: true,
+            existingPhoto: {
+              id: existingPhoto.id,
+              uploadedAt: existingPhoto.createdAt,
+            },
+          };
+        }
+
+        return {
+          filename: file.filename,
+          size: file.size,
+          isDuplicate: false,
+        };
+      })
+    );
+
+    // Extract successful results and handle failures
+    const successfulResults = results
+      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+      .map(result => result.value);
+
+    const failedCount = results.length - successfulResults.length;
+    if (failedCount > 0) {
+      console.warn(`⚠️ ${failedCount} file(s) failed during duplicate check`);
+    }
+
+    const duplicateCount = successfulResults.filter(r => r.isDuplicate).length;
+    console.log(`✅ Duplicate check complete: ${duplicateCount}/${successfulResults.length} duplicates found`);
+
+    res.json({
+      success: true,
+      results: successfulResults,
+      summary: {
+        total: files.length,
+        duplicates: duplicateCount,
+        unique: successfulResults.length - duplicateCount,
+        failed: failedCount,
+      },
+    });
+  } catch (error) {
+    const errorResponse = handleB2Error(error, "Check duplicates");
+    res.status(500).json(errorResponse);
+  }
+};
+
 export const createMultipartUpload = async (req: Request, res: Response) => {
   try {
     const { filename, contentType, galleryId, folderId } = req.body;
