@@ -341,12 +341,22 @@ export default function ClientDashboardPage() {
                     </div>
                     <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
                       <Heart className="h-4 w-4 text-red-500 mb-1" />
-                      <span className="text-lg font-semibold">{gallery._count?.likedBy ?? 0}</span>
+                      <span className="text-lg font-semibold">
+                        {gallery._count?.likedBy ?? 0}
+                        {gallery.likeLimit !== null && gallery.likeLimit !== undefined && (
+                          <span className="text-xs text-muted-foreground font-normal">/{gallery.likeLimit}</span>
+                        )}
+                      </span>
                       <span className="text-xs text-muted-foreground">liked</span>
                     </div>
                     <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg">
                       <Star className="h-4 w-4 text-yellow-500 mb-1" />
-                      <span className="text-lg font-semibold">{gallery._count?.favoritedBy ?? 0}</span>
+                      <span className="text-lg font-semibold">
+                        {gallery._count?.favoritedBy ?? 0}
+                        {gallery.favoriteLimit !== null && gallery.favoriteLimit !== undefined && (
+                          <span className="text-xs text-muted-foreground font-normal">/{gallery.favoriteLimit}</span>
+                        )}
+                      </span>
                       <span className="text-xs text-muted-foreground">favorites</span>
                     </div>
                   </div>

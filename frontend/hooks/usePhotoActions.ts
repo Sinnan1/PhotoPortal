@@ -40,7 +40,12 @@ export function usePhotoActions({ photos, onPhotoStatusChange, onDelete }: UsePh
             onPhotoStatusChange?.(photoId, { liked: !isLiked })
         } catch (error) {
             console.error('Like photo error:', error)
-            showToast("Failed to update like status", "error")
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            if (errorMessage.toLowerCase().includes('limit reached')) {
+                showToast("Like limit reached. Please unlike some photos to continue.", "error")
+            } else {
+                showToast("Failed to update like status", "error")
+            }
         }
     }
 
@@ -64,7 +69,12 @@ export function usePhotoActions({ photos, onPhotoStatusChange, onDelete }: UsePh
             onPhotoStatusChange?.(photoId, { favorited: !isFavorited })
         } catch (error) {
             console.error('Favorite photo error:', error)
-            showToast("Failed to update favorite status", "error")
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            if (errorMessage.toLowerCase().includes('limit reached')) {
+                showToast("Favorite limit reached. Please remove some favorites to continue.", "error")
+            } else {
+                showToast("Failed to update favorite status", "error")
+            }
         }
     }
 

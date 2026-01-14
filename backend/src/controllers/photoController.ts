@@ -745,7 +745,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true, isLocked: true },
+							select: { id: true, photographerId: true, isLocked: true, likeLimit: true },
 						},
 					},
 				},
@@ -763,16 +763,55 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
+		const galleryId = photo.folder.galleryId;
+		const gallery = photo.folder.gallery;
+
+		// Check if like limit is set and enforced
+		if (gallery.likeLimit !== null) {
+			// Count current likes for this user in this gallery
+			const currentLikeCount = await prisma.likedPhoto.count({
+				where: {
+					userId,
+					photo: {
+						folder: {
+							galleryId
+						}
+					}
+				}
+			});
+
+			// Check if user has already liked this photo (to avoid counting a re-like as new)
+			const alreadyLiked = await prisma.likedPhoto.findUnique({
+				where: {
+					userId_photoId: {
+						userId,
+						photoId: id
+					}
+				}
+			});
+
+			if (!alreadyLiked && currentLikeCount >= gallery.likeLimit) {
+				return res.status(403).json({
+					success: false,
+					error: "Like limit reached",
+					data: {
+						currentCount: currentLikeCount,
+						limit: gallery.likeLimit
+					}
+				});
+			}
+		}
+
 		// Sync likes across photographer and all clients with access to this gallery
 		// 1) Find gallery photographer
 		const galleryOwner = await prisma.gallery.findUnique({
-			where: { id: photo.folder.galleryId },
+			where: { id: galleryId },
 			select: { photographerId: true },
 		});
 
 		// 2) Find all clients who have access to this gallery
 		const accessUsers = await prisma.galleryAccess.findMany({
-			where: { galleryId: photo.folder.galleryId },
+			where: { galleryId },
 			select: { userId: true },
 		});
 
@@ -875,7 +914,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 				folder: {
 					include: {
 						gallery: {
-							select: { id: true, photographerId: true, isLocked: true },
+							select: { id: true, photographerId: true, isLocked: true, favoriteLimit: true },
 						},
 					},
 				},
@@ -893,13 +932,52 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 			});
 		}
 
+		const galleryId = photo.folder.galleryId;
+		const gallery = photo.folder.gallery;
+
+		// Check if favorite limit is set and enforced
+		if (gallery.favoriteLimit !== null) {
+			// Count current favorites for this user in this gallery
+			const currentFavoriteCount = await prisma.favoritedPhoto.count({
+				where: {
+					userId,
+					photo: {
+						folder: {
+							galleryId
+						}
+					}
+				}
+			});
+
+			// Check if user has already favorited this photo (to avoid counting a re-favorite as new)
+			const alreadyFavorited = await prisma.favoritedPhoto.findUnique({
+				where: {
+					userId_photoId: {
+						userId,
+						photoId: id
+					}
+				}
+			});
+
+			if (!alreadyFavorited && currentFavoriteCount >= gallery.favoriteLimit) {
+				return res.status(403).json({
+					success: false,
+					error: "Favorite limit reached",
+					data: {
+						currentCount: currentFavoriteCount,
+						limit: gallery.favoriteLimit
+					}
+				});
+			}
+		}
+
 		// Sync favorites across photographer and all clients with access
 		const galleryOwner = await prisma.gallery.findUnique({
-			where: { id: photo.folder.galleryId },
+			where: { id: galleryId },
 			select: { photographerId: true },
 		});
 		const accessUsers = await prisma.galleryAccess.findMany({
-			where: { galleryId: photo.folder.galleryId },
+			where: { galleryId },
 			select: { userId: true },
 		});
 

@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed top-4 right-4 z-50 space-y-3 max-w-sm">
+      <div className="toast-container fixed top-4 right-4 z-[100] space-y-3 max-w-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -66,19 +66,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           >
             <div
               className={cn("mt-0.5", {
-                "text-green-500": toast.type === "success",
-                "text-red-500": toast.type === "error",
-                "text-blue-500": toast.type === "info",
+                "text-green-600": toast.type === "success",
+                "text-red-600": toast.type === "error",
+                "text-blue-600": toast.type === "info",
               })}
             >
               {getIcon(toast.type)}
             </div>
-            <span className="flex-1 text-sm font-medium text-foreground leading-relaxed">
+            <span className="flex-1 text-sm font-medium text-gray-900 leading-relaxed">
               {toast.message}
             </span>
             <button
               onClick={() => removeToast(toast.id)}
-              className="ml-2 hover:opacity-70 transition-opacity text-muted-foreground hover:text-foreground"
+              className="ml-2 hover:opacity-70 transition-opacity text-gray-600 hover:text-gray-900"
             >
               <X className="w-4 h-4" />
             </button>

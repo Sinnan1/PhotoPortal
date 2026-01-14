@@ -16,7 +16,7 @@ interface AuthRequest extends Request {
 
 export const createGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { title, description, password, expiresAt, downloadLimit } = req.body
+		const { title, description, password, expiresAt, downloadLimit, likeLimit, favoriteLimit } = req.body
 		const photographerId = req.user!.id
 
 		// Validate input
@@ -52,6 +52,8 @@ export const createGallery = async (req: AuthRequest, res: Response) => {
 				password: hashedPassword,
 				expiresAt: expiryDate,
 				downloadLimit: downloadLimit || 0,
+				likeLimit: likeLimit !== undefined ? likeLimit : null,
+				favoriteLimit: favoriteLimit !== undefined ? favoriteLimit : null,
 				photographerId,
 				folders: {
 					create: {
@@ -419,7 +421,7 @@ export const verifyGalleryPassword = async (req: Request, res: Response) => {
 export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
 		const { id } = req.params
-		const { title, description, password, expiresAt, downloadLimit, groupId, isLocked } = req.body
+		const { title, description, password, expiresAt, downloadLimit, groupId, isLocked, likeLimit, favoriteLimit } = req.body
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -448,6 +450,8 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 		if (downloadLimit !== undefined) updateData.downloadLimit = downloadLimit
 		if (groupId !== undefined) updateData.groupId = groupId
 		if (isLocked !== undefined) updateData.isLocked = isLocked
+		if (likeLimit !== undefined) updateData.likeLimit = likeLimit
+		if (favoriteLimit !== undefined) updateData.favoriteLimit = favoriteLimit
 
 		// Handle password update
 		if (password !== undefined) {
@@ -940,18 +944,18 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 
 		// Transform the data to match the expected format
 		const galleries = accessibleGalleries.map((access) => {
-			let uniqueLikedPhotos = 0;
-			let uniqueFavoritedPhotos = 0;
+			let userLikedCount = 0;
+			let userFavoritedCount = 0;
 
-			// Calculate total photo count and count unique photos with likes/favorites
+			// Calculate total photo count and count photos liked/favorited BY THIS CLIENT
 			const totalPhotoCount = access.gallery.folders.reduce((sum, folder) => {
 				folder.photos.forEach(photo => {
-					// Count unique photos that have at least one like/favorite
-					if (photo.likedBy.length > 0) {
-						uniqueLikedPhotos++;
+					// Count photos liked/favorited by the current client
+					if (photo.likedBy.some(like => like.userId === clientId)) {
+						userLikedCount++;
 					}
-					if (photo.favoritedBy.length > 0) {
-						uniqueFavoritedPhotos++;
+					if (photo.favoritedBy.some(fav => fav.userId === clientId)) {
+						userFavoritedCount++;
 					}
 				});
 				return sum + folder._count.photos;
@@ -970,8 +974,8 @@ export const getClientGalleries = async (req: AuthRequest, res: Response) => {
 				isExpired: access.gallery.expiresAt ? new Date(access.gallery.expiresAt) < new Date() : false,
 				_count: {
 					...access.gallery._count,
-					likedBy: uniqueLikedPhotos,
-					favoritedBy: uniqueFavoritedPhotos,
+					likedBy: userLikedCount,
+					favoritedBy: userFavoritedCount,
 				}
 			}
 		})

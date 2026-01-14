@@ -140,6 +140,8 @@ export interface Gallery {
     createdAt: string;
     isExpired: boolean;
     downloadLimit?: number | null;
+    likeLimit?: number | null;
+    favoriteLimit?: number | null;
     canDownload?: boolean;
     password?: string | null;
     groupId?: string | null;

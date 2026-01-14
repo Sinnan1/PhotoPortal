@@ -391,4 +391,21 @@
   .dark .hover\:shadow-xl:hover {
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
   }
+
+  /* Toast styling when lightbox is open (dark overlay) - only change text to white */
+  html[data-lightbox-open="true"] .toast-container span {
+    color: white !important;
+  }
+
+  html[data-lightbox-open="true"] .toast-container button {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+
+  html[data-lightbox-open="true"] .toast-container button:hover {
+    color: white !important;
+  }
+
+  html[data-lightbox-open="true"] .toast-container svg {
+    color: inherit;
+  }
 }

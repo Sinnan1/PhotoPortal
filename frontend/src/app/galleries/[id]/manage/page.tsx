@@ -76,6 +76,8 @@ export default function ManageGalleryPage() {
     password: "",
     expiresAt: "",
     downloadLimit: "",
+    likeLimit: "",
+    favoriteLimit: "",
   })
 
   // Excel export state
@@ -98,6 +100,8 @@ export default function ManageGalleryPage() {
         password: gallery.password || "",
         expiresAt: gallery.expiresAt ? new Date(gallery.expiresAt).toISOString().slice(0, 16) : "",
         downloadLimit: gallery.downloadLimit?.toString() || "",
+        likeLimit: gallery.likeLimit?.toString() || "",
+        favoriteLimit: gallery.favoriteLimit?.toString() || "",
       })
       setIsLocked(gallery.isLocked || false)
 
@@ -179,6 +183,8 @@ export default function ManageGalleryPage() {
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
+        likeLimit: formData.likeLimit ? Number.parseInt(formData.likeLimit) : null,
+        favoriteLimit: formData.favoriteLimit ? Number.parseInt(formData.favoriteLimit) : null,
         isLocked: isLocked,
       }
 
@@ -765,6 +771,48 @@ export default function ManageGalleryPage() {
                       <p className="text-sm text-muted-foreground">Set maximum number of downloads (0 = unlimited)</p>
                       <p className="text-sm text-muted-foreground">Current: <span className="font-medium">{gallery?.downloadCount ?? 0}</span></p>
                     </div>
+                  </div>
+
+                  {/* Selection Limits */}
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      Selection Limits
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Limit how many photos clients can like or favorite to help reduce decision fatigue.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="likeLimit" className="block text-sm font-medium mb-2">
+                          Like Limit
+                        </Label>
+                        <Input
+                          id="likeLimit"
+                          type="number"
+                          value={formData.likeLimit}
+                          onChange={(e) => setFormData({ ...formData, likeLimit: e.target.value })}
+                          placeholder="Unlimited"
+                          className="h-11"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="favoriteLimit" className="block text-sm font-medium mb-2">
+                          Favorite Limit
+                        </Label>
+                        <Input
+                          id="favoriteLimit"
+                          type="number"
+                          value={formData.favoriteLimit}
+                          onChange={(e) => setFormData({ ...formData, favoriteLimit: e.target.value })}
+                          placeholder="Unlimited"
+                          className="h-11"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">Leave empty for unlimited selections</p>
                   </div>
 
                   {/* Lock Selection */}

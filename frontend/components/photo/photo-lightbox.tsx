@@ -20,9 +20,13 @@ interface PhotoLightboxProps {
   onPhotoStatusChange?: (photoId: string, status: { liked?: boolean; favorited?: boolean }) => void
   dataSaverMode?: boolean
   canDownload?: boolean
+  selectionLimits?: {
+    likeLimit: number | null
+    favoriteLimit: number | null
+  }
 }
 
-export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false, canDownload = true }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDownload, onUnpost, onPhotoStatusChange, dataSaverMode = false, canDownload = true, selectionLimits }: PhotoLightboxProps) {
   const { user } = useAuth()
   const [imageStates, setImageStates] = useState({
     thumbnail: photo.thumbnailUrl,
@@ -44,6 +48,14 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
   const currentPhoto = photos.find(p => p.id === photo.id) || photo;
   const isLiked = user ? (currentPhoto.likedBy ?? []).some(like => like.userId === user.id) : false;
   const isFavorited = user ? (currentPhoto.favoritedBy ?? []).some(fav => fav.userId === user.id) : false;
+
+  // Calculate current selection counts for the user across all photos in the gallery
+  const likedCount = user
+    ? photos.filter(p => (p.likedBy ?? []).some(like => like.userId === user.id)).length
+    : 0;
+  const favoritedCount = user
+    ? photos.filter(p => (p.favoritedBy ?? []).some(fav => fav.userId === user.id)).length
+    : 0;
 
   // Konami Code Easter Egg - REMOVED
   // const [konamiActivated, setKonamiActivated] = useState(false)
@@ -355,10 +367,12 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
 
     document.addEventListener("keydown", handleKeyDown)
     document.body.style.overflow = "hidden"
+    document.documentElement.setAttribute('data-lightbox-open', 'true')
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
       document.body.style.overflow = "unset"
+      document.documentElement.removeAttribute('data-lightbox-open')
     }
   }, [isFirst, isLast, onClose, onNext, onPrevious, photo.originalUrl, dataSaverMode])
 
@@ -424,13 +438,27 @@ export function PhotoLightbox({ photo, photos, onClose, onNext, onPrevious, onDo
         />
       </div>
 
-      {/* Selection Instructions - Top Left */}
+      {/* Selection Instructions & Counters - Top Left */}
       <div className="absolute top-20 left-4 md:top-20 md:left-4 text-white z-10 hidden md:block">
         <div className="backdrop-blur-md bg-black/40 rounded-lg px-3 py-2 border border-white/20">
           <p className="text-xs opacity-90 leading-relaxed">
             ❤️ Like = Editing<br />
             ⭐ Favorite = Album
           </p>
+          {user && selectionLimits && (selectionLimits.likeLimit !== null || selectionLimits.favoriteLimit !== null) && (
+            <div className="mt-2 pt-2 border-t border-white/20 space-y-0.5">
+              {selectionLimits.likeLimit !== null && (
+                <div className={`text-xs font-medium ${likedCount >= selectionLimits.likeLimit ? 'text-red-400' : 'text-white'}`}>
+                  ❤️ {likedCount}/{selectionLimits.likeLimit}
+                </div>
+              )}
+              {selectionLimits.favoriteLimit !== null && (
+                <div className={`text-xs font-medium ${favoritedCount >= selectionLimits.favoriteLimit ? 'text-amber-400' : 'text-white'}`}>
+                  ⭐ {favoritedCount}/{selectionLimits.favoriteLimit}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

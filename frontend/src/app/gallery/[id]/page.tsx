@@ -909,7 +909,7 @@ function GalleryPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Images className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span>{currentFolder?._count?.photos ?? 0} photos</span>
+                <span>{currentFolder?.photos?.length ?? currentFolder?._count?.photos ?? 0} photos</span>
               </div>
             </div>
           </div>
@@ -1035,6 +1035,9 @@ function GalleryPage() {
               <span className="hidden sm:inline">Liked</span>
               <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
                 {currentFolder ? (currentFolder.photos || []).filter(p => p.likedBy?.some((like) => like.userId === user?.id)).length : 0}
+                {gallery.likeLimit !== null && gallery.likeLimit !== undefined && (
+                  <span className="opacity-60">/{gallery.likeLimit}</span>
+                )}
               </Badge>
             </Button>
             <Button
@@ -1047,6 +1050,9 @@ function GalleryPage() {
               <span className="hidden sm:inline">Favorited</span>
               <Badge variant="secondary" className="ml-1.5 sm:ml-2 text-xs">
                 {currentFolder ? (currentFolder.photos || []).filter(p => p.favoritedBy?.some((fav) => fav.userId === user?.id)).length : 0}
+                {gallery.favoriteLimit !== null && gallery.favoriteLimit !== undefined && (
+                  <span className="opacity-60">/{gallery.favoriteLimit}</span>
+                )}
               </Badge>
             </Button>
           </div>
@@ -1270,6 +1276,10 @@ function GalleryPage() {
           onPhotoStatusChange={handlePhotoStatusChange}
           dataSaverMode={dataSaverMode}
           canDownload={gallery.canDownload !== false}
+          selectionLimits={{
+            likeLimit: gallery.likeLimit ?? null,
+            favoriteLimit: gallery.favoriteLimit ?? null
+          }}
         />
       )}
 
