@@ -168,7 +168,9 @@ export interface Gallery {
 export interface AdminGallery {
     id: string;
     title: string;
+    photographerId: string;
     photographer: {
+        id: string;
         name: string;
         email: string;
     };

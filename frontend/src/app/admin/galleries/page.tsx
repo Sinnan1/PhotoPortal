@@ -16,15 +16,24 @@ import {
   Users,
   Image,
   Calendar,
-  HardDrive
+  HardDrive,
+  ArrowRightLeft,
+  Loader2,
+  X
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { adminApi } from "@/lib/admin-api";
 import { useToast } from "@/hooks/use-toast";
 import { useStorageData, formatStorageSize } from "@/hooks/use-storage-data";
 import { TotalPhotoCount, PhotoCount } from "@/components/admin/PhotoCount";
 import { ClientActivityMetrics } from "@/components/admin/ClientActivityMetrics";
 import type { AdminGallery } from "@/types";
+
+interface Photographer {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export default function AdminGalleriesPage() {
   const [galleries, setGalleries] = useState<AdminGallery[]>([]);
@@ -33,6 +42,14 @@ export default function AdminGalleriesPage() {
   const [totalGalleries, setTotalGalleries] = useState(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'archived' | 'large'>('all');
   const { toast } = useToast();
+
+  // Transfer modal state
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedGallery, setSelectedGallery] = useState<AdminGallery | null>(null);
+  const [photographers, setPhotographers] = useState<Photographer[]>([]);
+  const [selectedPhotographer, setSelectedPhotographer] = useState<string>("");
+  const [transferring, setTransferring] = useState(false);
+  const [loadingPhotographers, setLoadingPhotographers] = useState(false);
 
   // Large gallery threshold (number of photos)
   const LARGE_GALLERY_THRESHOLD = 50;
@@ -79,6 +96,56 @@ export default function AdminGalleriesPage() {
     }
   };
 
+  // Fetch photographers for transfer modal
+  const fetchPhotographers = async () => {
+    try {
+      setLoadingPhotographers(true);
+      const response = await adminApi.getAllUsers({ role: 'PHOTOGRAPHER', limit: 100 });
+      setPhotographers(response.data.users || []);
+    } catch (error) {
+      console.error('Failed to fetch photographers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load photographers",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPhotographers(false);
+    }
+  };
+
+  // Open transfer modal
+  const openTransferModal = (gallery: AdminGallery) => {
+    setSelectedGallery(gallery);
+    setSelectedPhotographer("");
+    setTransferModalOpen(true);
+    fetchPhotographers();
+  };
+
+  // Handle transfer
+  const handleTransfer = async () => {
+    if (!selectedGallery || !selectedPhotographer) return;
+
+    try {
+      setTransferring(true);
+      const response = await adminApi.transferGalleryOwnership(selectedGallery.id, selectedPhotographer);
+      toast({
+        title: "Success",
+        description: response.message || "Gallery transferred successfully",
+      });
+      setTransferModalOpen(false);
+      fetchGalleries(); // Refresh list
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to transfer gallery",
+        variant: "destructive",
+      });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   // Use centralized storage hook for accurate B2 data
   const { totalStorageBytes, fetchStorageData, loading: storageLoading } = useStorageData();
 
@@ -99,6 +166,97 @@ export default function AdminGalleriesPage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Transfer Modal */}
+      <AnimatePresence>
+        {transferModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setTransferModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-background rounded-xl border border-border p-6 w-full max-w-md m-4 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Transfer Gallery Ownership</h3>
+                <Button variant="ghost" size="icon" onClick={() => setTransferModalOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {selectedGallery && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Gallery</p>
+                    <p className="font-medium">{selectedGallery.title}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Current owner: {selectedGallery.photographer.name}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Transfer to</label>
+                    {loadingPhotographers ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full p-2 rounded-lg border border-border bg-background"
+                        value={selectedPhotographer}
+                        onChange={(e) => setSelectedPhotographer(e.target.value)}
+                      >
+                        <option value="">Select a photographer...</option>
+                        {photographers
+                          .filter(p => p.id !== selectedGallery.photographerId)
+                          .map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.email})
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setTransferModalOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      disabled={!selectedPhotographer || transferring}
+                      onClick={handleTransfer}
+                    >
+                      {transferring ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Transferring...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRightLeft className="h-4 w-4 mr-2" />
+                          Transfer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -247,6 +405,15 @@ export default function AdminGalleriesPage() {
                   <div className="p-3 pt-0 mt-auto flex gap-2">
                     <Button size="sm" className="flex-1 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border-none">
                       <Eye className="h-4 w-4 mr-1.5" /> View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-border/50"
+                      onClick={() => openTransferModal(gallery)}
+                      title="Transfer ownership"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
                     </Button>
                   </div>
                 </Card>

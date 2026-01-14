@@ -6,7 +6,8 @@ import {
   getGalleryAnalytics,
   manageGalleryAccess,
   deleteGallery,
-  bulkGalleryOperations
+  bulkGalleryOperations,
+  transferGalleryOwnership
 } from '../controllers/adminGalleryController'
 import { authenticateAdmin } from '../middleware/adminAuth'
 import { auditGalleryAction, auditSystemAction } from '../middleware/auditMiddleware'
@@ -60,6 +61,13 @@ router.put(
   '/:id/access',
   auditGalleryAction('ADMIN_GALLERY_ACCESS_MANAGEMENT'),
   manageGalleryAccess
+)
+
+// Transfer gallery ownership to another photographer
+router.post(
+  '/:id/transfer',
+  auditGalleryAction('ADMIN_GALLERY_OWNERSHIP_TRANSFER'),
+  transferGalleryOwnership
 )
 
 // Bulk operations on galleries

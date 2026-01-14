@@ -271,6 +271,12 @@ export const adminApi = {
     return adminApiRequest(`/galleries/analytics${params}`);
   },
 
+  transferGalleryOwnership: (galleryId: string, newPhotographerId: string) =>
+    adminApiRequest(`/galleries/${galleryId}/transfer`, {
+      method: "POST",
+      body: JSON.stringify({ newPhotographerId }),
+    }),
+
   // Analytics APIs
   getSystemAnalytics: (timeRange?: string) => {
     const params = timeRange ? `?timeRange=${timeRange}` : '';

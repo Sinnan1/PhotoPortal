@@ -1114,3 +1114,104 @@ export const bulkGalleryOperations = async (req: AdminAuthRequest, res: Response
     })
   }
 }
+
+/**
+ * Transfer gallery ownership from one photographer to another
+ */
+export const transferGalleryOwnership = async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { newPhotographerId } = req.body
+
+    if (!newPhotographerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'New photographer ID is required'
+      })
+    }
+
+    // Get the gallery with current owner details
+    const gallery = await prisma.gallery.findUnique({
+      where: { id },
+      include: {
+        photographer: { select: { id: true, name: true, email: true } }
+      }
+    })
+
+    if (!gallery) {
+      return res.status(404).json({
+        success: false,
+        error: 'Gallery not found'
+      })
+    }
+
+    // Verify the new owner exists and is a photographer
+    const newPhotographer = await prisma.user.findUnique({
+      where: { id: newPhotographerId },
+      select: { id: true, name: true, email: true, role: true }
+    })
+
+    if (!newPhotographer) {
+      return res.status(404).json({
+        success: false,
+        error: 'Target photographer not found'
+      })
+    }
+
+    if (newPhotographer.role !== 'PHOTOGRAPHER') {
+      return res.status(400).json({
+        success: false,
+        error: 'Target user is not a photographer'
+      })
+    }
+
+    if (gallery.photographerId === newPhotographerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gallery already belongs to this photographer'
+      })
+    }
+
+    // Transfer ownership
+    const updatedGallery = await prisma.gallery.update({
+      where: { id },
+      data: { photographerId: newPhotographerId },
+      include: {
+        photographer: { select: { id: true, name: true, email: true } }
+      }
+    })
+
+    // Log the audit action
+    await logAdminAction(
+      req,
+      'ADMIN_GALLERY_OWNERSHIP_TRANSFER',
+      'gallery',
+      id,
+      {
+        galleryTitle: gallery.title,
+        previousOwner: {
+          id: gallery.photographer.id,
+          name: gallery.photographer.name,
+          email: gallery.photographer.email
+        },
+        newOwner: {
+          id: newPhotographer.id,
+          name: newPhotographer.name,
+          email: newPhotographer.email
+        }
+      }
+    )
+
+    res.json({
+      success: true,
+      message: `Gallery "${gallery.title}" transferred to ${newPhotographer.name}`,
+      data: updatedGallery
+    })
+  } catch (error) {
+    console.error('Admin transfer gallery ownership error:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    })
+  }
+}
