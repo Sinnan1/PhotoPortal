@@ -68,8 +68,8 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
-        likeLimit: formData.likeLimit ? Number.parseInt(formData.likeLimit) : null,
-        favoriteLimit: formData.favoriteLimit ? Number.parseInt(formData.favoriteLimit) : null,
+        likeLimit: formData.likeLimit ? Number.parseInt(formData.likeLimit) : undefined,
+        favoriteLimit: formData.favoriteLimit ? Number.parseInt(formData.favoriteLimit) : undefined,
         groupId: formData.groupId === "none" ? undefined : formData.groupId,
       }
 
@@ -175,7 +175,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="likeLimit">Like Limit</Label>
+                  <Label htmlFor="likeLimit">Like Limit (Optional)</Label>
                   <Input
                     id="likeLimit"
                     type="number"
@@ -186,7 +186,7 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="favoriteLimit">Favorite Limit</Label>
+                  <Label htmlFor="favoriteLimit">Favorite Limit (Optional)</Label>
                   <Input
                     id="favoriteLimit"
                     type="number"

@@ -1205,7 +1205,10 @@ export const transferGalleryOwnership = async (req: AdminAuthRequest, res: Respo
     res.json({
       success: true,
       message: `Gallery "${gallery.title}" transferred to ${newPhotographer.name}`,
-      data: updatedGallery
+      data: {
+        ...updatedGallery,
+        totalSize: Number(updatedGallery.totalSize)
+      }
     })
   } catch (error) {
     console.error('Admin transfer gallery ownership error:', error)
