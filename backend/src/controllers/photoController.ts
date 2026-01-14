@@ -766,72 +766,89 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 		const galleryId = photo.folder.galleryId;
 		const gallery = photo.folder.gallery;
 
-		// Check if like limit is set and enforced
-		if (gallery.likeLimit !== null) {
-			// Count current likes for this user in this gallery
-			const currentLikeCount = await prisma.likedPhoto.count({
-				where: {
-					userId,
-					photo: {
-						folder: {
-							galleryId
-						}
-					}
-				}
-			});
+		// Get gallery owner and all clients with access (needed for syncing)
+		const [galleryOwner, accessUsers] = await Promise.all([
+			prisma.gallery.findUnique({
+				where: { id: galleryId },
+				select: { photographerId: true },
+			}),
+			prisma.galleryAccess.findMany({
+				where: { galleryId },
+				select: { userId: true },
+			}),
+		]);
 
-			// Check if user has already liked this photo (to avoid counting a re-like as new)
-			const alreadyLiked = await prisma.likedPhoto.findUnique({
-				where: {
-					userId_photoId: {
-						userId,
-						photoId: id
-					}
-				}
-			});
-
-			if (!alreadyLiked && currentLikeCount >= gallery.likeLimit) {
-				return res.status(403).json({
-					success: false,
-					error: "Like limit reached",
-					data: {
-						currentCount: currentLikeCount,
-						limit: gallery.likeLimit
-					}
-				});
-			}
-		}
-
-		// Sync likes across photographer and all clients with access to this gallery
-		// 1) Find gallery photographer
-		const galleryOwner = await prisma.gallery.findUnique({
-			where: { id: galleryId },
-			select: { photographerId: true },
-		});
-
-		// 2) Find all clients who have access to this gallery
-		const accessUsers = await prisma.galleryAccess.findMany({
-			where: { galleryId },
-			select: { userId: true },
-		});
-
-		// 3) Build the set of users to mirror the like to (owner + all clients with access)
+		// Build the set of users to mirror the like to (owner + all clients with access)
 		const userIdsToLike = new Set<string>([
 			userId,
 			...(galleryOwner ? [galleryOwner.photographerId] : []),
 		]);
 		accessUsers.forEach((u) => userIdsToLike.add(u.userId));
 
-		// 4) Create likes for all these users, skipping duplicates
-		await prisma.likedPhoto.createMany({
-			data: Array.from(userIdsToLike).map((uid) => ({
-				userId: uid,
-				photoId: id,
-			})),
-			skipDuplicates: true,
-		});
+		// Use a transaction with Serializable isolation to prevent race conditions
+		// The entire check-and-create sequence happens atomically
+		try {
+			await prisma.$transaction(async (tx) => {
+				// Check if like limit is set and enforced
+				if (gallery.likeLimit !== null) {
+					// Count current likes for this user in this gallery
+					const currentLikeCount = await tx.likedPhoto.count({
+						where: {
+							userId,
+							photo: {
+								folder: {
+									galleryId
+								}
+							}
+						}
+					});
 
-		return res.json({ success: true, message: "Photo liked (synced)" });
+					// Check if user has already liked this photo
+					const alreadyLiked = await tx.likedPhoto.findUnique({
+						where: {
+							userId_photoId: {
+								userId,
+								photoId: id
+							}
+						}
+					});
+
+					// If not already liked and at limit, throw sentinel error
+					if (!alreadyLiked && currentLikeCount >= gallery.likeLimit) {
+						const error = new Error('LIMIT_REACHED');
+						(error as any).data = {
+							currentCount: currentLikeCount,
+							limit: gallery.likeLimit
+						};
+						throw error;
+					}
+				}
+
+				// Create likes for all synced users, using skipDuplicates to handle unique constraint
+				await tx.likedPhoto.createMany({
+					data: Array.from(userIdsToLike).map((uid) => ({
+						userId: uid,
+						photoId: id,
+					})),
+					skipDuplicates: true,
+				});
+			}, {
+				isolationLevel: 'Serializable'
+			});
+
+			return res.json({ success: true, message: "Photo liked (synced)" });
+		} catch (txError: any) {
+			// Handle the sentinel error for limit reached
+			if (txError.message === 'LIMIT_REACHED') {
+				return res.status(403).json({
+					success: false,
+					error: "Like limit reached",
+					data: txError.data
+				});
+			}
+			// Re-throw other errors
+			throw txError;
+		}
 	} catch (error) {
 		console.error("Like photo error:", error);
 		return res
@@ -935,67 +952,89 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 		const galleryId = photo.folder.galleryId;
 		const gallery = photo.folder.gallery;
 
-		// Check if favorite limit is set and enforced
-		if (gallery.favoriteLimit !== null) {
-			// Count current favorites for this user in this gallery
-			const currentFavoriteCount = await prisma.favoritedPhoto.count({
-				where: {
-					userId,
-					photo: {
-						folder: {
-							galleryId
-						}
-					}
-				}
-			});
+		// Get gallery owner and all clients with access (needed for syncing)
+		const [galleryOwner, accessUsers] = await Promise.all([
+			prisma.gallery.findUnique({
+				where: { id: galleryId },
+				select: { photographerId: true },
+			}),
+			prisma.galleryAccess.findMany({
+				where: { galleryId },
+				select: { userId: true },
+			}),
+		]);
 
-			// Check if user has already favorited this photo (to avoid counting a re-favorite as new)
-			const alreadyFavorited = await prisma.favoritedPhoto.findUnique({
-				where: {
-					userId_photoId: {
-						userId,
-						photoId: id
-					}
-				}
-			});
-
-			if (!alreadyFavorited && currentFavoriteCount >= gallery.favoriteLimit) {
-				return res.status(403).json({
-					success: false,
-					error: "Favorite limit reached",
-					data: {
-						currentCount: currentFavoriteCount,
-						limit: gallery.favoriteLimit
-					}
-				});
-			}
-		}
-
-		// Sync favorites across photographer and all clients with access
-		const galleryOwner = await prisma.gallery.findUnique({
-			where: { id: galleryId },
-			select: { photographerId: true },
-		});
-		const accessUsers = await prisma.galleryAccess.findMany({
-			where: { galleryId },
-			select: { userId: true },
-		});
-
+		// Build the set of users to mirror the favorite to (owner + all clients with access)
 		const userIdsToFavorite = new Set<string>([
 			userId,
 			...(galleryOwner ? [galleryOwner.photographerId] : []),
 		]);
 		accessUsers.forEach((u) => userIdsToFavorite.add(u.userId));
 
-		await prisma.favoritedPhoto.createMany({
-			data: Array.from(userIdsToFavorite).map((uid) => ({
-				userId: uid,
-				photoId: id,
-			})),
-			skipDuplicates: true,
-		});
+		// Use a transaction with Serializable isolation to prevent race conditions
+		// The entire check-and-create sequence happens atomically
+		try {
+			await prisma.$transaction(async (tx) => {
+				// Check if favorite limit is set and enforced
+				if (gallery.favoriteLimit !== null) {
+					// Count current favorites for this user in this gallery
+					const currentFavoriteCount = await tx.favoritedPhoto.count({
+						where: {
+							userId,
+							photo: {
+								folder: {
+									galleryId
+								}
+							}
+						}
+					});
 
-		return res.json({ success: true, message: "Photo favorited (synced)" });
+					// Check if user has already favorited this photo
+					const alreadyFavorited = await tx.favoritedPhoto.findUnique({
+						where: {
+							userId_photoId: {
+								userId,
+								photoId: id
+							}
+						}
+					});
+
+					// If not already favorited and at limit, throw sentinel error
+					if (!alreadyFavorited && currentFavoriteCount >= gallery.favoriteLimit) {
+						const error = new Error('LIMIT_REACHED');
+						(error as any).data = {
+							currentCount: currentFavoriteCount,
+							limit: gallery.favoriteLimit
+						};
+						throw error;
+					}
+				}
+
+				// Create favorites for all synced users, using skipDuplicates to handle unique constraint
+				await tx.favoritedPhoto.createMany({
+					data: Array.from(userIdsToFavorite).map((uid) => ({
+						userId: uid,
+						photoId: id,
+					})),
+					skipDuplicates: true,
+				});
+			}, {
+				isolationLevel: 'Serializable'
+			});
+
+			return res.json({ success: true, message: "Photo favorited (synced)" });
+		} catch (txError: any) {
+			// Handle the sentinel error for limit reached
+			if (txError.message === 'LIMIT_REACHED') {
+				return res.status(403).json({
+					success: false,
+					error: "Favorite limit reached",
+					data: txError.data
+				});
+			}
+			// Re-throw other errors
+			throw txError;
+		}
 	} catch (error) {
 		console.error("Favorite photo error:", error);
 		return res
