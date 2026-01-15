@@ -47,7 +47,7 @@ export default function LoginPage() {
       {/* Left side: Image Panel */}
       <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
-          src="/Login.jpg"
+          src="/Login.webp"
           alt="Wedding photography"
           fill
           className="object-cover"
@@ -60,7 +60,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-6 bg-background">
         <div className="mx-auto grid w-full max-w-[420px] gap-5">
           {/* Logo and Header */}
-          <div className="grid gap-1 text-center">              
+          <div className="grid gap-1 text-center">
             <h1 className="text-3xl font-bold tracking-tight font-audrey">Welcome Back</h1>
             <p className="text-muted-foreground text-sm">
               Sign in to your photographer account

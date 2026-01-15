@@ -1,16 +1,54 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Playfair_Display, Inter } from "next/font/google"
+import localFont from "next/font/local"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { ToastProvider } from "@/components/ui/toast"
-import { Navigation } from "@/components/layout/navigation"
+import { NavigationWrapper } from "@/components/layout/navigation-wrapper"
 import { ThemeProvider } from "@/components/theme/theme-provider"
 import { Footer } from "@/components/layout/footer"
 import { QueryProvider } from "@/lib/react-query"
+import { NonCriticalCssLoader } from "@/components/ui/non-critical-css-loader"
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+const audrey = localFont({
+  src: [
+    {
+      path: "../../public/fonts/Audrey-Normal.woff",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Audrey-NormalOblique.woff",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/Audrey-Medium.woff",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Audrey-MediumOblique.woff",
+      weight: "500",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/Audrey-Bold.woff",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Audrey-BoldOblique.woff",
+      weight: "700",
+      style: "italic",
+    },
+  ],
+  variable: "--font-audrey",
+  display: "swap",
+})
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -72,14 +110,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${inter.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${playfair.variable} ${inter.variable} ${audrey.variable}`} suppressHydrationWarning>
+      <head>
+        <NonCriticalCssLoader />
+      </head>
       <body className="font-inter">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <ToastProvider>
             <AuthProvider>
               <QueryProvider>
                 <div className="flex min-h-screen flex-col">
-                  <Navigation />
+                  <NavigationWrapper />
                   <main className="flex-1">{children}</main>
                   <Footer />
                 </div>

@@ -61,11 +61,12 @@ export default function ClientLoginPage() {
         className="absolute inset-0 z-0"
       >
         <Image
-          src="/Client-Login.jpg"
+          src="/Client-Login.webp"
           alt="Client Login Background"
           fill
           className="object-cover opacity-60"
           priority
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
       </motion.div>

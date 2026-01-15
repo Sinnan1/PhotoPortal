@@ -38,12 +38,13 @@ export function Navigation() {
             <Link href="/" className="flex items-center space-x-3 cursor-pointer nav-item">
 
               <Image
-                src="/WHITE-NoBack.png"
+                src="/WHITE-NoBack.webp"
                 alt="Yarrow Weddings & Co. Logo"
                 width={160}
                 height={30}
                 className="object-contain transition-opacity duration-200 hover:opacity-90"
                 priority={true}
+                fetchPriority="high"
                 quality={95}
                 sizes="(max-width: 640px) 100px, 120px"
                 style={{
