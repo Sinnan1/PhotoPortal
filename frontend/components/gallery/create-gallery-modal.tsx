@@ -68,8 +68,8 @@ export function CreateGalleryModal({ open, onOpenChange, onSuccess }: CreateGall
         password: formData.password || undefined,
         expiresAt: formData.expiresAt || undefined,
         downloadLimit: formData.downloadLimit ? Number.parseInt(formData.downloadLimit) : undefined,
-        likeLimit: formData.likeLimit ? Number.parseInt(formData.likeLimit) : undefined,
-        favoriteLimit: formData.favoriteLimit ? Number.parseInt(formData.favoriteLimit) : undefined,
+        likeLimit: formData.likeLimit !== "" && formData.likeLimit != null ? Number.parseInt(formData.likeLimit) : undefined,
+        favoriteLimit: formData.favoriteLimit !== "" && formData.favoriteLimit != null ? Number.parseInt(formData.favoriteLimit) : undefined,
         groupId: formData.groupId === "none" ? undefined : formData.groupId,
       }
 

@@ -1177,9 +1177,25 @@ export const transferGalleryOwnership = async (req: AdminAuthRequest, res: Respo
       where: { id },
       data: { photographerId: newPhotographerId },
       include: {
-        photographer: { select: { id: true, name: true, email: true } }
+        photographer: { select: { id: true, name: true, email: true } },
+        folders: {
+          include: {
+            _count: { select: { photos: true } }
+          }
+        },
+        _count: { select: { folders: true } }
       }
     })
+
+    // Debug log to verify folders and photos are intact
+    const totalPhotos = updatedGallery.folders.reduce((sum, f) => sum + f._count.photos, 0)
+    console.log(`📋 Gallery transfer complete:`)
+    console.log(`   - Gallery ID: ${id}`)
+    console.log(`   - Title: ${gallery.title}`)
+    console.log(`   - Folders: ${updatedGallery._count.folders}`)
+    console.log(`   - Total Photos: ${totalPhotos}`)
+    console.log(`   - Previous owner: ${gallery.photographer.name}`)
+    console.log(`   - New owner: ${newPhotographer.name}`)
 
     // Log the audit action
     await logAdminAction(
@@ -1208,6 +1224,10 @@ export const transferGalleryOwnership = async (req: AdminAuthRequest, res: Respo
       data: {
         ...updatedGallery,
         totalSize: Number(updatedGallery.totalSize)
+      },
+      transferStats: {
+        foldersCount: updatedGallery._count.folders,
+        photosCount: totalPhotos
       }
     })
   } catch (error) {
