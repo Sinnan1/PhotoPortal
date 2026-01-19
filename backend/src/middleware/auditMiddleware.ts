@@ -40,7 +40,7 @@ export const auditMiddleware = (
 
     // Store original res.json to intercept response
     const originalJson = res.json;
-    
+
     res.json = function (body: any) {
       // Log the action after successful response
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -56,15 +56,15 @@ export const auditMiddleware = (
               return;
             }
 
-            const details = options.extractDetails 
+            const details = options.extractDetails
               ? options.extractDetails(req, res)
               : {
-                  method: req.method,
-                  url: req.originalUrl,
-                  body: req.method !== 'GET' ? req.body : undefined,
-                  query: req.query,
-                  responseStatus: res.statusCode,
-                };
+                method: req.method,
+                url: req.originalUrl,
+                body: req.method !== 'GET' ? req.body : undefined,
+                query: req.query,
+                responseStatus: res.statusCode,
+              };
 
             await AuditLogger.logAction({
               adminId: req.auditContext.adminId,
@@ -142,7 +142,7 @@ export const logBulkAdminAction = async (
   };
 
   // Log each target separately for better tracking
-  const logPromises = targets.map(target => 
+  const logPromises = targets.map(target =>
     AuditLogger.logAction({
       ...baseEntry,
       targetId: target.id,
@@ -167,9 +167,12 @@ export const logBulkAdminAction = async (
 /**
  * Predefined audit middleware for common admin operations
  */
-export const auditUserAction = (action: string) => 
+export const auditUserAction = (action: string) =>
   auditMiddleware(action, 'user', {
-    extractTargetId: (req) => req.params.userId || req.params.id,
+    extractTargetId: (req) => {
+      const id = req.params.userId || req.params.id;
+      return Array.isArray(id) ? id[0] : id;
+    },
     extractDetails: (req) => ({
       method: req.method,
       url: req.originalUrl,
@@ -178,9 +181,12 @@ export const auditUserAction = (action: string) =>
     }),
   });
 
-export const auditGalleryAction = (action: string) => 
+export const auditGalleryAction = (action: string) =>
   auditMiddleware(action, 'gallery', {
-    extractTargetId: (req) => req.params.galleryId || req.params.id,
+    extractTargetId: (req) => {
+      const id = req.params.galleryId || req.params.id;
+      return Array.isArray(id) ? id[0] : id;
+    },
     extractDetails: (req) => ({
       method: req.method,
       url: req.originalUrl,
@@ -189,7 +195,7 @@ export const auditGalleryAction = (action: string) =>
     }),
   });
 
-export const auditSystemAction = (action: string) => 
+export const auditSystemAction = (action: string) =>
   auditMiddleware(action, 'system', {
     extractDetails: (req) => ({
       method: req.method,
@@ -199,9 +205,12 @@ export const auditSystemAction = (action: string) =>
     }),
   });
 
-export const auditConfigAction = (action: string) => 
+export const auditConfigAction = (action: string) =>
   auditMiddleware(action, 'config', {
-    extractTargetId: (req) => req.params.configKey || req.body.configKey,
+    extractTargetId: (req) => {
+      const id = req.params.configKey || req.body.configKey;
+      return Array.isArray(id) ? id[0] : id;
+    },
     extractDetails: (req) => ({
       method: req.method,
       url: req.originalUrl,

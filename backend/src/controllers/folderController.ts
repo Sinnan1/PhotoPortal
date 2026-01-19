@@ -14,7 +14,7 @@ interface AuthRequest extends Request {
 // Create a new folder
 export const createFolder = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params
+		const galleryId = req.params.galleryId as string
 		const { name, parentId } = req.body
 		const photographerId = req.user!.id
 
@@ -79,7 +79,7 @@ export const createFolder = async (req: AuthRequest, res: Response) => {
 // Get folder tree structure for a gallery
 export const getFolderTree = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params
+		const galleryId = req.params.galleryId as string
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -158,7 +158,7 @@ export const getFolderTree = async (req: AuthRequest, res: Response) => {
 // Get a specific folder with its contents
 export const getFolder = async (req: AuthRequest, res: Response) => {
 	try {
-		const { folderId } = req.params
+		const folderId = req.params.folderId as string
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -241,7 +241,7 @@ export const getFolder = async (req: AuthRequest, res: Response) => {
 // Update folder (rename)
 export const updateFolder = async (req: AuthRequest, res: Response) => {
 	try {
-		const { folderId } = req.params
+		const folderId = req.params.folderId as string
 		const { name } = req.body
 		const photographerId = req.user!.id
 
@@ -299,7 +299,7 @@ export const updateFolder = async (req: AuthRequest, res: Response) => {
 // Delete folder
 export const deleteFolder = async (req: AuthRequest, res: Response) => {
 	try {
-		const { folderId } = req.params
+		const folderId = req.params.folderId as string
 		const photographerId = req.user!.id
 
 		// Verify folder exists and belongs to photographer's gallery
@@ -345,7 +345,7 @@ export const deleteFolder = async (req: AuthRequest, res: Response) => {
 // Set folder cover photo
 export const setFolderCover = async (req: AuthRequest, res: Response) => {
 	try {
-		const { folderId } = req.params
+		const folderId = req.params.folderId as string
 		const { photoId } = req.body
 		const photographerId = req.user!.id
 
@@ -409,7 +409,7 @@ export const setFolderCover = async (req: AuthRequest, res: Response) => {
 // Move folder to different parent (for reorganization)
 export const moveFolder = async (req: AuthRequest, res: Response) => {
 	try {
-		const { folderId } = req.params
+		const folderId = req.params.folderId as string
 		const { newParentId } = req.body
 		const photographerId = req.user!.id
 

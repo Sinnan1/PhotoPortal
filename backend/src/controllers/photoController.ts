@@ -127,7 +127,7 @@ export const uploadPhotos = async (req: AuthRequest, res: Response) => {
 // Add batch upload endpoint for better performance
 export const batchUploadPhotos = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const photographerId = req.user!.id;
 
 		// Verify gallery
@@ -176,7 +176,7 @@ export const batchUploadPhotos = async (req: AuthRequest, res: Response) => {
 // Keep existing functions but add better error handling
 export const getPhotos = async (req: Request, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 24; // Good for grid display
 
@@ -316,7 +316,7 @@ export const getPhotos = async (req: Request, res: Response) => {
 // Add photo compression endpoint for web viewing
 export const getCompressedPhoto = async (req: Request, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const { quality = "80", width, height } = req.query;
 
 		const photo = await prisma.photo.findUnique({
@@ -351,7 +351,7 @@ export const getCompressedPhoto = async (req: Request, res: Response) => {
 // Download photo endpoint - returns the actual image data for download
 export const downloadPhoto = async (req: Request, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const { galleryId } = req.query;
 
 		console.log(`📥 Download request for photo ID: ${id} (method: ${req.method})`);
@@ -559,7 +559,7 @@ export const downloadPhoto = async (req: Request, res: Response) => {
 // Enhanced delete with better cleanup
 export const deletePhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const photographerId = req.user!.id;
 
 		console.log(`🗑️ Delete request for photo ${id} by photographer ${photographerId}`);
@@ -734,7 +734,7 @@ export const bulkDeletePhotos = async (req: AuthRequest, res: Response) => {
 // Like a photo
 export const likePhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 		const userRole = req.user!.role;
 
@@ -860,7 +860,7 @@ export const likePhoto = async (req: AuthRequest, res: Response) => {
 // Unlike a photo
 export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 		const userRole = req.user!.role;
 
@@ -921,7 +921,7 @@ export const unlikePhoto = async (req: AuthRequest, res: Response) => {
 // Favorite a photo
 export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 		const userRole = req.user!.role;
 
@@ -1046,7 +1046,7 @@ export const favoritePhoto = async (req: AuthRequest, res: Response) => {
 // Unfavorite a photo
 export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 		const userRole = req.user!.role;
 
@@ -1107,7 +1107,7 @@ export const unfavoritePhoto = async (req: AuthRequest, res: Response) => {
 // Get like/favorite status for the current user
 export const getPhotoStatus = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		const [liked, favorited, posted] = await Promise.all([
@@ -1201,7 +1201,7 @@ export const getFavoritedPhotos = async (req: AuthRequest, res: Response) => {
 // Mark a photo for posting (photographer only)
 export const postPhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		// Ensure photo exists and belongs to the photographer
@@ -1258,7 +1258,7 @@ export const postPhoto = async (req: AuthRequest, res: Response) => {
 // Unmark a photo for posting (photographer only)
 export const unpostPhoto = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		// Ensure photo exists and belongs to the photographer
@@ -1335,7 +1335,7 @@ export const getPosts = async (req: AuthRequest, res: Response) => {
 // Download liked photos as zip
 export const downloadLikedPhotos = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 		const providedPassword =
 			(req.headers["x-gallery-password"] as string | undefined) ||
@@ -1484,7 +1484,7 @@ export const downloadFavoritedPhotos = async (
 	res: Response
 ) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 		const providedPassword =
 			(req.headers["x-gallery-password"] as string | undefined) ||
@@ -1535,7 +1535,7 @@ export const downloadFavoritedPhotos = async (
 // Get download progress
 export const getDownloadProgress = async (req: AuthRequest, res: Response) => {
 	try {
-		const { downloadId } = req.params;
+		const downloadId = req.params.downloadId as string;
 
 		const progress = DownloadService.getProgress(downloadId);
 
@@ -1562,7 +1562,7 @@ export const getDownloadProgress = async (req: AuthRequest, res: Response) => {
 // Download all photos from gallery as zip
 export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user?.id;
 
 		if (!userId) {
@@ -1638,7 +1638,8 @@ export const downloadAllPhotos = async (req: AuthRequest, res: Response) => {
 // Download folder photos as zip
 export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId, folderId } = req.params;
+		const galleryId = req.params.galleryId as string;
+		const folderId = req.params.folderId as string;
 		const userId = req.user?.id;
 
 		if (!userId) {
@@ -1715,7 +1716,7 @@ export const downloadFolderPhotos = async (req: AuthRequest, res: Response) => {
 // Export liked photos filenames to Excel (Photographer/Admin only)
 export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 
 		// Verify user is photographer or admin
@@ -1862,7 +1863,7 @@ export const exportLikedPhotosToExcel = async (req: AuthRequest, res: Response) 
 // Export favorited photos filenames to Excel (Photographer/Admin only)
 export const exportFavoritedPhotosToExcel = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 
 		// Verify user is photographer or admin
@@ -2038,7 +2039,7 @@ const convertToCSV = (data: any[]): string => {
 // Export liked photos filenames to CSV (Photographer/Admin only)
 export const exportLikedPhotosToCSV = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 
 		// Verify user is photographer or admin
@@ -2161,7 +2162,7 @@ export const exportLikedPhotosToCSV = async (req: AuthRequest, res: Response) =>
 // Export favorited photos filenames to CSV (Photographer/Admin only)
 export const exportFavoritedPhotosToCSV = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 
 		// Verify user is photographer or admin
@@ -2284,7 +2285,7 @@ export const exportFavoritedPhotosToCSV = async (req: AuthRequest, res: Response
 // Get liked and favorited photo counts for a gallery (photographer only)
 export const getGalleryPhotoStats = async (req: AuthRequest, res: Response) => {
 	try {
-		const { galleryId } = req.params;
+		const galleryId = req.params.galleryId as string;
 		const userId = req.user!.id;
 
 		// Verify user is photographer or admin

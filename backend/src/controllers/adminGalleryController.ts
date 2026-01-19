@@ -280,7 +280,7 @@ export const getAllGalleries = async (req: AdminAuthRequest, res: Response) => {
  */
 export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     const gallery = await prisma.gallery.findUnique({
       where: { id },
@@ -422,7 +422,7 @@ export const getGalleryDetails = async (req: AdminAuthRequest, res: Response) =>
  */
 export const updateGallerySettings = async (req: AdminAuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { title, description, password, expiresAt, downloadLimit, isActive } = req.body
 
     // Get existing gallery for audit logging
@@ -700,7 +700,7 @@ export const getGalleryAnalytics = async (req: AdminAuthRequest, res: Response) 
  */
 export const manageGalleryAccess = async (req: AdminAuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { clientIds, action } = req.body // action: 'grant' | 'revoke'
 
     if (!Array.isArray(clientIds) || clientIds.length === 0) {
@@ -823,7 +823,7 @@ export const manageGalleryAccess = async (req: AdminAuthRequest, res: Response) 
  */
 export const deleteGallery = async (req: AdminAuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { reason } = req.body
 
     // Get gallery with all related data for cleanup and audit
@@ -1120,7 +1120,7 @@ export const bulkGalleryOperations = async (req: AdminAuthRequest, res: Response
  */
 export const transferGalleryOwnership = async (req: AdminAuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { newPhotographerId } = req.body
 
     if (!newPhotographerId) {

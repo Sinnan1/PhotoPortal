@@ -2,11 +2,11 @@ import { Response } from 'express'
 import { Request } from 'express'
 
 interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+	user?: {
+		id: string;
+		email: string;
+		role: string;
+	};
 }
 
 import bcrypt from 'bcryptjs'
@@ -108,7 +108,7 @@ export const getClients = async (req: AuthRequest, res: Response) => {
 
 export const toggleClientDownload = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const { canDownload } = req.body
 		const photographerId = (req.user as any).id
 
@@ -155,7 +155,7 @@ export const toggleClientDownload = async (req: AuthRequest, res: Response) => {
 
 export const removeClient = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const photographerId = (req.user as any).id
 
 		const client = await prisma.user.findFirst({

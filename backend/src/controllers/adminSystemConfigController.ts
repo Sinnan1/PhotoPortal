@@ -400,7 +400,7 @@ export const getAllConfigurations = async (req: AdminAuthRequest, res: Response)
  */
 export const getConfiguration = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { configKey } = req.params
+        const configKey = req.params.configKey as string
         const adminId = req.admin!.id
 
         if (!configKey) {
@@ -483,7 +483,7 @@ export const getConfiguration = async (req: AdminAuthRequest, res: Response) => 
  */
 export const updateConfiguration = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { configKey } = req.params
+        const configKey = req.params.configKey as string
         const { value, reason } = req.body
         const adminId = req.admin!.id
 
@@ -700,7 +700,7 @@ export const updateMultipleConfigurations = async (req: AdminAuthRequest, res: R
  */
 export const resetConfiguration = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { configKey } = req.params
+        const configKey = req.params.configKey as string
         const { reason } = req.body
         const adminId = req.admin!.id
 
@@ -774,7 +774,7 @@ export const resetConfiguration = async (req: AdminAuthRequest, res: Response) =
  */
 export const getConfigurationHistory = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { configKey } = req.params
+        const configKey = req.params.configKey as string
         const { page = 1, limit = 20 } = req.query
         const adminId = req.admin!.id
 

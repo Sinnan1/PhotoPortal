@@ -3,15 +3,15 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { logAdminAction } from '../middleware/auditMiddleware'
-import { 
-  validateUserCreation, 
-  validateEmail, 
-  validatePassword, 
-  validateName, 
-  validateRole,
-  validateSearchInput,
-  validatePaginationParams,
-  sanitizeString
+import {
+    validateUserCreation,
+    validateEmail,
+    validatePassword,
+    validateName,
+    validateRole,
+    validateSearchInput,
+    validatePaginationParams,
+    sanitizeString
 } from '../utils/validation'
 
 // Allow dependency injection for testing
@@ -240,7 +240,7 @@ export const getAllUsers = async (req: AdminAuthRequest, res: Response) => {
  */
 export const getUserDetails = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const adminId = req.admin!.id
 
         if (!userId) {
@@ -393,7 +393,7 @@ export const getUserDetails = async (req: AdminAuthRequest, res: Response) => {
  */
 export const updateUserRole = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const { role, reason } = req.body
         const adminId = req.admin!.id
 
@@ -484,7 +484,7 @@ export const updateUserRole = async (req: AdminAuthRequest, res: Response) => {
  */
 export const suspendUser = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const { reason } = req.body
         const adminId = req.admin!.id
 
@@ -580,7 +580,7 @@ export const suspendUser = async (req: AdminAuthRequest, res: Response) => {
  */
 export const activateUser = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const { reason } = req.body
         const adminId = req.admin!.id
 
@@ -659,7 +659,7 @@ export const activateUser = async (req: AdminAuthRequest, res: Response) => {
  */
 export const deleteUser = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const { reason, confirmEmail } = req.body
         const adminId = req.admin!.id
 
@@ -1031,7 +1031,7 @@ export const searchUsers = async (req: AdminAuthRequest, res: Response) => {
  */
 export const approvePendingUser = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { userId } = req.params
+        const userId = req.params.userId as string
         const { reason } = req.body
         const adminId = req.admin!.id
 
@@ -1045,10 +1045,10 @@ export const approvePendingUser = async (req: AdminAuthRequest, res: Response) =
         // Get the pending user
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { 
-                id: true, 
-                email: true, 
-                name: true, 
+            select: {
+                id: true,
+                email: true,
+                name: true,
                 role: true,
                 suspendedAt: true,
                 suspensionReason: true
@@ -1192,7 +1192,7 @@ export const createUser = async (req: AdminAuthRequest, res: Response) => {
             requireNumbers: true,
             requireSpecialChars: true
         })
-        
+
         if (passwordValidation.strength === 'weak') {
             return res.status(400).json({
                 success: false,

@@ -78,7 +78,7 @@ export const getActiveUsers = async (req: AdminAuthRequest, res: Response) => {
  */
 export const getGalleryPresence = async (req: AdminAuthRequest, res: Response) => {
     try {
-        const { galleryId } = req.params
+        const galleryId = req.params.galleryId as string
         const activeThreshold = new Date(Date.now() - ACTIVE_THRESHOLD_MS)
 
         const viewers = await prisma.userPresence.findMany({

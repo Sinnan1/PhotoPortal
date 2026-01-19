@@ -42,13 +42,13 @@ router.post(
 	authenticateToken,
 	requireAnyRole(['PHOTOGRAPHER', 'ADMIN']),
 	auditMiddleware('UPLOAD_PHOTOS', 'photo', {
-		extractTargetId: (req) => req.params.folderId
+		extractTargetId: (req) => req.params.folderId as string
 	}),
 	uploadMiddleware,
 	uploadPhotos
 )
 router.delete('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('DELETE_PHOTO', 'photo', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), deletePhoto)
 
 // Bulk operations - Admin can delete any photos
@@ -62,10 +62,10 @@ router.delete('/:id/favorite', authenticateToken, unfavoritePhoto)
 
 // Post routes (photographer and admin)
 router.post('/:id/post', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('POST_PHOTO', 'photo', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), postPhoto)
 router.delete('/:id/post', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('UNPOST_PHOTO', 'photo', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), unpostPhoto)
 
 // Status and lists

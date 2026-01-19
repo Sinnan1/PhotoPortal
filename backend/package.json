@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "npm": ">=10.0.0 <11.0.0"
+  },
   "scripts": {
     "test": "jest --testTimeout=30000",
     "test:watch": "jest --watch --testTimeout=30000",

@@ -34,17 +34,17 @@ router.get('/timeline', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMI
 router.get('/timeline/:year/:month', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleriesByYearMonth)
 router.get('/uncategorized', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getUncategorizedGalleries)
 router.patch('/:id/date', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY_DATE', 'gallery', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), updateGalleryDate)
 
 // Protected routes (require authentication) - Admin can access all
 router.post('/', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), auditMiddleware('CREATE_GALLERY', 'gallery'), createGallery)
 router.get('/', authenticateToken, requireAnyRole(['PHOTOGRAPHER', 'ADMIN']), getGalleries)
 router.put('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY', 'gallery', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), updateGallery)
 router.delete('/:id', authenticateToken, requireAdminOrOwner, auditMiddleware('DELETE_GALLERY', 'gallery', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), deleteGallery)
 
 // Client routes
@@ -62,7 +62,7 @@ router.delete('/:id/favorite', authenticateToken, unfavoriteGallery)
 
 // Routes for managing client access to galleries - Admin can manage any gallery
 router.put('/:id/access', authenticateToken, requireAdminOrOwner, auditMiddleware('UPDATE_GALLERY_ACCESS', 'gallery', {
-	extractTargetId: (req) => req.params.id
+	extractTargetId: (req) => req.params.id as string
 }), updateGalleryAccess)
 router.get('/:id/allowed-clients', authenticateToken, requireAdminOrOwner, getAllowedClients)
 

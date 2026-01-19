@@ -199,7 +199,7 @@ export const getGalleries = async (req: AuthRequest, res: Response) => {
 
 export const getGallery = async (req: Request, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 
 		const gallery = await prisma.gallery.findUnique({
 			where: { id },
@@ -367,7 +367,7 @@ export const getGallery = async (req: Request, res: Response) => {
 
 export const verifyGalleryPassword = async (req: Request, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const { password } = req.body
 
 		const gallery = await prisma.gallery.findUnique({
@@ -420,7 +420,7 @@ export const verifyGalleryPassword = async (req: Request, res: Response) => {
 
 export const updateGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const { title, description, password, expiresAt, downloadLimit, groupId, isLocked, likeLimit, favoriteLimit } = req.body
 		const userId = req.user!.id
 		const userRole = req.user!.role
@@ -500,7 +500,7 @@ export const updateGallery = async (req: AuthRequest, res: Response) => {
 
 export const deleteGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const userId = req.user!.id
 		const userRole = req.user!.role
 
@@ -582,7 +582,7 @@ export const deleteGallery = async (req: AuthRequest, res: Response) => {
 
 export const likeGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		const existingLike = await prisma.likedGallery.findUnique({
@@ -606,7 +606,7 @@ export const likeGallery = async (req: AuthRequest, res: Response) => {
 
 export const unlikeGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		await prisma.likedGallery.delete({
@@ -622,7 +622,7 @@ export const unlikeGallery = async (req: AuthRequest, res: Response) => {
 
 export const favoriteGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		const existingFavorite = await prisma.favoritedGallery.findUnique({
@@ -646,7 +646,7 @@ export const favoriteGallery = async (req: AuthRequest, res: Response) => {
 
 export const unfavoriteGallery = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const userId = req.user!.id;
 
 		await prisma.favoritedGallery.delete({
@@ -797,7 +797,7 @@ export const searchGalleries = async (req: AuthRequest, res: Response) => {
 
 export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const { clientIds, access } = req.body // access is a boolean
 		const userId = req.user!.id
 		const userRole = req.user!.role
@@ -846,7 +846,7 @@ export const updateGalleryAccess = async (req: AuthRequest, res: Response) => {
 
 export const getAllowedClients = async (req: AuthRequest, res: Response) => {
 	try {
-		const { id } = req.params
+		const id = req.params.id as string
 		const userId = req.user!.id
 		const userRole = req.user!.role
 

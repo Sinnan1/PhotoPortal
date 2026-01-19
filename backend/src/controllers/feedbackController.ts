@@ -103,7 +103,7 @@ export const submitFeedback = async (req: AuthRequest, res: Response) => {
 // Request feedback from a client (photographer only)
 export const requestFeedback = async (req: AuthRequest, res: Response) => {
   try {
-    const { clientId } = req.params;
+    const clientId = req.params.clientId as string;
     const photographerId = req.user!.id;
 
     // Verify the client belongs to this photographer

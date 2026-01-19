@@ -33,7 +33,7 @@ interface AuthRequest extends Request {
  */
 export const getGallerySelections = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { galleryId } = req.params
+    const galleryId = req.params.galleryId as string
     const userId = req.user!.id
 
     if (!galleryId) {
@@ -53,7 +53,7 @@ export const getGallerySelections = async (req: AuthRequest, res: Response): Pro
 
   } catch (error) {
     console.error('Get gallery selections error:', error)
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found')) {
         res.status(404).json({
@@ -62,7 +62,7 @@ export const getGallerySelections = async (req: AuthRequest, res: Response): Pro
         })
         return
       }
-      
+
       if (error.message.includes('Access denied')) {
         res.status(403).json({
           success: false,
@@ -85,7 +85,7 @@ export const getGallerySelections = async (req: AuthRequest, res: Response): Pro
  */
 export const getFolderSelections = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { folderId } = req.params
+    const folderId = req.params.folderId as string
     const userId = req.user!.id
 
     if (!folderId) {
@@ -105,7 +105,7 @@ export const getFolderSelections = async (req: AuthRequest, res: Response): Prom
 
   } catch (error) {
     console.error('Get folder selections error:', error)
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found')) {
         res.status(404).json({
@@ -114,7 +114,7 @@ export const getFolderSelections = async (req: AuthRequest, res: Response): Prom
         })
         return
       }
-      
+
       if (error.message.includes('Access denied')) {
         res.status(403).json({
           success: false,
@@ -198,7 +198,7 @@ export const getPhotographerSelections = async (req: AuthRequest, res: Response)
 
   } catch (error) {
     console.error('Get photographer selections error:', error)
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found')) {
         res.status(404).json({
@@ -272,7 +272,7 @@ export const recalculateSelectionCounts = async (req: AuthRequest, res: Response
 
     res.json({
       success: true,
-      message: galleryId 
+      message: galleryId
         ? `Selection counts recalculated for gallery ${galleryId}`
         : 'Selection counts recalculated for all galleries'
     })

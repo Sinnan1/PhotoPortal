@@ -147,8 +147,8 @@ export const getGalleriesByYearMonth = async (req: AuthRequest, res: Response) =
     try {
         const userId = req.user?.id
         const userRole = req.user?.role
-        const year = parseInt(req.params.year)
-        const month = parseInt(req.params.month)
+        const year = parseInt(req.params.year as string)
+        const month = parseInt(req.params.month as string)
 
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' })
@@ -348,7 +348,7 @@ export const updateGalleryDate = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id
         const userRole = req.user?.role
-        const galleryId = req.params.id
+        const galleryId = req.params.id as string
         const { shootDate } = req.body as { shootDate?: string | null }
 
         if (!userId) {

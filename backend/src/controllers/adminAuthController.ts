@@ -4,11 +4,11 @@ import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
 import { AdminAuthRequest } from '../middleware/adminAuth'
 import { AuditLogger } from '../utils/auditLogger'
-import { 
-  validateEmail, 
-  validatePassword, 
-  validateName,
-  sanitizeString
+import {
+	validateEmail,
+	validatePassword,
+	validateName,
+	sanitizeString
 } from '../utils/validation'
 
 const prisma = new PrismaClient()
@@ -66,7 +66,7 @@ export const adminLogin = async (req: Request, res: Response) => {
 		// Check for rate limiting based on IP
 		const attemptKey = `${email}:${ipAddress}`
 		const attempts = failedAttempts.get(attemptKey)
-		
+
 		if (attempts && attempts.count >= MAX_FAILED_ATTEMPTS) {
 			const timeSinceLastAttempt = Date.now() - attempts.lastAttempt.getTime()
 			if (timeSinceLastAttempt < LOCKOUT_DURATION) {
@@ -91,7 +91,7 @@ export const adminLogin = async (req: Request, res: Response) => {
 
 		// Find admin user with sanitized email
 		const admin = await prisma.user.findUnique({
-			where: { 
+			where: {
 				email: sanitizedEmail,
 				role: 'ADMIN'
 			}
@@ -269,9 +269,9 @@ export const getAdminProfile = async (req: AdminAuthRequest, res: Response) => {
 		})
 
 		if (!admin) {
-			return res.status(404).json({ 
-				success: false, 
-				error: 'Admin not found' 
+			return res.status(404).json({
+				success: false,
+				error: 'Admin not found'
 			})
 		}
 
@@ -286,18 +286,18 @@ export const getAdminProfile = async (req: AdminAuthRequest, res: Response) => {
 			}
 		})
 
-		res.json({ 
-			success: true, 
-			data: { 
+		res.json({
+			success: true,
+			data: {
 				admin,
 				session
-			} 
+			}
 		})
 	} catch (error) {
 		console.error('Get admin profile error:', error)
-		res.status(500).json({ 
-			success: false, 
-			error: 'Internal server error' 
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error'
 		})
 	}
 }
@@ -358,7 +358,7 @@ export const getAdminSessions = async (req: AdminAuthRequest, res: Response) => 
 		const adminId = req.admin!.id
 
 		const sessions = await prisma.adminSession.findMany({
-			where: { 
+			where: {
 				adminId,
 				expiresAt: {
 					gt: new Date()
@@ -399,7 +399,7 @@ export const extendAdminSession = async (req: AdminAuthRequest, res: Response) =
 
 		// Extend session by 2 hours
 		const newExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
-		
+
 		await prisma.adminSession.update({
 			where: { id: sessionId },
 			data: { expiresAt: newExpiresAt }
@@ -409,7 +409,7 @@ export const extendAdminSession = async (req: AdminAuthRequest, res: Response) =
 			adminId,
 			action: 'SESSION_EXTENDED',
 			targetType: 'system',
-			details: { 
+			details: {
 				sessionId,
 				newExpiresAt: newExpiresAt.toISOString()
 			},
@@ -438,7 +438,7 @@ export const extendAdminSession = async (req: AdminAuthRequest, res: Response) =
  */
 export const revokeAdminSession = async (req: AdminAuthRequest, res: Response) => {
 	try {
-		const { sessionId } = req.params
+		const sessionId = req.params.sessionId as string
 		const adminId = req.admin!.id
 
 		// Ensure admin can only revoke their own sessions
@@ -547,7 +547,7 @@ export const setupFirstAdmin = async (req: Request, res: Response) => {
 				adminId: 'SYSTEM',
 				action: 'FIRST_ADMIN_SETUP_BLOCKED',
 				targetType: 'system',
-				details: { 
+				details: {
 					attemptedEmail: email,
 					reason: 'Admin already exists'
 				},
@@ -568,7 +568,7 @@ export const setupFirstAdmin = async (req: Request, res: Response) => {
 			requireNumbers: true,
 			requireSpecialChars: true
 		})
-		
+
 		if (!passwordValidation.isValid) {
 			return res.status(400).json({
 				success: false,
@@ -773,7 +773,7 @@ export const inviteAdmin = async (req: AdminAuthRequest, res: Response) => {
  */
 export const verifyAdminInvitation = async (req: Request, res: Response) => {
 	try {
-		const { token } = req.params
+		const token = req.params.token as string
 
 		if (!token) {
 			return res.status(400).json({

@@ -80,7 +80,7 @@ export const getAdminInvitations = async (req: AdminAuthRequest, res: Response) 
  */
 export const getAdminInvitation = async (req: AdminAuthRequest, res: Response) => {
 	try {
-		const { invitationId } = req.params
+		const invitationId = req.params.invitationId as string
 		const adminId = req.admin!.id
 
 		const invitation = await prisma.adminInvitation.findUnique({
@@ -134,7 +134,7 @@ export const getAdminInvitation = async (req: AdminAuthRequest, res: Response) =
  */
 export const revokeAdminInvitation = async (req: AdminAuthRequest, res: Response) => {
 	try {
-		const { invitationId } = req.params
+		const invitationId = req.params.invitationId as string
 		const adminId = req.admin!.id
 		const ipAddress = req.ip
 		const userAgent = req.get('User-Agent')
@@ -213,7 +213,7 @@ export const revokeAdminInvitation = async (req: AdminAuthRequest, res: Response
  */
 export const resendAdminInvitation = async (req: AdminAuthRequest, res: Response) => {
 	try {
-		const { invitationId } = req.params
+		const invitationId = req.params.invitationId as string
 		const adminId = req.admin!.id
 		const ipAddress = req.ip
 		const userAgent = req.get('User-Agent')
@@ -241,10 +241,10 @@ export const resendAdminInvitation = async (req: AdminAuthRequest, res: Response
 		// Generate new token and extend expiration
 		const jwt = require('jsonwebtoken')
 		const newToken = jwt.sign(
-			{ 
-				email: invitation.email, 
-				name: invitation.name, 
-				invitedBy: invitation.invitedBy 
+			{
+				email: invitation.email,
+				name: invitation.name,
+				invitedBy: invitation.invitedBy
 			},
 			process.env.JWT_SECRET!,
 			{ expiresIn: '7d' }
@@ -306,7 +306,7 @@ export const resendAdminInvitation = async (req: AdminAuthRequest, res: Response
  */
 export const deleteAdminInvitation = async (req: AdminAuthRequest, res: Response) => {
 	try {
-		const { invitationId } = req.params
+		const invitationId = req.params.invitationId as string
 		const adminId = req.admin!.id
 		const ipAddress = req.ip
 		const userAgent = req.get('User-Agent')

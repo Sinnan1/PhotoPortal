@@ -137,7 +137,7 @@ export const galleryGroupController = {
     async getGroupById(req: AuthRequest, res: Response) {
         try {
             const photographerId = req.user?.id;
-            const { id } = req.params;
+            const id = req.params.id as string;
 
             if (!photographerId) {
                 return res.status(401).json({ error: 'Unauthorized' });
@@ -220,7 +220,7 @@ export const galleryGroupController = {
     async updateGroup(req: AuthRequest, res: Response) {
         try {
             const photographerId = req.user?.id;
-            const { id } = req.params;
+            const id = req.params.id as string;
 
             if (!photographerId) {
                 return res.status(401).json({ error: 'Unauthorized' });
@@ -289,7 +289,7 @@ export const galleryGroupController = {
     async deleteGroup(req: AuthRequest, res: Response) {
         try {
             const photographerId = req.user?.id;
-            const { id } = req.params;
+            const id = req.params.id as string;
 
             if (!photographerId) {
                 return res.status(401).json({ error: 'Unauthorized' });
@@ -320,7 +320,7 @@ export const galleryGroupController = {
     async assignGalleries(req: AuthRequest, res: Response) {
         try {
             const photographerId = req.user?.id;
-            const { id } = req.params;
+            const id = req.params.id as string;
 
             if (!photographerId) {
                 return res.status(401).json({ error: 'Unauthorized' });
@@ -374,7 +374,7 @@ export const galleryGroupController = {
     async removeGalleries(req: AuthRequest, res: Response) {
         try {
             const photographerId = req.user?.id;
-            const { id } = req.params;
+            const id = req.params.id as string;
 
             if (!photographerId) {
                 return res.status(401).json({ error: 'Unauthorized' });
