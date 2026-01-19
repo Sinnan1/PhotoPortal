@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import express from 'express'
 import { authenticateToken, requireRole } from '../middleware/auth'
-import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts, checkDuplicates } from '../controllers/uploadsController'
+import { createMultipartUpload, signMultipartPart, completeMultipartUpload, uploadPartProxy, registerPhoto, uploadDirect, abortMultipartUpload, listUploadedParts, checkDuplicates, pingUpload } from '../controllers/uploadsController'
 import { generateThumbnail } from '../controllers/thumbnailController'
 import { UPLOAD_CONFIG } from '../config/uploadConfig'
 import { createRateLimiter } from '../middleware/rateLimiter'
@@ -86,6 +86,9 @@ router.use((req, res, next) => {
   }
   next()
 })
+
+// Pre-warm connection endpoint
+router.get('/ping', authenticateToken, requireRole('PHOTOGRAPHER'), pingUpload)
 
 // Photographers only: create and complete uploads; clients normally don't upload
 router.post('/multipart/create', uploadRateLimit, authenticateToken, requireRole('PHOTOGRAPHER'), createMultipartUpload)

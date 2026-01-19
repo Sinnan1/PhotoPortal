@@ -34,7 +34,7 @@ class UploadManager {
   private batches: Map<string, UploadBatch> = new Map()
   private listeners: Set<UploadListener> = new Set()
   private activeUploads: Map<string, XMLHttpRequest> = new Map()
-  private maxConcurrent = 3  // Reduced from 10 to 3 for better reliability
+  private maxConcurrent = 6  // Increased for better upload speed
   private maxRetries = 3  // For server errors only
   private isOnline = true
   private activeWorkers = new Map<string, number>()  // Track active workers per batch
@@ -167,13 +167,38 @@ class UploadManager {
     this.batches.set(batchId, batch)
     this.notify()
 
-    // Check for duplicates before starting uploads
-    await this.checkDuplicatesBeforeUpload(batchId, folderId)
+    // Pre-warm connection and check duplicates in parallel
+    await Promise.all([
+      this.preWarmConnection(),
+      this.checkDuplicatesBeforeUpload(batchId, folderId)
+    ])
 
     // Start processing (only non-duplicate files will be uploaded)
     this.processBatch(batchId)
 
     return batchId
+  }
+
+  private async preWarmConnection() {
+    try {
+      const BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+      const token = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find((row) => row.startsWith('auth-token='))?.split('=')[1]
+        : undefined
+
+      if (!token) return
+
+      // Make a lightweight request to warm up the connection
+      await fetch(`${BASE_URL}/uploads/ping`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        cache: 'no-store'
+      })
+    } catch (error) {
+      // Silently fail - pre-warming is optional
+    }
   }
 
   private async checkDuplicatesBeforeUpload(batchId: string, folderId: string) {

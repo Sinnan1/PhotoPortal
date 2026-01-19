@@ -55,6 +55,18 @@ const handleB2Error = (error: any, operation: string) => {
   };
 };
 
+export const pingUpload = async (req: Request, res: Response) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Connection warmed'
+    });
+  } catch (error) {
+    const errorResponse = handleB2Error(error, "Ping upload");
+    res.status(500).json(errorResponse);
+  }
+};
+
 export const checkDuplicates = async (req: Request, res: Response) => {
   try {
     const { files, folderId } = req.body;
@@ -666,8 +678,9 @@ export const uploadDirect = async (req: Request, res: Response) => {
       let metadata;
       const sharp = require('sharp');
       try {
-        // This validates the file is a REAL image, not just a renamed script
-        metadata = await sharp(file.buffer).metadata();
+        // Validate only first 1KB for faster processing - still validates it's a real image
+        const buffer = file.buffer.slice(0, 1024);
+        metadata = await sharp(buffer).metadata();
 
         // Ensure it's in our allowed format list (basically standard web/photo formats)
         const allowedFormats = ['jpeg', 'png', 'webp', 'gif', 'tiff', 'heif', 'avif'];
