@@ -34,7 +34,7 @@ class UploadManager {
   private batches: Map<string, UploadBatch> = new Map()
   private listeners: Set<UploadListener> = new Set()
   private activeUploads: Map<string, XMLHttpRequest> = new Map()
-  private maxConcurrent = 6  // Increased for better upload speed
+  private maxConcurrent = 3  // Reduced to 3 as requested
   private maxRetries = 3  // For server errors only
   private isOnline = true
   private activeWorkers = new Map<string, number>()  // Track active workers per batch
@@ -230,10 +230,10 @@ class UploadManager {
       if (response.success && response.results) {
         // Mark duplicate files as failed immediately
         response.results.forEach((result: { filename: string; size: number; isDuplicate: boolean; existingPhoto?: { id: string; uploadedAt: Date } }) => {
-          const uploadFile = batch.files.find(f => 
+          const uploadFile = batch.files.find(f =>
             f.file?.name === result.filename && f.file?.size === result.size
           )
-          
+
           if (uploadFile && result.isDuplicate) {
             uploadFile.status = 'failed'
             uploadFile.error = `File "${result.filename}" already exists in this folder`
