@@ -678,22 +678,23 @@ export const uploadDirect = async (req: Request, res: Response) => {
       let metadata;
       const sharp = require('sharp');
       try {
-        // Try first 64KB for faster validation
-        const bufferSize = Math.min(65536, file.buffer.length);
-        const buffer = file.buffer.slice(0, bufferSize);
-        metadata = await sharp(buffer).metadata();
-      } catch (partialError) {
         try {
-          console.log(`⚠️ Partial validation failed, reading full buffer for ${file.originalname}`);
-          metadata = await sharp(file.buffer).metadata();
-        } catch (fullError) {
-          console.error(`❌ Security rejection for ${file.originalname}:`, fullError);
-          return res.status(400).json({
-            success: false,
-            error: 'Security Error: File is not a valid image.'
-          });
+          // Try first 64KB for faster validation
+          const bufferSize = Math.min(65536, file.buffer.length);
+          const buffer = file.buffer.slice(0, bufferSize);
+          metadata = await sharp(buffer).metadata();
+        } catch (partialError) {
+          try {
+            console.log(`⚠️ Partial validation failed, reading full buffer for ${file.originalname}`);
+            metadata = await sharp(file.buffer).metadata();
+          } catch (fullError) {
+            console.error(`❌ Security rejection for ${file.originalname}:`, fullError);
+            return res.status(400).json({
+              success: false,
+              error: 'Security Error: File is not a valid image.'
+            });
+          }
         }
-      }
 
         // Ensure it's in our allowed format list (basically standard web/photo formats)
         const allowedFormats = ['jpeg', 'png', 'webp', 'gif', 'tiff', 'heif', 'avif'];
