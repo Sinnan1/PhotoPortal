@@ -3,12 +3,12 @@ FROM node:20-alpine AS builder
 
 # Install dependencies for Sharp (image processing)
 RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    vips-dev \
-    fftw-dev \
-    build-base
+  python3 \
+  make \
+  g++ \
+  vips-dev \
+  fftw-dev \
+  build-base
 
 WORKDIR /app
 
@@ -18,6 +18,9 @@ COPY prisma ./prisma/
 
 # Install ALL dependencies (including devDependencies for build)
 RUN npm ci && npm cache clean --force
+
+# Explicitly install sharp for linux-musl (Alpine)
+RUN npm install --os=linux --libc=musl --cpu=x64 sharp
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -33,8 +36,8 @@ FROM node:20-alpine
 
 # Install runtime dependencies for Sharp
 RUN apk add --no-cache \
-    vips \
-    fftw
+  vips \
+  fftw
 
 WORKDIR /app
 
@@ -44,6 +47,9 @@ COPY prisma ./prisma/
 
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
+
+# Explicitly install sharp for linux-musl (Alpine)
+RUN npm install --os=linux --libc=musl --cpu=x64 sharp
 
 # Generate Prisma client
 RUN npx prisma generate
