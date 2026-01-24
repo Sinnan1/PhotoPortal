@@ -71,12 +71,20 @@ export const regeneratePendingThumbnails = async (req: Request, res: Response) =
             })
         }
 
+        // Mark these photos as PROCESSING immediately to prevent re-queuing
+        const photoIds = photos.map(p => p.id)
+        await prisma.photo.updateMany({
+            where: { id: { in: photoIds } },
+            data: { thumbnailStatus: 'PROCESSING' }
+        })
+
         // Queue thumbnail jobs
         let queued = 0
         for (const photo of photos) {
-            const bucketName = process.env.S3_BUCKET_NAME!
-            const endpoint = `https://s3.${process.env.AWS_REGION || 'us-east-005'}.backblazeb2.com`
-            const s3Key = photo.originalUrl.replace(`${endpoint}/${bucketName}/`, '')
+            // Extract S3 key from URL - handles any region (us-east-005, us-west-004, etc.)
+            // URL format: https://s3.{region}.backblazeb2.com/{bucket}/{key}
+            const urlMatch = photo.originalUrl.match(/backblazeb2\.com\/[^\/]+\/(.+)$/)
+            const s3Key = urlMatch ? urlMatch[1] : photo.originalUrl.split('/').slice(4).join('/')
 
             await parallelThumbnailQueue.add({
                 photoId: photo.id,
@@ -93,7 +101,7 @@ export const regeneratePendingThumbnails = async (req: Request, res: Response) =
             success: true,
             message: `Queued ${queued} photos for thumbnail regeneration`,
             queued,
-            remaining: await prisma.photo.count({ where: { thumbnailStatus: 'PENDING' } }) - queued
+            remaining: await prisma.photo.count({ where: { thumbnailStatus: 'PENDING' } })
         })
     } catch (error) {
         console.error('Failed to start thumbnail regeneration:', error)
