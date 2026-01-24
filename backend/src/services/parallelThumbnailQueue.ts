@@ -83,28 +83,34 @@ class ParallelThumbnailQueue {
 
         console.log(`🔄 Starting parallel thumbnail processing (${this.queue.length} jobs, ${this.maxWorkers} workers)`)
 
-        while (this.queue.length > 0 || this.activeWorkers > 0) {
-            // Start new workers up to max limit
-            while (this.activeWorkers < this.maxWorkers && this.queue.length > 0) {
-                const job = this.queue.shift()
-                if (job) {
-                    this.activeWorkers++
-                    this.processJobParallel(job)
-                        .catch(error => {
-                            console.error(`❌ Thumbnail job failed: ${job.originalFilename}`, error)
-                        })
-                        .finally(() => {
-                            this.activeWorkers--
-                        })
+        try {
+            while (this.queue.length > 0 || this.activeWorkers > 0) {
+                // Start new workers up to max limit
+                while (this.activeWorkers < this.maxWorkers && this.queue.length > 0) {
+                    const job = this.queue.shift()
+                    if (job) {
+                        this.activeWorkers++
+                        this.processJobParallel(job)
+                            .catch(error => {
+                                console.error(`❌ Thumbnail job failed: ${job.originalFilename}`, error)
+                            })
+                            .finally(() => {
+                                this.activeWorkers--
+                            })
+                    }
                 }
+
+                // Wait before checking again
+                await new Promise(resolve => setTimeout(resolve, 50))
             }
 
-            // Wait before checking again
-            await new Promise(resolve => setTimeout(resolve, 50))
+            console.log(`✅ Parallel thumbnail processing complete`)
+        } catch (error) {
+            console.error('❌ Thumbnail processing loop error:', error)
+        } finally {
+            // Always reset processing flag to prevent queue from getting stuck
+            this.processing = false
         }
-
-        this.processing = false
-        console.log(`✅ Parallel thumbnail processing complete`)
     }
 
     /**
@@ -134,13 +140,14 @@ class ParallelThumbnailQueue {
                 }
             }
 
-            // Update photo record with thumbnail URLs
+            // Update photo record with thumbnail URLs and status
             await prisma.photo.update({
                 where: { id: job.photoId },
                 data: {
                     thumbnailUrl: thumbnailUrls.medium, // Use medium as default thumbnail
                     mediumUrl: thumbnailUrls.medium,
-                    largeUrl: thumbnailUrls.medium // We only generate one size now
+                    largeUrl: thumbnailUrls.medium, // We only generate one size now
+                    thumbnailStatus: 'COMPLETED'
                 }
             })
 

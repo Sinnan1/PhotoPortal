@@ -25,6 +25,7 @@ import selectionAnalyticsRoutes from './routes/selectionAnalytics'
 import feedbackRoutes from './routes/feedback'
 import presenceRoutes from './routes/presence'
 import adminPresenceRoutes from './routes/adminPresence'
+import adminThumbnailRoutes from './routes/adminThumbnails'
 
 // Import admin session manager
 import { adminSessionManager } from './utils/adminSessionManager'
@@ -116,6 +117,7 @@ app.use('/api/analytics', selectionAnalyticsRoutes)
 app.use('/api', feedbackRoutes)
 app.use('/api/presence', presenceRoutes)
 app.use('/api/admin/presence', adminPresenceRoutes)
+app.use('/api/admin/thumbnails', adminThumbnailRoutes)
 
 // Upload configuration endpoint for frontend - using unified config
 app.get('/api/upload-config', (req, res) => {
