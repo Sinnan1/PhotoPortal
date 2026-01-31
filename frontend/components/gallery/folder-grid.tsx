@@ -132,8 +132,8 @@ export function FolderGrid({
           />
 
           {/* Action overlay */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200 flex items-end justify-center pb-2">
-            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="absolute inset-0 bg-black/0 lg:group-hover:bg-black/5 transition-colors duration-200 flex items-end justify-center pb-2">
+            <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">
               <Button
                 size="sm"
                 variant="secondary"

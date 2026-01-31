@@ -178,8 +178,8 @@ export function PhotoGrid({
             />
 
             {/* Action overlay - positioned at bottom to avoid overlap with like/favorite */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all flex items-end justify-center pb-2">
-              <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute inset-0 bg-black/0 lg:group-hover:bg-black/5 transition-all flex items-end justify-center pb-2">
+              <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                 {onView && (
                   <Button
                     size="sm"
